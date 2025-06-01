@@ -35,8 +35,7 @@ spec:
             env:
               TZ: UTC
               TRILIUM_DATA_DIR: &datadir /trilium-data
-            
-              USER_GID: 1000
+
             probes:
               liveness: &probes
                 enabled: true
@@ -52,7 +51,7 @@ spec:
               readiness: *probes
             securityContext:
               allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
+              readOnlyRootFilesystem: false
               capabilities: { drop: ["ALL"] }
             resources:
               requests:
