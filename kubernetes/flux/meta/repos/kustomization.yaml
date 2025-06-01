@@ -6,3 +6,4 @@ resources:
   - ./external-dns.yaml
   - ./openebs.yaml
   - ./externalsecrets.yaml
+  - ./bjw-s.yaml

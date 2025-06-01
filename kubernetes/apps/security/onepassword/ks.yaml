@@ -4,13 +4,13 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app onepassword
-  namespace: &namespace external-secrets
+  namespace: &namespace security
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
   interval: 30m
-  path: ./kubernetes/apps/external-secrets/onepassword/app
+  path: ./kubernetes/apps/security/onepassword/app
   prune: true
   sourceRef:
     kind: GitRepository
@@ -25,21 +25,21 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app onepassword-store
-  namespace: &namespace external-secrets
+  namespace: &namespace security
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: onepassword
-      namespace: external-secrets
-  healthCheckExprs:
-    - apiVersion: external-secrets.io/v1beta1
-      kind: ClusterSecretStore
-      failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
-      current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
+      namespace: security
+  # healthCheckExprs:
+  #   - apiVersion: external-secrets.io/v1beta1
+  #     kind: ClusterSecretStore
+  #     failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
+  #     current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
   interval: 30m
-  path: ./kubernetes/apps/external-secrets/onepassword/store
+  path: ./kubernetes/apps/security/onepassword/store
   prune: true
   sourceRef:
     kind: GitRepository
