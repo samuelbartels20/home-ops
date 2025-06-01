@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-    name: op-credentials
-    namespace: security
-stringData:
-    1password-credentials.json: {"version":"2","verifier":{"salt":"jzJDLSMbcOvc5glPl-lrOQ","localHash":"wXd9b_RP7clWSJapOM5wfyF3h5ZoU-evDuK1BJ4Rhx4"},"healthVerifier":null,"encCredentials":{"kid":"localauthv2keykid","enc":"A256GCM","cty":"b5+jwk+json","iv":"SpOuzQtSAGicnxfI","data":"oq-kjxzgR5mlb6taWxHYtB81dUEWYa0cfkeiyrOiGQ9ASIvaMmcMdta6O4hwqzbwzpCo4In7DokXM9zl7Q_iFjScn31zUhWEQwgQjagV2qmL9_73h4ZGRGUD5imaXEG4BLZlolB8IGPZ0os6DqZ7K5X0Fn-7zJhcGVeP76zGH8giXEb1xypnv7yBcYvclErhZWIQcWIZgQwfvSe4Slj_Z_BuKaGSiWZzdWv3Jsbk57xFLQIKDRRA6JVxrP0CHPGmrkFd-uKXT87X7AOr6gTTvnjYx9pVrB2ort59zPXairoqPdW3YX5W-VlYcjL8VM-cJYILqPyc8hYibTJe8UCmmlQ0Q1liCe809HfbhAVEfTDdVYqQeQpL3OF8dGghilxcYBjxpBzfbVCgV05Ue9el5rIGrp0kveeuwDAo2LWGLx1TViDc5JjepJ0kScAkI4nwckWCGDxKA7yqq-Nwsug_LfHNktbKOewpWKzDZ7gKVCu_Wwc84o5m5ild5W7PTYbm_30v96dQRAJEhEC29G3lT5miukwdTeGgVxPn2j63PyhrI4xuIrdPCW7i8QQrTOkdL5NjUycVHeLH7z63W4cbkOpBzTnQx4wXLKtqi0T3b9PBy3IQ6R2MMyPYkhcjV0QjSpLDcwotqaDJfQ9Pb2o"},"uniqueKey":{"alg":"A256GCM","kid":"rabeb3cxf5mkrbtm2jvkiuuruq","k":"sb-NH1RxvubrrqARlM1XPwscz-4kj0SZ-uu0zea9RKc","key_ops":["encrypt","decrypt"],"ext":true,"kty":"oct"},"deviceUuid":"rzbzgih6pujynq5bcb2pnfueoe"}
