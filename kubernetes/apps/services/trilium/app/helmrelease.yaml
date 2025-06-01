@@ -39,7 +39,7 @@
     values:
 
       controllers:
-        trilium:
+        app:
           annotations:
             reloader.stakater.com/auto: "true"
           containers:
