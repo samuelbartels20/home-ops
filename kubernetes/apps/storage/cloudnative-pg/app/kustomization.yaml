@@ -2,9 +2,7 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: storage
 resources:
-  - ./external-dns.yaml
-  - ./openebs.yaml
-  - ./externalsecrets.yaml
-  - ./bjw-s.yaml
-  - ./cloudnative-pg.yaml
+  - ./externalsecret.yaml
+  - ./helmrelease.yaml
