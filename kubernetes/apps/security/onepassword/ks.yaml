@@ -33,9 +33,14 @@ spec:
   dependsOn:
     - name: onepassword
       namespace: security
-  interval: 30m
+  interval: 1h
   path: ./kubernetes/apps/security/onepassword/store
+  postBuild:
+    substituteFrom:
+      - name: cluster-secrets
+        kind: Secret
   prune: true
+  retryInterval: 2m
   sourceRef:
     kind: GitRepository
     name: flux-system
