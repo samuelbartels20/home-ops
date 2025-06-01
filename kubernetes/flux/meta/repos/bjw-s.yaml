@@ -6,6 +6,5 @@ metadata:
   name: app-template
   namespace: flux-system
 spec:
-  type: default
   interval: 12h
   url: https://bjw-s-labs.github.io/helm-charts
