@@ -35,27 +35,12 @@ spec:
             env:
               TZ: UTC
               TRILIUM_DATA_DIR: &datadir /trilium-data
-            probes:
-              liveness: &probes
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /
-                    port: &port 8080
-                  initialDelaySeconds: 30
-                  periodSeconds: 10
-                  timeoutSeconds: 5
-                  failureThreshold: 3
-              readiness: *probes
-
             resources:
               requests:
                 cpu: 100m
                 memory: 100Mi
               limits:
                 memory: 2Gi
-
     service:
       app:
         controller: trilium
