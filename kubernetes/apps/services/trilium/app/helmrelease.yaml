@@ -62,7 +62,7 @@ spec:
         rules:
           - backendRefs:
               - identifier: app
-                port: *port
+                port: 8080
     persistence:
       config:
         enabled: true
