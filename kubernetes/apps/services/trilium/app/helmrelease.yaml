@@ -60,11 +60,10 @@ spec:
                 memory: 100Mi
               limits:
                 memory: 2Gi
-    # defaultPodOptions:
-    #   securityContext:
-    #     runAsNonRoot: true
-    #     runAsUser: 1000
-    #     runAsGroup: 1000
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
     service:
       app:
         controller: trilium
