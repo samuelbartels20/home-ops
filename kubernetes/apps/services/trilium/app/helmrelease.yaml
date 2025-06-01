@@ -35,7 +35,7 @@ spec:
             env:
               TZ: UTC
               TRILIUM_DATA_DIR: &datadir /trilium-data
-              USER_UID: 1000
+            
               USER_GID: 1000
             probes:
               liveness: &probes
