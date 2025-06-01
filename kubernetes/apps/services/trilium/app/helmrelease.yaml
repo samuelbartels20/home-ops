@@ -30,7 +30,9 @@
       remediation:
         strategy: rollback
         retries: 3
-
+    dependsOn:
+      - name: cloudflare-tunnel
+        namespace: network
     uninstall:
       keepHistory: false
 
@@ -63,23 +65,23 @@
           ports:
             http:
               port: &port 8080
-
-      ingress:
+      serviceMonitor:
         app:
-          enabled: true
-          className: external
-          annotations:
-            external-dns.alpha.kubernetes.io/target: external.samcloud.online
-          hosts:
-            - host: &host "{{ .Release.Name }}.samcloud.online"
-              paths:
-                - path: /
-                  service:
-                    identifier: *app
-                    port: *port
-          tls:
-            - hosts:
-                - *host
+          serviceName: *app
+          endpoints:
+            - port: http
+      route:
+        app:
+          hostnames: ["{{ .Release.Name }}.${SECRET_DOMAIN}"]
+          parentRefs:
+            - name: external
+              namespace: kube-system
+              sectionName: https
+          rules:
+            - backendRefs:
+                - identifier: app
+                  port: *port
+
       persistence:
         config:
           enabled: true
