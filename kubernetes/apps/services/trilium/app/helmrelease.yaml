@@ -43,7 +43,7 @@
           annotations:
             reloader.stakater.com/auto: "true"
           containers:
-            *app :
+            app :
               image:
                 repository: triliumnext/notes
                 tag: v0.91.6
@@ -60,14 +60,14 @@
                   memory: 2Gi
 
       service:
-        *app :
-          controller: *app
+        app :
+          controller: app
           ports:
             http:
               port: &port 8080
       serviceMonitor:
         app:
-          serviceName: *app
+          serviceName: app
           endpoints:
             - port: http
       route:
