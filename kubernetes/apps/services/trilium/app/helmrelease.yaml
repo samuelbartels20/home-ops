@@ -35,8 +35,6 @@ spec:
             env:
               TZ: UTC
               TRILIUM_DATA_DIR: &datadir /trilium-data
-              USER_UID: 1000
-              USER_GID: 1000
             probes:
               liveness: &probes
                 enabled: true
@@ -50,20 +48,14 @@ spec:
                   timeoutSeconds: 5
                   failureThreshold: 3
               readiness: *probes
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: false
-              capabilities: { drop: ["ALL"] }
+
             resources:
               requests:
                 cpu: 100m
                 memory: 100Mi
               limits:
                 memory: 2Gi
-    defaultPodOptions:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
+
     service:
       app:
         controller: trilium
