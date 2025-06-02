@@ -6,4 +6,4 @@ namespace: database
 resources:
   - ./cluster.yaml
   - ./scheduledbackup.yaml
-  - ./prometheus-rule.yaml
+  - ./prometheus-rules.yaml
