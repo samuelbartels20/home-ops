@@ -46,6 +46,19 @@ data:
     username: op://K8s/cloudnative-pg/POSTGRES_SUPER_USER
     AWS_ACCESS_KEY_ID: op://K8s/cloudnative-pg/AWS_ACCESS_KEY_ID
     AWS_SECRET_ACCESS_KEY: op://K8s/cloudnative-pg/AWS_SECRET_ACCESS_KEY
+
+
+---
+# grafana/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: grafana-admin-secret
+    namespace: observability
+data:
+    admin-password: op://K8s/grafana-admin/GRAFANA_ADMIN_PASSWORD
+    admin-user: op://K8s/grafana-admin/GRAFANA_ADMIN_USERNAME
+
 ---
 apiVersion: v1
 kind: Secret

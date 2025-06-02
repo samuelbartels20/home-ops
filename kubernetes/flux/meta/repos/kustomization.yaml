@@ -9,3 +9,4 @@ resources:
   - ./bjw-s.yaml
   - ./cloudnative-pg.yaml
   - ./kube-prometheus-stack.yaml
+  - ./grafana.yaml

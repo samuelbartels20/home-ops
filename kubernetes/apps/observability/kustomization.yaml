@@ -6,5 +6,6 @@ components:
   - ../../components/common
 resources:
   - ./kube-prometheus-stack/ks.yaml
+  - ./grafana/ks.yaml
 
 
