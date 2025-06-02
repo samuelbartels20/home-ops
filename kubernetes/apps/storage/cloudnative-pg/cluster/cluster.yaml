@@ -32,33 +32,6 @@ spec:
     enablePodMonitor: true
     enableServiceMonitor: true
   # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-  barmanObjectStore:
-    enabled: true
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    imageName: ghcr.io/cloudnative-pg/barman-operator:1.10.0
-    imagePullPolicy: IfNotPresent
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    version: 1.10.0
-  # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-  barmanObjectStoreConfig:
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    imageName: ghcr.io/cloudnative-pg/barman-operator-config:1.10.0
-    imagePullPolicy: IfNotPresent
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    version: 1.10.0
-  # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-  barmanObjectStoreConfigSecret:
-    name: cloudnative-pg-barman-object-store-config
-  # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-  barmanObjectStoreConfigMap:
-    name: cloudnative-pg-barman-object-store-config
-  # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-  barmanObjectStoreConfigMapData:
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    imageName: ghcr.io/cloudnative-pg/barman-operator-config:1.10.0
-    imagePullPolicy: IfNotPresent
-    # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-    version: 1.10.0
 
   backup:
     retentionPolicy: 10d
