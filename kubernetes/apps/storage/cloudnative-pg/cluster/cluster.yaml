@@ -30,8 +30,6 @@ spec:
       memory: 1Gi
   monitoring:
     enablePodMonitor: true
-  # renovate: datasource=github-tags depName=cloudnative-pg/barman-operator
-
   backup:
     retentionPolicy: 10d
     barmanObjectStore: &barmanObjectStore
