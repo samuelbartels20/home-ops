@@ -34,7 +34,8 @@ spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
-    name: grafana
+    name: grafana-charts/loki
+    # Note: The chartRef name is prefixed with "grafana-charts/" to match the OCIRepository URL.
     namespace: flux-system
   install:
     crds: Skip
