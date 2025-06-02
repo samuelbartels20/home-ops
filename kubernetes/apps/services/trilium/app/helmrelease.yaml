@@ -46,7 +46,7 @@ spec:
         controller: trilium
         ports:
           http:
-            port: *port
+            port: 8080
     serviceMonitor:
       app:
         serviceName: trilium
