@@ -50,6 +50,7 @@ spec:
             - name: external
               namespace: kube-system
               sectionName: https
+
       alertmanagerSpec:
         alertmanagerConfiguration:
           name: alertmanager
@@ -60,8 +61,6 @@ spec:
           volumeClaimTemplate:
             spec:
               storageClassName: openebs-hostpath
-              accessModes:
-                - ReadWriteOnce
               resources:
                 requests:
                   storage: 1Gi
