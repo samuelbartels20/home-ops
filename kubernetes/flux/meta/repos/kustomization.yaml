@@ -7,4 +7,4 @@ resources:
   - ./openebs.yaml
   - ./externalsecrets.yaml
   - ./bjw-s.yaml
-  - ./cloudnative-pg.yaml
+  # - ./cloudnative-pg.yaml
