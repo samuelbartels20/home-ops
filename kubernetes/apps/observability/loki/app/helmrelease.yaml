@@ -1,18 +1,29 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
-apiVersion: source.toolkit.fluxcd.io/v1
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1beta2.json
+apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: OCIRepository
 metadata:
   name: loki
   namespace: flux-system
+  annotations:
+    fluxcd.io/sync-checksum: "b3c4f8d2e5a1c6f7b8d9e0a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1"
+    fluxcd.io/sync-gc-mark: "true"
+    fluxcd.io/sync-gc-keep: "true"
+    fluxcd.io/sync-gc-keep-tag: "6.30.0"
+    fluxcd.io/sync-gc-keep-untagged: "true"
 spec:
   interval: 5m
   layerSelector:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy
   ref:
-    tag: 6.30.1
-  url: oci://ghcr.io/grafana/helm-charts/loki
+    tag: 6.30.0
+  url: oci://ghcr.io/home-operations/charts-mirror/loki
+  verify:
+    provider: cosign
+    matchOIDCIdentity:
+      - issuer: "^https://token.actions.githubusercontent.com$"
+        subject: "^https://github.com/home-operations/charts-mirror.*$"
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
 apiVersion: helm.toolkit.fluxcd.io/v2
@@ -68,7 +79,7 @@ spec:
         ruler:
           enable_api: true
           enable_alertmanager_v2: true
-          alertmanager_url: http://alertmanager-operated.observability.svc.cluster.local:9093
+          alertmanager_url: http://alertmanager.observability.svc.cluster.local:9093
           storage:
             type: local
             local:
@@ -98,7 +109,6 @@ spec:
       enabled: false
     sidecar:
       image:
-        repository: ghcr.io/home-operations/k8s-sidecar
-        tag: 1.30.3@sha256:39cca7abcad8f1621b9462d95f7d0e60301b92fcb0ff4de0ad4561859011cddf
+        repository: ghcr.io/kiwigrid/k8s-sidecar
       rules:
         searchNamespace: ALL
