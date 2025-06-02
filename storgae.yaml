@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: prometheus-secrets
+  namespace: observability
+stringData:
+  PUSHOVER_TOKEN: ax8qe3wv42j57f3yhq54kryo6wz986
+  PUSHOVER_USER_KEY: u9syaj8kxb3eq6bkq86qonjm5z82y3
