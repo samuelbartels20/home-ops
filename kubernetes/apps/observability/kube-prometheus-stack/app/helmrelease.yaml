@@ -41,32 +41,22 @@ spec:
         forceConflict: true
     cleanPrometheusOperatorObjectNames: true
 
-    service:
-      app:
-        controller: alertmanager
-        ports:
-          http:
-            port: 9093
-            targetPort: 9093
-            protocol: TCP
-
-    serviceMonitor:
-      app:
-        serviceName: alertmanager
-        endpoints:
-          - port: 9093
-    route:
-      app:
-        hostnames: ["alertmanager.samcloud.online"]
-        parentRefs:
-          - name: external
-            namespace: kube-system
-            sectionName: https
-        rules:
-          - backendRefs:
-              - identifier: app
-                port: 9093
-
+    alertmanager:
+      route:
+        app:
+          hostnames: ["alertmanager.samcloud.online"]
+          parentRefs:
+            - name: external
+              namespace: kube-system
+              sectionName: https
+          rules:
+            - backendRefs:
+                - identifier: alertmanager
+                  port: 9093
+          annotations:
+            hajimari.io/appName: Alertmanager
+            hajimari.io/icon: simple-icons:alertmanager
+            external-dns.alpha.kubernetes.io/target: external.samcloud.online
 
       alertmanagerSpec:
         alertmanagerConfiguration:
@@ -160,21 +150,21 @@ spec:
       enabled: false # Disabled due to eBPF
 
     prometheus:
-      ingress:
-        enabled: true
-        ingressClassName: external
-        annotations:
-          hajimari.io/appName: Prometheus
-          hajimari.io/icon: simple-icons:prometheus
-          external-dns.alpha.kubernetes.io/target: external.samcloud.online
-        pathType: Prefix
-        hosts:
-          - &host "prometheus.samcloud.online"
-        tls:
-          - hosts:
-              - *host
-
-
+      route:
+        app:
+          hostnames: ["prometheus.samcloud.online"]
+          parentRefs:
+            - name: external
+              namespace: kube-system
+              sectionName: https
+          rules:
+            - backendRefs:
+                - identifier: prometheus
+                  port: 9090
+          annotations:
+            hajimari.io/appName: Prometheus
+            hajimari.io/icon: simple-icons:prometheus
+            external-dns.alpha.kubernetes.io/target: external.samcloud.online
 
       prometheusSpec:
         ruleSelectorNilUsesHelmValues: false
