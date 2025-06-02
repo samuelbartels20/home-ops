@@ -11,7 +11,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: onepassword-secret
-  namespace: external-secrets
+  namespace: security
 stringData:
   token: op://K8s/1password-token/password
   1password-credentials.json: op://K8s/1password-json/1password-credentials.json
@@ -31,6 +31,21 @@ data:
     aws-access-key-id: op://K8s/AWS_ACCESS_KEY_ID/AWS_ACCESS_KEY_ID
     aws-secret-access-key: op://K8s/AWS_SECRET_ACCESS_KEY/AWS_SECRET_ACCESS_KEY
 
+
+---
+# databases/cloudnative-pg/operator/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloudnative-pg-secret
+    namespace: storage
+    labels:
+        cnpg.io/reload: "true"
+data:
+    password: op://K8s/cloudnative-pg/POSTGRES_SUPER_PASS
+    username: op://K8s/cloudnative-pg/POSTGRES_SUPER_USER
+    AWS_ACCESS_KEY_ID: op://K8s/cloudnative-pg/AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: op://K8s/cloudnative-pg/AWS_SECRET_ACCESS_KEY
 ---
 apiVersion: v1
 kind: Secret
@@ -43,12 +58,12 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: devbu-io-tls
+  name: samcloud.online-tls
   namespace: kube-system
   annotations:
-    cert-manager.io/alt-names: '*.devbu.io,devbu.io'
-    cert-manager.io/certificate-name: devbu-io
-    cert-manager.io/common-name: devbu.io
+    cert-manager.io/alt-names: '*.samcloud.online,samcloud.online'
+    cert-manager.io/certificate-name: samcloud.online
+    cert-manager.io/common-name: samcloud.online
     cert-manager.io/ip-sans: ""
     cert-manager.io/issuer-group: ""
     cert-manager.io/issuer-kind: ClusterIssuer
@@ -58,8 +73,8 @@ metadata:
     controller.cert-manager.io/fao: "true"
 type: kubernetes.io/tls
 data:
-  tls.crt: op://kubernetes/devbu-io-tls/tls.crt
-  tls.key: op://kubernetes/devbu-io-tls/tls.key
+  tls.crt: op://kubernetes/samcloud.online-tls/tls.crt
+  tls.key: op://kubernetes/samcloud.online-tls/tls.key
 ---
 apiVersion: v1
 kind: Secret
