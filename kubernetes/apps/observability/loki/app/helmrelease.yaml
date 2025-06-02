@@ -4,6 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: loki
+  namespace: flux-system
 spec:
   interval: 5m
   layerSelector:
@@ -24,6 +25,7 @@ spec:
   chartRef:
     kind: OCIRepository
     name: loki
+    namespace: flux-system
   install:
     crds: Skip
     remediation:
