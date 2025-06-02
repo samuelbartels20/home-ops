@@ -59,7 +59,9 @@ spec:
         storage:
           volumeClaimTemplate:
             spec:
-              storageClassName: ceph-block
+              storageClassName: openebs-hostpath
+              accessModes:
+                - ReadWriteOnce
               resources:
                 requests:
                   storage: 1Gi
@@ -143,20 +145,13 @@ spec:
 
     prometheus:
       route:
-        app:
+        main:
+          enabled: true
           hostnames: ["prometheus.samcloud.online"]
           parentRefs:
             - name: external
               namespace: kube-system
               sectionName: https
-          rules:
-            - backendRefs:
-                - identifier: prometheus
-                  port: 9090
-          annotations:
-            hajimari.io/appName: Prometheus
-            hajimari.io/icon: simple-icons:prometheus
-            external-dns.alpha.kubernetes.io/target: external.samcloud.online
 
       prometheusSpec:
         ruleSelectorNilUsesHelmValues: false
