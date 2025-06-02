@@ -35,7 +35,7 @@ spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
-    name: loki
+    name: grafana-loki
     namespace: flux-system
   install:
     crds: Skip
