@@ -31,7 +31,7 @@ spec:
           app:
             image:
               repository: triliumnext/notes
-              tag: v0.93.0
+              tag: v0.94.0
             env:
               TZ: UTC
               TRILIUM_DATA_DIR: &datadir /trilium-data
