@@ -41,16 +41,33 @@ spec:
         forceConflict: true
     cleanPrometheusOperatorObjectNames: true
 
-    alertmanager:
-      ingress:
-        enabled: true
-        ingressClassName: external
-        hosts: ["alertmanager.samcloud.online"]
-        pathType: Prefix
-        annotations:
-          hajimari.io/appName: Alertmanager
-          hajimari.io/icon: simple-icons:alertmanager
-          external-dns.alpha.kubernetes.io/target: external.samcloud.online
+    service:
+      app:
+        controller: alertmanager
+        ports:
+          http:
+            port: 9093
+            targetPort: 9093
+            protocol: TCP
+
+    serviceMonitor:
+      app:
+        serviceName: alertmanager
+        endpoints:
+          - port: 9093
+    route:
+      app:
+        hostnames: ["alertmanager.samcloud.online"]
+        parentRefs:
+          - name: external
+            namespace: kube-system
+            sectionName: https
+        rules:
+          - backendRefs:
+              - identifier: app
+                port: 9093
+
+
       alertmanagerSpec:
         alertmanagerConfiguration:
           name: alertmanager
@@ -141,6 +158,7 @@ spec:
             regex: "(apiserver_audit|apiserver_client|apiserver_delegated|apiserver_envelope|apiserver_storage|apiserver_webhooks|authenticated_user|authentication|disabled_metric|go|hidden_metric|kubernetes_build|kubernetes_feature|leader_election|process_cpu|process_max|process_open|process_resident|process_start|process_virtual|registered_metric|rest_client|scheduler|scrape_duration|scrape_samples|scrape_series|workqueue)_(.+)"
     kubeProxy:
       enabled: false # Disabled due to eBPF
+
     prometheus:
       ingress:
         enabled: true
@@ -155,6 +173,8 @@ spec:
         tls:
           - hosts:
               - *host
+
+
 
       prometheusSpec:
         ruleSelectorNilUsesHelmValues: false
