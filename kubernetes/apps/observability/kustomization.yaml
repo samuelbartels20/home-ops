@@ -8,5 +8,6 @@ resources:
   - ./kube-prometheus-stack/ks.yaml
   - ./grafana/ks.yaml
   - ./gatus/ks.yaml
+  - ./loki/ks.yaml
 
 
