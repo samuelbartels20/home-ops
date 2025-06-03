@@ -32,26 +32,30 @@ spec:
     remediation:
       strategy: rollback
       retries: 3
+  dependsOn:
+    - name: openebs
+      namespace: storage
   values:
     deploymentMode: SingleBinary
-    replicaCount: 3
+    replicaCount: 2  # Minimum 2 for HA
 
     loki:
       auth_enabled: false
       commonConfig:
-        replication_factor: 3
+        replication_factor: 2
+      memberlist:
+        join_members:
+          - "loki-memberlist.observability.svc.cluster.local:7946"
 
-      # Storage configuration matching your requested format
       storage_config:
         aws:
-          s3: http://$accessKey:$accessKey@192.168.8.161:9000
+          s3: http://${accessKey}:${secretKey}@192.168.8.161:9000
           s3forcepathstyle: true
         tsdb_shipper:
           active_index_directory: /loki/index
           cache_location: /loki/index_cache
           cache_ttl: 24h
 
-      # Schema configuration
       schemaConfig:
         configs:
           - from: "2020-07-01"
@@ -62,20 +66,23 @@ spec:
               prefix: index_
               period: 24h
 
-      # Limits configuration
       limits_config:
         retention_period: 14d
 
-    # SingleBinary configuration
     singleBinary:
-      replicas: 3
+      replicas: 2  # Must match replicaCount
       persistence:
         enabled: true
         storageClass: openebs-hostpath
         size: 50Gi
         annotations: {}
 
-    # Ruler configuration
+    service:
+      memberlist:
+        enabled: true
+        type: ClusterIP
+        port: 7946
+
     ruler:
       storage:
         type: s3
@@ -84,14 +91,13 @@ spec:
           bucketnames: loki-data-ruler
           secretAccessKey:
             name: loki-s3-credentials
-            key: accessKey
+            key: secretKey
           accessKeyId:
             name: loki-s3-credentials
-            key: secretKey
+            key: accessKey
           s3ForcePathStyle: true
           insecure: true
 
-    # Resources
     resources:
       requests:
         cpu: 500m
@@ -99,13 +105,11 @@ spec:
       limits:
         memory: 2Gi
 
-    # Monitoring
     monitoring:
       enabled: true
       serviceMonitor:
         enabled: true
 
-    # Sidecar for rule loading
     sidecar:
       image:
         repository: ghcr.io/home-operations/k8s-sidecar
