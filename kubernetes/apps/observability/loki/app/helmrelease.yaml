@@ -36,8 +36,8 @@ spec:
   chartRef:
     kind: OCIRepository
     name: loki
-    # Note: The chartRef name is prefixed with "grafana-charts/" to match the OCIRepository URL.
-    namespace: flux-system
+    namespace: default
+  targetNamespace: observability
   install:
     crds: Skip
     remediation:
