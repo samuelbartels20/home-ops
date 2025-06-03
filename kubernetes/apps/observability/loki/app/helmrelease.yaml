@@ -72,19 +72,19 @@ spec:
               directory: /rules
           rule_path: /rules/fake
     singleBinary:
-      replicas: 3
+      replicas: 1
       persistence:
         enabled: true
         storageClass: openebs-hostpath
         size: 50Gi
     gateway:
-      replicas: 2
+      replicas: 0
     backend:
-      replicas: 2
+      replicas: 0
     read:
-      replicas: 2
+      replicas: 0
     write:
-      replicas: 2
+      replicas: 0
     chunksCache:
       enabled: false
     resultsCache:
