@@ -9,7 +9,9 @@ spec:
   chartRef:
     kind: OCIRepository
     name: app-template
+    namespace: flux-system
   install:
+    crds: Create
     remediation:
       retries: -1
   upgrade:
@@ -70,7 +72,7 @@ spec:
             port: *healthPort
     route:
       app:
-        hostnames: ["{{ .Release.Name }}.devbu.io"]
+        hostnames: ["{{ .Release.Name }}.samcloud.online"]
         parentRefs:
           - name: external
             namespace: kube-system
