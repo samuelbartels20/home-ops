@@ -53,7 +53,9 @@ spec:
         replication_factor: 3
       storage:
         type: s3
-        bucketNames: s3://lokibackup  # Matching your MinIO bucket name
+        bucketNames:
+          chunks: lokibackup
+          ruler: loki-data-ruler  # Matching your MinIO bucket name
         s3:
           endpoint: http://192.168.8.161:9000  # Matching your MinIO endpoint
           secretAccessKey:
@@ -85,7 +87,7 @@ spec:
       storage:
         type: s3
         s3:
-          bucket: s3://lokibackup
+          bucket: loki-data-ruler
           endpoint: http://192.168.8.161:9000
           secretAccessKey:
             name: loki-s3-credentials
