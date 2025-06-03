@@ -8,3 +8,4 @@ components:
 resources:
   - ./echo/ks.yaml
   - ./trilium/ks.yaml
+  - ./kafka/schema-registry/ks.yaml

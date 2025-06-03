@@ -50,9 +50,9 @@ spec:
     route:
       app:
         hostnames:
-          - "{{ .Release.Name }}.${LIMITED_DOMAIN}"
+          - "{{ .Release.Name }}.samcloud.online"
         parentRefs:
-          - name: internal
+          - name: external
             namespace: network
             sectionName: https
         rules:
