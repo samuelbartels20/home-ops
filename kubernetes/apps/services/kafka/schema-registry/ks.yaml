@@ -10,7 +10,7 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/kafka/schema-registry/app
+  path: ./kubernetes/apps/services/kafka/schema-registry/app
   prune: true
   sourceRef:
     kind: GitRepository
