@@ -9,6 +9,6 @@ resources:
   - ./grafana/ks.yaml
   - ./gatus/ks.yaml
   - ./loki/ks.yaml
-  - ./keda/ks.yaml
+  # - ./keda/ks.yaml
 
 
