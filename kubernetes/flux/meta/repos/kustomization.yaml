@@ -11,4 +11,4 @@ resources:
   - ./kube-prometheus-stack.yaml
   - ./grafana.yaml
   - ./loki.yaml
-  - ./keda.yaml
+  - ./kedacore.yaml
