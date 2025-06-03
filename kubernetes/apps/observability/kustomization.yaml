@@ -9,7 +9,6 @@ resources:
   - ./grafana/ks.yaml
   - ./gatus/ks.yaml
   - ./loki/ks.yaml
-  - ./keda/ks.yaml
   - ./blackbox-exporter/ks.yaml
   - ./kromgo/ks.yaml
   - ./silence-operator/ks.yaml
