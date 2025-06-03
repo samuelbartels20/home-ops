@@ -12,7 +12,7 @@ resources:
   - ./keda/ks.yaml
   - ./blackbox-exporter/ks.yaml
   - ./kromgo/ks.yaml
-  - ./silence-operator/operator/ks.yaml
+  - ./silence-operator/ks.yaml
 
 
 
