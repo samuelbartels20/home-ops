@@ -37,7 +37,7 @@ spec:
     loki:
       auth_enabled: false
       analytics:
-        reporting_enabled: false
+        reporting_enabled: true
       server:
         log_level: info
       commonConfig:
@@ -72,19 +72,19 @@ spec:
               directory: /rules
           rule_path: /rules/fake
     singleBinary:
-      replicas: 1
+      replicas: 3
       persistence:
         enabled: true
         storageClass: openebs-hostpath
         size: 50Gi
     gateway:
-      replicas: 0
+      replicas: 2
     backend:
-      replicas: 0
+      replicas: 2
     read:
-      replicas: 0
+      replicas: 2
     write:
-      replicas: 0
+      replicas: 2
     chunksCache:
       enabled: false
     resultsCache:
