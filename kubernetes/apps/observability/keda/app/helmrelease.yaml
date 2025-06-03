@@ -24,7 +24,7 @@ spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
-    name: keda
+    name: kedacore
     namespace: flux-system
 
   install:
@@ -33,6 +33,7 @@ spec:
       retries: -1
   upgrade:
     cleanupOnFail: true
+    crds: Create
     remediation:
       retries: 3
   values:
