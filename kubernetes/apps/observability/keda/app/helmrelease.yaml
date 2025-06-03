@@ -24,7 +24,7 @@ spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
-    name: kedacore
+    name: keda
     namespace: flux-system
 
   install:
