@@ -1,0 +1,20 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: mqtt-source-connector
+  labels:
+    strimzi.io/cluster: hoohoot-connect
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+spec:
+  class: io.lenses.streamreactor.connect.mqtt.source.MqttSourceConnector
+  config:
+    connect.mqtt.connection.clean: true
+    connect.mqtt.connection.timeout: 1000
+    connect.mqtt.client.id: kafkasource
+    connect.mqtt.hosts: tcp://emqx-listeners.infrastructure.svc.cluster.local:1883
+    connect.mqtt.username: ${secrets:kafka/connect-credentials:mqtt-username}
+    connect.mqtt.password: ${secrets:kafka/connect-credentials:mqtt-password}
+    connect.mqtt.service.quality: 0
+    connect.mqtt.kcql: INSERT INTO zigbee2mqtt SELECT * FROM zigbee2mqtt/+ WITHCONVERTER=`io.lenses.streamreactor.connect.converters.source.JsonPassThroughConverter`
+    connect.progress.enabled: true

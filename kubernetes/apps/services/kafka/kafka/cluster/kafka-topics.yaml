@@ -1,0 +1,180 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: zigbee2mqtt
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: matrix-messages
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: incoming-notifications
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sonarr-notifications
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: radarr-notifications
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: lidarr-notifications
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sonarr-notifications-dlq
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 604800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: radarr-notifications-dlq
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 604800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: lidarr-notifications-dlq
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 604800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: jellyseerr-notifications
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: jellyseerr-notifications-dlq
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 604800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: issue-notifications-sent
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    retention.ms: 2592000000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sensors-temperatures
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sensors-linky
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.ms: 172800000
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: sensors-power
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 2
+  replicas: 3
+  config:
+    retention.ms: 172800000

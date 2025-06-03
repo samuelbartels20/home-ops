@@ -1,0 +1,62 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  name: hoohoot-connect
+  annotations:
+    strimzi.io/use-connector-resources: "true"
+spec:
+  version: 4.0.0
+  replicas: 1
+  bootstrapServers: hoohoot-kafka-bootstrap:9093
+  tls:
+    trustedCertificates:
+      - secretName: hoohoot-cluster-ca-cert
+        pattern: "*.crt"
+  config:
+    group.id: connect-cluster
+    offset.storage.topic: connect-cluster-offsets
+    config.storage.topic: connect-cluster-configs
+    status.storage.topic: connect-cluster-status
+    # -1 means it will use the default replication factor configured in the broker
+    config.storage.replication.factor: -1
+    offset.storage.replication.factor: -1
+    status.storage.replication.factor: -1
+    config.providers: secrets,configmaps
+    config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
+    config.providers.configmaps.class: io.strimzi.kafka.KubernetesConfigMapConfigProvider
+  build:
+    output:
+      type: docker
+      image: ghcr.io/lucas-dclrcq/homelabitty/kafka-connect:latest
+      pushSecret: kafka-connect-registry
+    plugins:
+      - name: mqtt-connector
+        artifacts:
+          - type: zip
+            url: https://github.com/lensesio/stream-reactor/releases/download/8.1.16/kafka-connect-mqtt-8.1.16.zip
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: connector-configuration-role
+  namespace: kafka
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["connect-credentials"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: connector-configuration-role-binding
+  namespace: kafka
+subjects:
+  - kind: ServiceAccount
+    name: hoohoot-connect-connect
+    namespace: kafka
+roleRef:
+  kind: Role
+  name: connector-configuration-role
+  apiGroup: rbac.authorization.k8s.io

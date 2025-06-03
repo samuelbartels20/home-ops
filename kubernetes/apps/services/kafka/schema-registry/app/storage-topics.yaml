@@ -1,0 +1,13 @@
+---
+kind: KafkaTopic
+apiVersion: kafka.strimzi.io/v1beta1
+metadata:
+  namespace: kafka
+  name: schemas
+  labels:
+    strimzi.io/cluster: hoohoot
+spec:
+  partitions: 1
+  replicas: 2
+  config:
+    cleanup.policy: compact
