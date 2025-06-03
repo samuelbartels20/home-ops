@@ -1,0 +1,46 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: clickhouse-operator
+  namespace: services
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: clickhouse-operator
+      version: 0.19.0
+      sourceRef:
+        kind: HelmRepository
+        name: altinity-clickhouse
+        namespace: flux-system
+      interval: 1h
+  install:
+    remediation:
+      retries: 3
+    createNamespace: true
+  upgrade:
+    remediation:
+      retries: 3
+    force: false
+  values:
+    fullnameOverride: clickhouse-operator
+    watchNamespaces:
+      - clickhouse
+    image:
+      repository: altinity/clickhouse-operator
+      tag: 0.19.0
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        namespace: clickhouse
+        additionalLabels:
+          release: prometheus-operator

@@ -1,0 +1,62 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: clickhouse-cluster
+  namespace: clickhouse
+spec:
+  interval: 15m
+  dependsOn:
+    - name: clickhouse-operator
+  chart:
+    spec:
+      chart: clickhouse-cluster
+      version: 0.10.0
+      sourceRef:
+        kind: HelmRepository
+        name: altinity-clickhouse
+        namespace: flux-system
+  values:
+    cluster:
+      name: "production"
+      layout:
+        shardsCount: 3
+        replicasCount: 2
+
+    image:
+      repository: clickhouse/clickhouse-server
+      tag: 22.8-alpine
+      pullPolicy: IfNotPresent
+
+    configuration:
+      users:
+        default/password: "changeme-production-password"
+        default/networks/ip: "::/0"
+      profiles:
+        default/max_memory_usage: 10000000000
+
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: gp2
+      accessMode: ReadWriteOnce
+
+    resources:
+      requests:
+        memory: 4Gi
+        cpu: 2
+      limits:
+        memory: 8Gi
+        cpu: 4
+
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        additionalLabels:
+          release: prometheus-operator
+
+    securityContext:
+      enabled: true
+      runAsUser: 101
+      runAsGroup: 101
+      fsGroup: 101
