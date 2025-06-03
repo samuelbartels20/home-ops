@@ -10,6 +10,7 @@ resources:
   - ./gatus/ks.yaml
   - ./loki/ks.yaml
   - ./keda/ks.yaml
+  - ./blackbox-exporter/ks.yaml
 
 
 
