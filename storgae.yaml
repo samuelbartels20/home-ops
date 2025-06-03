@@ -1,8 +1,9 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: grafana-admin-secret
+  name: loki-s3-credentials
   namespace: observability
+type: Opaque
 stringData:
-  admin-user: postgres
-  admin-password: postgres
+  accessKey: cQY7QVBJIgVgsAVid4Pn
+  secretKey: G4k80oDO4CimiD3UydmkrUCia4Ll4SKNJm2mOOyL

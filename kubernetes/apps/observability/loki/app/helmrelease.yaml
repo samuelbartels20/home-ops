@@ -4,6 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: loki
+  namespace: observability
 spec:
   interval: 5m
   layerSelector:
@@ -18,6 +19,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: loki
+  namespace: observability
 spec:
   interval: 1h
   chartRef:
@@ -26,76 +28,104 @@ spec:
   install:
     crds: Create
     remediation:
-      retries: -1
+      retries: 3
   upgrade:
     cleanupOnFail: true
-    crds: Create
     remediation:
+      strategy: rollback
       retries: 3
+  dependsOn:
+    - name: openebs
+      namespace: storage
   values:
     deploymentMode: SingleBinary
+    replicaCount: 3
+    monitoring:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+    podAnnotations:
+      secret.reloader.stakater.com/reload: loki-s3-credentials
+
     loki:
       auth_enabled: false
-      analytics:
-        reporting_enabled: true
-      server:
-        log_level: info
       commonConfig:
-        replication_factor: 1
-      compactor:
-        working_directory: /var/loki/compactor/retention
-        delete_request_store: filesystem
-        retention_enabled: true
-      ingester:
-        chunk_encoding: snappy
-      limits_config:
-        retention_period: 14d
+        replication_factor: 3
       storage:
-        type: filesystem
+        type: s3
+        bucketNames: s3://lokibackup  # Matching your MinIO bucket name
+        s3:
+          endpoint: http://192.168.8.161:9000  # Matching your MinIO endpoint
+          secretAccessKey:
+            name: loki-s3-credentials
+            key: secretKey  # Matching your secret key names
+          accessKeyId:
+            name: loki-s3-credentials
+            key: accessKey      # Matching your access key names
+          s3ForcePathStyle: true       # Required for MinIO
+          insecure: true               # For HTTP connections
       schemaConfig:
         configs:
-          - from: "2024-04-01" # quote
+          - from: "2024-04-01"
             store: tsdb
-            object_store: filesystem
+            object_store: s3
             schema: v13
             index:
               prefix: loki_index_
               period: 24h
-      structuredConfig:
-        ruler:
-          enable_api: true
-          enable_alertmanager_v2: true
-          alertmanager_url: http://alertmanager-operated.observability.svc.cluster.local:9093
-          storage:
-            type: local
-            local:
-              directory: /rules
-          rule_path: /rules/fake
+
     singleBinary:
-      replicas: 1
       persistence:
         enabled: true
         storageClass: openebs-hostpath
         size: 50Gi
-    gateway:
-      replicas: 0
-    backend:
-      replicas: 0
-    read:
-      replicas: 0
-    write:
-      replicas: 0
-    chunksCache:
-      enabled: false
-    resultsCache:
-      enabled: false
-    lokiCanary:
-      enabled: false
-    test:
-      enabled: false
+        resizeInUseVolumes: false
+
+    rulerConfig:
+      storage:
+        type: s3
+        s3:
+          bucket: s3://lokibackup
+          endpoint: http://192.168.8.161:9000
+          secretAccessKey:
+            name: loki-s3-credentials
+            key:  secretKey
+          accessKeyId:
+            name: loki-s3-credentials
+            key: accessKey
+          s3ForcePathStyle: true
+          insecure: true
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+
     sidecar:
       image:
         repository: ghcr.io/home-operations/k8s-sidecar
         tag: 1.30.3@sha256:39cca7abcad8f1621b9462d95f7d0e60301b92fcb0ff4de0ad4561859011cddf
       rules:
         searchNamespace: ALL
+---
+# yaml-language-server: $schema=https://kubernetesjsonschema.dev/v1.10.3-standalone/service-v1.json
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki-lb
+  namespace: observability
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: loki.samcloud.online
+    lbipam.cilium.io/ips: 192.168.8.102
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 3100
+      protocol: TCP
+      targetPort: http
+  selector:
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/name: loki
