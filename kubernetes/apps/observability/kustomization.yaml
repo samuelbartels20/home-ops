@@ -10,6 +10,6 @@ resources:
   - ./gatus/ks.yaml
   - ./loki/ks.yaml
   - ./keda/ks.yaml
-  - ./kromgo/ks.yaml
+
 
 
