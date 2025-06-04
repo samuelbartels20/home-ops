@@ -1,0 +1,94 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app miniflux
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  values:
+    controllers:
+      main:
+        replicas: 2
+        strategy: RollingUpdate
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        containers:
+          main:
+            image:
+              repository: ghcr.io/miniflux/miniflux
+              tag: 2.2.9
+            env:
+              BASE_URL: "https://miniflux.${SECRET_DOMAIN}"
+              CREATE_ADMIN: "0"
+              DEBUG: "1"
+              LOG_DATE_TIME: "1"
+              POLLING_SCHEDULER: "entry_frequency"
+              POLLING_FREQUENCY: "15"
+              METRICS_COLLECTOR: "1"
+              METRICS_ALLOWED_NETWORKS: "10.69.0.0/16"
+              CLEANUP_ARCHIVE_UNREAD_DAYS: "-1"
+              CLEANUP_ARCHIVE_READ_DAYS: "-1"
+              RUN_MIGRATIONS: "1"
+              OAUTH2_USER_CREATION: "1"
+              OAUTH2_PROVIDER: oidc
+              OAUTH2_REDIRECT_URL: "https://{{ .Release.Name }}.${SECRET_DOMAIN}/oauth2/oidc/callback"
+
+            envFrom:
+              - secretRef:
+                  name: miniflux-secret
+
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  initialDelaySeconds: 30
+                  periodSeconds: 10
+                  timeoutSeconds: 1
+                  failureThreshold: 3
+                  httpGet:
+                    path: /healthcheck
+                    port: 8080
+
+            resources:
+              requests:
+                cpu: 12m
+                memory: 64M
+              limits:
+                memory: 256M
+
+    service:
+      main:
+        controller: main
+        ports:
+          http:
+            port: &port 8080
+
+    serviceMonitor:
+      app:
+        serviceName: miniflux
+        endpoints:
+          - port: http
+            scheme: http
+            path: /metrics
+            interval: 1m
+            scrapeTimeout: 10s
+
+    route:
+      app:
+        hostnames:
+          - "{{ .Release.Name }}.${SECRET_DOMAIN}"
+        parentRefs:
+          - name: external
+            namespace: network
+            sectionName: https
+        rules:
+          - backendRefs:
+              - name: *app
+                port: *port

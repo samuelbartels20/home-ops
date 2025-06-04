@@ -1,0 +1,85 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app changedetection
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      app:
+        containers:
+          main:
+            image:
+              repository: ghcr.io/dgtlmoon/changedetection.io
+              tag: "0.50.2@sha256:7779eb4ede0b577efeeeac6b57803cb9babc2833c551260fccb8d6245b02282e"
+
+            env:
+              TZ: ${CONFIG_TIMEZONE}
+              PORT: &port 5000
+              USE_X_SETTINGS: 1
+              PLAYWRIGHT_DRIVER_URL: ws://localhost:3000/?stealth=1&--disable-web-security=true&--user-data-dir=~/browserless-cache-123
+
+          browser:
+            image:
+              repository: docker.io/browserless/chrome
+              tag: latest@sha256:57d19e414d9fe4ae9d2ab12ba768c97f38d51246c5b31af55a009205c136012f
+              pullPolicy: IfNotPresent
+
+            env:
+              - {name: SCREEN_WIDTH, value: "1920"}
+              - {name: SCREEN_HEIGHT, value: "1024"}
+              - {name: SCREEN_DEPTH, value: "16"}
+              - {name: ENABLE_DEBUGGER, value: "false"}
+              - {name: PREBOOT_CHROME, value: "true"}
+              - {name: CONNECTION_TIMEOUT, value: "300000"}
+              - {name: MAX_CONCURRENT_SESSIONS, value: "10"}
+              - {name: CHROME_REFRESH_TIME, value: "600000"}
+              - {name: DEFAULT_BLOCK_ADS, value: "true"}
+              - {name: DEFAULT_STEALTH, value: "true"}
+
+            resources:
+              requests:
+                cpu: 25m
+                memory: 512Mi
+              limits:
+                memory: 1Gi
+    service:
+      app:
+        controller: app
+        ports:
+          http:
+            port: *port
+
+    route:
+      app:
+        hostnames:
+          - "{{ .Release.Name }}.${LIMITED_DOMAIN}"
+        parentRefs:
+          - name: internal
+            namespace: network
+            sectionName: https
+        rules:
+          - backendRefs:
+              - name: *app
+                port: *port
+
+    persistence:
+      datastore:
+        existingClaim: *app

@@ -1,0 +1,69 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app bytestash
+spec:
+  interval: 15m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  maxHistory: 3
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      bytestash:
+        containers:
+          main:
+            image:
+              repository: ghcr.io/jordan-dalby/bytestash
+              tag: 1.5.7
+
+            env:
+              BASE_PATH: ""
+              TOKEN_EXPIRY: 24h
+              ALLOW_NEW_ACCOUNTS: "true"
+              DEBUG: "true"
+              DISABLE_ACCOUNTS: "false"
+              DISABLE_INTERNAL_ACCOUNTS: "false"
+
+            envFrom:
+              - secretRef:
+                  name: bytestash-secret
+
+    service:
+      app:
+        controller: *app
+        ports:
+          http:
+            port: &port 5000
+
+    route:
+      app:
+        hostnames:
+          - "{{ .Release.Name }}.${SECRET_DOMAIN}"
+        parentRefs:
+          - name: external
+            namespace: network
+            sectionName: https
+        rules:
+          - backendRefs:
+              - name: *app
+                port: *port
+
+
+    persistence:
+      data:
+        existingClaim: *app
+        globalMounts:
+          - path: /data/snippets

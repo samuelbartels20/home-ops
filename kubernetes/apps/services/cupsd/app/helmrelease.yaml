@@ -1,0 +1,92 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app cupsd
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      cupsd:
+        type: statefulset
+
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        containers:
+          app:
+            image:
+              repository: docker.io/olbat/cupsd
+              tag: stable-2024-11-15
+            env:
+              TZ: "${TIMEZONE}"
+
+            securityContext:
+              privileged: true
+
+            resources:
+              requests:
+                cpu: 10m
+                memory: 100Mi
+              limits:
+                memory: 256Mi
+
+    defaultPodOptions:
+      nodeSelector:
+        kubernetes.io/hostname: nighteyes
+
+    service:
+      app:
+        type: LoadBalancer
+        externalTrafficPolicy: Cluster
+        annotations:
+          io.cilium/lb-ipam-ips: "${LB_IP_CUPS}"
+          external-dns.alpha.kubernetes.io/hostname: "printer.${LIMITED_DOMAIN}"
+        controller: cupsd
+        ports:
+          http:
+            port: &port 631
+          udp:
+            port: 631
+            protocol: UDP
+
+    route:
+      app:
+        hostnames:
+          - "{{ .Release.Name }}.${LIMITED_DOMAIN}"
+        parentRefs:
+          - name: internal
+            namespace: network
+            sectionName: https
+        rules:
+          - backendRefs:
+              - name: *app
+                port: *port
+
+    persistence:
+      config:
+        enabled: true
+        type: configMap
+        name: cupsd-config
+        globalMounts:
+          - path: /etc/cups/cupsd.conf
+            subPath: cupsd.conf
+      usb:
+        enabled: true
+        type: hostPath
+        hostPath: /var/run/dbus
+        globalMounts:
+          - path: /var/run/dbus

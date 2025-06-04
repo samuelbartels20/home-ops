@@ -1,0 +1,89 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app wallabag
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  maxHistory: 2
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    defaultPodOptions:
+      securityContext:
+        runAsUser: 0
+
+    controllers:
+      wallabag:
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        pod:
+          enableServiceLinks: false
+
+        containers:
+          app:
+            image:
+              repository: ghcr.io/wallabag/docker
+              tag: 2.6.12@sha256:9989e05769885aef0b316508b728580460c7713e435cc0b02c16e7b06e17bb6a
+
+            envFrom:
+              - secretRef:
+                  name: wallabag-secret
+
+            env:
+              SYMFONY__ENV__FOSUSER_REGISTRATION: "true"
+              SYMFONY__ENV__FOSUSER_CONFIRMATION: "true"
+              SYMFONY__ENV__FROM_EMAIL: wallabag@${SECRET_DOMAIN}
+              SYMFONY__ENV__MAILER_DSN: smtp://smtp-relay.infrastructure.svc.cluster.local:2525
+              SYMFONY__ENV__DOMAIN_NAME: https://wallabag.${SECRET_DOMAIN}
+              SYMFONY__ENV__SERVER_NAME: Wallabag
+              POPULATE_DATABASE: "false"
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 250Mi
+              limits:
+                memory: 512Mi
+
+    service:
+      app:
+        controller: *app
+        ports:
+          http:
+            port: &port 80
+
+    route:
+      app:
+        hostnames:
+          - "{{ .Release.Name }}.${SECRET_DOMAIN}"
+        parentRefs:
+          - name: external
+            namespace: network
+            sectionName: https
+        rules:
+          - backendRefs:
+              - name: *app
+                port: *port
+
+    persistence:
+      config:
+        enabled: true
+        existingClaim: *app
+        globalMounts:
+          - path: /images
