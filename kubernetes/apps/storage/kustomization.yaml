@@ -10,3 +10,4 @@ resources:
   - ./cloudnative-pg/ks.yaml
   - ./volsync/ks.yaml
   - ./snapshot-controller/ks.yaml
+  - ./dragonfly/ks.yaml
