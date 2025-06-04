@@ -1,0 +1,222 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: home
+  namespace: default
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: hajimari
+      version: 2.0.2
+      sourceRef:
+        kind: HelmRepository
+        name: hajimari
+        namespace: flux-system
+      interval: 5m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    image:
+      repository: ghcr.io/toboshii/hajimari
+      tag: v0.3.1
+    env:
+      TZ: ${TIMEZONE:=Etc/UTC}
+    hajimari:
+      defaultEnable: true
+      lightTheme: gazette
+      darkTheme: blackboard
+      namespaceSelector:
+        matchNames:
+          - default
+          - openebs
+          - media
+          - network
+          - kube-system
+          - observability
+          - flux-system
+          - external
+      name: "Sam"
+      defaultSearchProvider: Google
+      searchProviders:
+        - name: Google
+          token: g
+          icon: simple-icons:google
+          searchUrl: https://www.google.com/search?q={query}
+          url: https://www.google.com
+      globalBookmarks:
+        - group: Applications
+          bookmarks:
+            - name: "Home Assistant"
+              url: "https://homeassistant.samcloud.online/"
+            - name: "Plex"
+              url: "https://plex.samcloud.online/"
+            - name: "Grafana"
+              url: "https://grafana.samcloud.online/"
+            - name: "Portainer"
+              url: "https://portainer.samcloud.online/"
+            - name: "Hajimari"
+              url: "https://hajimari.samcloud.online/"
+            - name: "Gatus"
+              url: "https://gatus.samcloud.online/"
+            - name: "Uptime-Kuma"
+              url: "https://uptime-kuma.samcloud.online/"
+            - name: Midjourney
+              url: "https://www.midjourney.com/app/"
+            - name: Unifi
+              url: "https://unifi.ui.com/consoles"
+            - name: "Cloudflare dashboard"
+              url: "https://dash.cloudflare.com/"
+        - group: Observability & Monitoring
+          bookmarks:
+            - name: k8s-at-home-search
+              url: "https://kubesearch.dev/"
+            - name: "Selfhosted newsletter"
+              url: "https://selfh.st"
+            - name: Artifacthub
+              url: "https://artifacthub.io/"
+            - name: "Loki logs"
+              url: "https://grafana.samcloud.online/explore"
+            - name: InfoSecNews
+              url: "https://allinfosecnews.com"
+            - name: "News"
+              url: "https://www.newsminimalist.com/"
+        - group: Databases
+          bookmarks:
+            - name: "PostgreSQL"
+              url: "https://www.postgresql.org/"
+            - name: "MongoDB"
+              url: "https://www.mongodb.com/"
+            - name: "Redis"
+              url: "https://redis.io/"
+            - name: HomeLab
+              url: "https://github.com/samuelbartels20/kubernetes-homelab"
+
+            - name: TerraformCloud
+              url: "https://app.terraform.io/"
+            - name: Visual studio
+              url: https://my.visualstudio.com"
+            - name: Atlantis
+              url: "https://www.runatlantis.io/"
+            - name: Git-cleaner
+              url: "https://rtyley.github.io/bfg-repo-cleaner/"
+            - name: K8S Exam simulator
+              url: "https://killer.sh/"
+            - name: Github-download-folder
+              url: "https://download-directory.github.io"
+        - group: Security
+          bookmarks:
+            - name: "CVE Details"
+              url: "https://www.cvedetails.com/"
+            - name: "CVE Search"
+              url: "https://cve.circl.lu/"
+            - name: "CVE Mitre"
+              url: "https://cve.mitre.org/"
+            - name: "CVE NVD"
+              url: "https://nvd.nist.gov/"
+            - name: "CVE Redhat"
+              url: "https://access.redhat.com/security/cve/"
+            - name: "CVE Ubuntu"
+              url: "https://ubuntu.com/security/cve/"
+            - name: Translator
+              url: "https://www.deepl.com/translator"
+            - name: Archive
+              url: "https://archive.ph"
+            - name: Wallpapers
+              url: "https://unsplash.com"
+            - name: "Anime"
+              url: "https://anichart.net/"
+            - name: Diving-sites
+              url: "https://www.padi.com/dive-sites"
+        - group: Reddit
+          bookmarks:
+            - name: "/r/midjourney"
+              url: "https://red.artemislena.eu/r/midjourney"
+            - name: "/r/selfhosted"
+              url: "https://red.artemislena.eu/r/selfhosted/"
+            - name: "/r/kubernetes"
+              url: "https://red.artemislena.eu/r/kubernetes/"
+            - name: "/r/virtualreality"
+              url: "https://red.artemislena.eu/r/virtualreality/"
+            - name: "/r/mk"
+              url: "https://red.artemislena.eu/r/mechanicalkeyboards/"
+            - name: "/r/ChatGPT"
+              url: "https://red.artemislena.eu/r/ChatGPT/"
+            - name: "/r/plex"
+              url: "https://red.artemislena.eu/r/plex/"
+            - name: "/r/NonCredibleDefense"
+              url: "https://red.artemislena.eu/r/NonCredibleDefense/"
+        - group: Networking
+          bookmarks:
+            - name: "IP Geolocation"
+              url: "https://ipgeolocation.io/"
+            - name: "IP Location"
+              url: "https://www.iplocation.net/"
+            - name: "IP Info"
+            - name: Hacker News
+              url: "https://news.ycombinator.com/"
+            - name: Shodan
+              url: "https://shodan.io"
+            - name: Intelx
+              url: "https://intelx.io/"
+            - name: Greynoise
+              url: "https://www.greynoise.io/"
+            - name: GrayHatWarFare
+              url: "https://www.greyhatwarfare.com/"
+            - name: GPP Tools
+              url: "https://bgp.tools"
+            - name: BGP View
+              url: "https://bgpview.io"
+            - name: "Bookhatrix"
+              url: "https://book.hacktricks.xyz"
+            - name: "Pentest-tools"
+              url: "https://offsec.tools/"
+
+    ingress:
+      main:
+        enabled: true
+        ingressClassName: external
+        annotations:
+          gatus.io/enabled: "true"
+          external-dns.home.arpa/enabled: "true"
+          auth.home.arpa/enabled: "true"
+          hajimari.io/enable: "true"
+          hajimari.io/group: "Web"
+          hajimari.io/appName: "Hajimari"
+          external-dns.alpha.kubernetes.io/target: "external.samcloud.online"
+          external-dns.alpha.kubernetes.io/hostname: "home.samcloud.online"
+
+          hajimari.io/icon: "weather-sunset"
+        hosts:
+          # - host: &custom-host "home.samcloud.online"
+          #   paths:
+          #     - path: /
+          #       pathType: Prefix
+          - host:   &host "{{ .Release.Name }}.samcloud.online"
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              # - *custom-host
+              - *host
+    persistence:
+      data:
+        enabled: true
+        existingClaim: hajimari-pvc
+    podSecurityContext:
+      fsGroup: 101
+    podAnnotations:
+      configmap.reloader.stakater.com/reload: "hajimari-settings"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
