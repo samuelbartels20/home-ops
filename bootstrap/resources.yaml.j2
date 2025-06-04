@@ -1,10 +1,13 @@
 {% for namespace in ["external-secrets", "flux-system", "network"] %}
+
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ namespace }}
 {% endfor %}
+
+
 ---
 # onepassword secret
 apiVersion: v1
@@ -79,6 +82,8 @@ metadata:
   namespace: flux-system
 stringData:
   age.agekey: op://kubernetes/sops/SOPS_PRIVATE_KEY
+
+
 ---
 apiVersion: v1
 kind: Secret
@@ -100,6 +105,8 @@ type: kubernetes.io/tls
 data:
   tls.crt: op://kubernetes/samcloud.online-tls/tls.crt
   tls.key: op://kubernetes/samcloud.online-tls/tls.key
+
+
 ---
 apiVersion: v1
 kind: Secret
