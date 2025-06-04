@@ -12,4 +12,5 @@ resources:
   - ./grafana.yaml
   - ./loki.yaml
   - ./keda.yaml
+  - ./strimzi.yaml
 
