@@ -1,8 +1,8 @@
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1beta1
 kind: KafkaTopic
 metadata:
-  namespace: kafka
+  namespace: services
   name: schemas
   labels:
     strimzi.io/cluster: hoohoot
