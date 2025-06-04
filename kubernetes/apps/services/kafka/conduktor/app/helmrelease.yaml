@@ -25,7 +25,7 @@ spec:
   values:
     config:
       database:
-        host: "postgres-16-primary.infrastructure.svc.cluster.local"
+        host: 192.168.8.101
         port: 5432
         name: "conduktor"
 

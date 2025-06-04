@@ -1,0 +1,18 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./helmrelease.yaml
+  - ./prometheusrule.yaml
+configMapGenerator:
+  - name: volsync-dashboard
+    files:
+      - volsync.json=./resources/grafana_dashboard.json
+generatorOptions:
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+    k8s-sidecar-target-directory: /var/lib/grafana/dashboards/storage
+  labels:
+    grafana_dashboard: "true"
+  disableNameSuffixHash: true

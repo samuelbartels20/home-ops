@@ -43,20 +43,20 @@ spec:
         configuration:
           bootstrap:
             annotations:
-              external-dns.alpha.kubernetes.io/hostname: bootstrap.kafka.${LIMITED_DOMAIN}.
+              external-dns.alpha.kubernetes.io/hostname: bootstrap.kafka.samcloud.online
               external-dns.alpha.kubernetes.io/ttl: "60"
           brokers:
             - broker: 0
               annotations:
-                external-dns.alpha.kubernetes.io/hostname: broker-0.kafka.${LIMITED_DOMAIN}.
+                external-dns.alpha.kubernetes.io/hostname: broker-0.kafka.samcloud.online
                 external-dns.alpha.kubernetes.io/ttl: "60"
             - broker: 1
               annotations:
-                external-dns.alpha.kubernetes.io/hostname: broker-1.kafka.${LIMITED_DOMAIN}.
+                external-dns.alpha.kubernetes.io/hostname: broker-1.kafka.samcloud.online
                 external-dns.alpha.kubernetes.io/ttl: "60"
             - broker: 2
               annotations:
-                external-dns.alpha.kubernetes.io/hostname: broker-2.kafka.${LIMITED_DOMAIN}.
+                external-dns.alpha.kubernetes.io/hostname: broker-2.kafka.samcloud.online
                 external-dns.alpha.kubernetes.io/ttl: "60"
     config:
       auto.create.topics.enable: "false"

@@ -13,4 +13,6 @@ resources:
   - ./loki.yaml
   - ./keda.yaml
   - ./strimzi.yaml
+  - ./backube.yaml
+  - ./piraeus.yaml
 

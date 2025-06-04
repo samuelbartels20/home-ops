@@ -4,13 +4,13 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app kafka-operator
-  namespace: &namespace kafka
+  namespace: &namespace services
 spec:
   targetNamespace: *namespace
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/kafka/kafka/operator
+  path: ./kubernetes/apps/services/kafka/kafka/operator
   prune: true
   sourceRef:
     kind: GitRepository
@@ -26,13 +26,13 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app kafka-cluster
-  namespace: &namespace kafka
+  namespace: &namespace services
 spec:
   targetNamespace: *namespace
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/kafka/kafka/cluster
+  path: ./kubernetes/apps/services/kafka/kafka/cluster
   prune: true
   sourceRef:
     kind: GitRepository

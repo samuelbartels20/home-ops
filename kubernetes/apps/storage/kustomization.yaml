@@ -8,3 +8,5 @@ components:
 resources:
   - ./openebs/ks.yaml
   - ./cloudnative-pg/ks.yaml
+  - ./volsync/ks.yaml
+  - ./snapshot-controller/ks.yaml

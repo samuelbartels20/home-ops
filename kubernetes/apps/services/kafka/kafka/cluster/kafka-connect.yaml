@@ -40,7 +40,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: connector-configuration-role
-  namespace: kafka
+  namespace: services
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -51,11 +51,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: connector-configuration-role-binding
-  namespace: kafka
+  namespace: services
 subjects:
   - kind: ServiceAccount
     name: hoohoot-connect-connect
-    namespace: kafka
+    namespace: services
 roleRef:
   kind: Role
   name: connector-configuration-role

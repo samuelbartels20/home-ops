@@ -3,20 +3,20 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app conduktor
-  namespace: &namespace services
+  name: &app volsync
+  namespace: flux-system
 spec:
-  targetNamespace: *namespace
+  targetNamespace: storage
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/services/kafka/conduktor/app
+  path: ./kubernetes/apps/storage/volsync/app
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  wait: true
+  wait: false
   interval: 30m
   retryInterval: 1m
   timeout: 5m
