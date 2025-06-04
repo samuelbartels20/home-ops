@@ -59,6 +59,18 @@ data:
     admin-password: op://K8s/grafana-admin/GRAFANA_ADMIN_PASSWORD
     admin-user: op://K8s/grafana-admin/GRAFANA_ADMIN_USERNAME
 
+
+---
+# vernemq/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: vernemq-auth
+    namespace: storage
+data:
+    DOCKER_VERNEMQ_USER_ADMIN: op://K8s/vernemq-auth/vernemq_password
+    DOCKER_VERNEMQ_USER_MQTT: op://K8s/vernemq-auth/vernemq_user_mqtt_password
+
 ---
 apiVersion: v1
 kind: Secret
