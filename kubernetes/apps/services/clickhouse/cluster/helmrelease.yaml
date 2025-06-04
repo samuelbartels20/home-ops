@@ -24,7 +24,7 @@ spec:
 
     image:
       repository: clickhouse/clickhouse-server
-      tag: 22.8-alpine
+      tag: 22.12-alpine
       pullPolicy: IfNotPresent
 
     configuration:
