@@ -1,6 +1,6 @@
 ---
-kind: KafkaTopic
 apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
 metadata:
   namespace: kafka
   name: schemas
