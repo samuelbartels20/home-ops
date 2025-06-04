@@ -4,11 +4,12 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app schema-registry
+  namespace:  services
 spec:
   interval: 30m
   chartRef:
     kind: OCIRepository
-    name: bjw-s
+    name: app-template
     namespace: flux-system
   install:
     remediation:
