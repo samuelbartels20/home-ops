@@ -22,6 +22,8 @@ spec:
   dependsOn:
     - name: onepassword
       namespace: security
+    - name: external-secrets
+      namespace: security
   postBuild:
     substitute:
       APP: *appname
