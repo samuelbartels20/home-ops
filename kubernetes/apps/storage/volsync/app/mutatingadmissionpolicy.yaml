@@ -2,7 +2,7 @@
 # This requires deploying a webhook service
 
 ---
-apiVersion: admissionregistration.k8s.io/v1
+apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingAdmissionWebhook
 metadata:
   name: volsync-mover-jitter
@@ -115,7 +115,7 @@ spec:
   template:
     metadata:
       labels:
-        app: volsync-jitter-webhook
+        app: "volsync-jitter-webhook"
     spec:
       containers:
       - name: webhook
