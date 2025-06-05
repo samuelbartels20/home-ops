@@ -71,8 +71,8 @@ spec:
                 memory: 128Mi
               limits:
                 memory: 512Mi
-    # persistence:
-    #   backup:
-    #     type: nfs
-    #     server: 192.168.8.101:=fnord}
-    #     path: /backup/data/k8s/postgres
+    persistence:
+      backup:
+        type: nfs
+        server: 192.168.8.161:=fnord}
+        path: /hoemlab/backup/data/k8s/postgres/backup
