@@ -44,8 +44,8 @@ spec:
             - name: TZ
               value: ${TIMEZONE:=Etc/UTC}
           volumeMounts:
-            - name: backup
-              mountPath: /mnt/hoemlab/backup/data/k8s/postgres/backup
+            - name: pg-backup  # Changed from "backup" to "pg-backup"
+              mountPath: /backup  # Updated mount path to match command
           resources:
             requests:
               memory: "128Mi"
