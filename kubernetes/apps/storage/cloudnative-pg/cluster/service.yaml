@@ -7,9 +7,9 @@ metadata:
     external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
 spec:
   type: LoadBalancer
-  externalIPs: ["${POSTGRES_IPV4}", "${POSTGRES_IPV6}"]
+  externalIPs: ["${POSTGRES_IPV4}"]
   externalTrafficPolicy: Local
-  ipFamilies: [IPv4, IPv6]
+  ipFamilies: [IPv4]
   ipFamilyPolicy: PreferDualStack
   ports:
     - name: postgres
