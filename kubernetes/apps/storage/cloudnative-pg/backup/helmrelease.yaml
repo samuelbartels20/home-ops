@@ -64,7 +64,7 @@ spec:
               - "/bin/sh"
             args:
               - "-c"
-              - "pg_dumpall -U $PGUSER | gzip > /backup/postgres-cluster.dump.gz"
+              - "pg_dumpall -U $PGUSER | gzip > /mnt/hoemlab/backup/data/k8s/postgres/backup/postgres-cluster.dump.gz"
             resources:
               requests:
                 cpu: 50m
