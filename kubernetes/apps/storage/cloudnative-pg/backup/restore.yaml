@@ -14,6 +14,7 @@ spec:
           nfs:
             server: 192.168.8.161
             path: /mnt/hoemlab/backup/data/k8s/postgres/backup
+            readOnly: false
 
       securityContext:
         fsGroup: 1022
