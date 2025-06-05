@@ -1,50 +1,147 @@
+# Alternative implementation using MutatingAdmissionWebhook
+# This requires deploying a webhook service
+
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.32.0/mutatingadmissionpolicybinding-admissionregistration-v1alpha1.json
-apiVersion: admissionregistration.k8s.io/v1alpha1
-kind: MutatingAdmissionPolicyBinding
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
 metadata:
   name: volsync-mover-jitter
-spec:
-  policyName: volsync-mover-jitter
+webhooks:
+- name: volsync-jitter.storage.svc.cluster.local
+  clientConfig:
+    service:
+      name: volsync-jitter-webhook
+      namespace: storage
+      path: "/mutate"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["batch"]
+    apiVersions: ["v1"]
+    resources: ["jobs"]
+  namespaceSelector: {}
+  objectSelector:
+    matchLabels:
+      app.kubernetes.io/created-by: volsync
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/yannh/kubernetes-json-schema/refs/heads/master/v1.32.0/mutatingadmissionpolicy-admissionregistration-v1alpha1.json
-apiVersion: admissionregistration.k8s.io/v1alpha1
-kind: MutatingAdmissionPolicy
+# Simple webhook implementation using a Job that checks conditions
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: volsync-mover-jitter
+  name: webhook-script
+  namespace: storage
+data:
+  webhook.py: |
+    #!/usr/bin/env python3
+    import json
+    import base64
+    import random
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+
+    class WebhookHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+
+            try:
+                admission_review = json.loads(body)
+                request = admission_review["request"]
+                obj = request["object"]
+
+                # Check conditions
+                name = obj.get("metadata", {}).get("name", "")
+                labels = obj.get("metadata", {}).get("labels", {})
+
+                allowed = True
+                patch = []
+
+                if (name.startswith("volsync-src-") and
+                    labels.get("app.kubernetes.io/created-by") == "volsync"):
+
+                    # Add jitter init container
+                    jitter_container = {
+                        "name": "jitter",
+                        "image": "ghcr.io/home-operations/busybox:1.37.0@sha256:026ed7273270ec08f6902b4ae8334c23b473e5394bec3bbbdbfe580c710d50bc",
+                        "imagePullPolicy": "IfNotPresent",
+                        "command": ["sh", "-c", f"sleep $(shuf -i 0-90 -n 1)"]
+                    }
+
+                    patch = [
+                        {
+                            "op": "add",
+                            "path": "/spec/template/spec/initContainers",
+                            "value": [jitter_container]
+                        }
+                    ]
+
+                response = {
+                    "apiVersion": "admission.k8s.io/v1",
+                    "kind": "AdmissionResponse",
+                    "response": {
+                        "uid": request["uid"],
+                        "allowed": allowed,
+                        "patchType": "JSONPatch",
+                        "patch": base64.b64encode(json.dumps(patch).encode()).decode()
+                    }
+                }
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response).encode())
+
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+
+    if __name__ == '__main__':
+        server = HTTPServer(('0.0.0.0', 8443), WebhookHandler)
+        server.serve_forever()
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: volsync-jitter-webhook
   namespace: storage
 spec:
-  matchConstraints:
-    resourceRules:
-      - apiGroups: ["batch"]
-        apiVersions: ["v1"]
-        operations: ["CREATE", "UPDATE"]
-        resources: ["jobs"]
-  matchConditions:
-    - name: has-volsync-job-name-prefix
-      expression: >
-        object.metadata.name.startsWith("volsync-src-")
-    - name: has-volsync-created-by-labels
-      expression: >
-        object.metadata.labels["app.kubernetes.io/created-by"] == "volsync"
-  failurePolicy: Fail
-  reinvocationPolicy: IfNeeded
-  mutations:
-    - patchType: JSONPatch
-      jsonPatch:
-        expression: >
-          [
-            JSONPatch{
-              op: "add", path: "/spec/template/spec/initContainers",
-              value: []
-            },
-            JSONPatch{
-              op: "add", path: "/spec/template/spec/initContainers/-",
-              value: Object.spec.template.spec.initContainers{
-                name: "jitter",
-                image: "ghcr.io/home-operations/busybox:1.37.0@sha256:026ed7273270ec08f6902b4ae8334c23b473e5394bec3bbbdbfe580c710d50bc",
-                imagePullPolicy: "IfNotPresent",
-                command: ["sh", "-c", "sleep $(shuf -i 0-90 -n 1)"]
-              }
-            }
-          ]
+  replicas: 1
+  selector:
+    matchLabels:
+      app: volsync-jitter-webhook
+  template:
+    metadata:
+      labels:
+        app: volsync-jitter-webhook
+    spec:
+      containers:
+      - name: webhook
+        image: python:3.9-alpine
+        ports:
+        - containerPort: 8443
+        command: ["python3", "/app/webhook.py"]
+        volumeMounts:
+        - name: webhook-script
+          mountPath: /app
+      volumes:
+      - name: webhook-script
+        configMap:
+          name: webhook-script
+          defaultMode: 0755
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: volsync-jitter-webhook
+  namespace: storage
+spec:
+  selector:
+    app: volsync-jitter-webhook
+  ports:
+  - port: 443
+    targetPort: 8443
+    protocol: TCP
