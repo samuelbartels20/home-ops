@@ -6,3 +6,4 @@ namespace: storage
 resources:
   - ./externalsecret.yaml
   - ./helmrelease.yaml
+  - ./podmonitor.yaml
