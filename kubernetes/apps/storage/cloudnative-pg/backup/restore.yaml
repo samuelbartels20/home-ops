@@ -1,63 +1,158 @@
 ---
 apiVersion: batch/v1
-kind: Job
+kind: CronJob
 metadata:
-  name: &name pg-restore
+  name: pg-backup-schedule
 spec:
-  ttlSecondsAfterFinished: 86400
-  template:
+  # Run daily at 2:30 AM
+  schedule: "30 2 * * *"
+  timeZone: "Etc/UTC"  # Adjust to your timezone
+
+  # Keep last 3 completed jobs and 1 failed job for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+  # Don't start new job if previous one is still running
+  concurrencyPolicy: Forbid
+
+  # Allow job to be late by up to 10 minutes before considering it failed
+  startingDeadlineSeconds: 600
+
+  jobTemplate:
     spec:
-      automountServiceAccountToken: true
-      restartPolicy: OnFailure
-      volumes:
-        - name: pg-backup
-          nfs:
-            server: 192.168.8.161
-            path: /mnt/hoemlab/backup/data/k8s/postgres/backup
-            readOnly: false
+      # Clean up completed jobs after 24 hours
+      ttlSecondsAfterFinished: 86400
+      template:
+        spec:
+          automountServiceAccountToken: true
+          restartPolicy: OnFailure
+          volumes:
+            - name: pg-backup
+              nfs:
+                server: 192.168.8.161
+                path: /mnt/hoemlab/backup/data/k8s/postgres/backup
+                readOnly: false
 
-      securityContext:
-        fsGroup: 1022
-        runAsGroup: 1022
-        runAsUser: 1022
+          securityContext:
+            fsGroup: 1022
+            runAsGroup: 1022
+            runAsUser: 1022
 
-      containers:
-        - name: postgres
-          # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
-          image: ghcr.io/cloudnative-pg/postgresql:16.9-5
-          command: ["/bin/sh"]
-          args:
-            - "-c"
-            - "gunzip < /mnt/hoemlab/backup/data/k8s/postgres/backup/postgres-cluster.dump.gz | pg_restore -U $PGUSER -f -"
-          env:
-            - name: PGHOST
-              value: 192.168.8.101
-            - name: PGPORT
-              value: "5432"
-            - name: PGUSER
-              value: postgres
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: cloudnative-pg-secret
-                  key: password
-            - name: TZ
-              value: ${TIMEZONE:=Etc/UTC}
-          volumeMounts:
-            - name: pg-backup  # Changed from "backup" to "pg-backup"
-              mountPath: /mnt/hoemlab/backup/data/k8s/postgres/backup  # Updated mount path to match command
-          resources:
-            requests:
-              memory: "128Mi"
-              cpu: "1"
-            limits:
-              memory: "512Mi"
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/arch
-                    operator: In
-                    values:
-                      - "amd64"
+          containers:
+            - name: postgres-backup
+              # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
+              image: ghcr.io/cloudnative-pg/postgresql:16.9-5
+              command: ["/bin/sh"]
+              args:
+                - "-c"
+                - |
+                  echo "=== PostgreSQL Scheduled Backup Started ==="
+                  echo "Target: $PGHOST:$PGPORT"
+                  echo "User: $PGUSER"
+                  echo "Timestamp: $(date)"
+
+                  # Create backup directory if it doesn't exist
+                  mkdir -p /backup
+
+                  # Generate timestamped filename
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_FILE="/backup/kochhaus-cluster_${TIMESTAMP}.dump.gz"
+                  LATEST_LINK="/backup/kochhaus-cluster.dump.gz"
+
+                  echo "Creating backup: $BACKUP_FILE"
+
+                  # Test database connection first
+                  echo "Testing database connection..."
+                  pg_isready -h $PGHOST -p $PGPORT -U $PGUSER
+                  if [ $? -ne 0 ]; then
+                    echo "ERROR: Cannot connect to database"
+                    exit 1
+                  fi
+
+                  # Create the backup
+                  pg_dump -U $PGUSER -h $PGHOST -p $PGPORT \
+                    --format=custom \
+                    --verbose \
+                    --no-password \
+                    --compress=0 | gzip > "$BACKUP_FILE"
+
+                  BACKUP_EXIT_CODE=$?
+
+                  if [ $BACKUP_EXIT_CODE -eq 0 ]; then
+                    # Verify backup file was created and has content
+                    if [ -s "$BACKUP_FILE" ]; then
+                      echo "Backup created successfully"
+
+                      # Create/update symlink to latest backup
+                      ln -sf "$(basename "$BACKUP_FILE")" "$LATEST_LINK"
+
+                      echo "Backup details:"
+                      ls -la "$BACKUP_FILE"
+                      ls -la "$LATEST_LINK"
+
+                      # Show backup file size
+                      BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+                      echo "Backup size: $BACKUP_SIZE"
+
+                      # Test backup integrity
+                      echo "Testing backup integrity..."
+                      gunzip -t "$BACKUP_FILE"
+                      if [ $? -eq 0 ]; then
+                        echo "Backup integrity test: PASSED"
+                      else
+                        echo "WARNING: Backup integrity test: FAILED"
+                      fi
+
+                      # Clean up old backups (keep last 30 days for scheduled backups)
+                      echo "Cleaning up old backups (keeping last 30 days)..."
+                      OLD_BACKUPS=$(find /backup -name "kochhaus-cluster_*.dump.gz" -type f -mtime +30 | wc -l)
+                      find /backup -name "kochhaus-cluster_*.dump.gz" -type f -mtime +30 -delete
+                      echo "Removed $OLD_BACKUPS old backups"
+
+                      # Show remaining backups
+                      REMAINING_BACKUPS=$(find /backup -name "kochhaus-cluster_*.dump.gz" -type f | wc -l)
+                      echo "Total backups remaining: $REMAINING_BACKUPS"
+
+                      echo "=== Scheduled backup completed successfully ==="
+                    else
+                      echo "ERROR: Backup file is empty or was not created"
+                      rm -f "$BACKUP_FILE"
+                      exit 1
+                    fi
+                  else
+                    echo "ERROR: Backup failed with exit code $BACKUP_EXIT_CODE"
+                    rm -f "$BACKUP_FILE"
+                    exit 1
+                  fi
+              env:
+                - name: PGHOST
+                  value: 192.168.8.101
+                - name: PGPORT
+                  value: "5432"
+                - name: PGUSER
+                  value: postgres
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudnative-pg-secret
+                      key: password
+                - name: TZ
+                  value: ${TIMEZONE:=Etc/UTC}
+              volumeMounts:
+                - name: pg-backup
+                  mountPath: /backup
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "1"
+                limits:
+                  memory: "512Mi"
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/arch
+                        operator: In
+                        values:
+                          - "amd64"
