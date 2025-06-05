@@ -58,34 +58,34 @@ spec:
         secretAccessKey:
           name: cloudnative-pg-secret
           key: AWS_SECRET_ACCESS_KEY
-  # Note: previousCluster needs to be set to the name of the previous
-  # cluster when recovering from an existing cnpg cluster
-  bootstrap:
-    recovery:
-      source: &previousCluster postgres-v16-v1
-    # upgrade or recover from another running instance
-    # initdb:
-    #   import:
-    #     type: monolith
-    #     databases:
-    #       - "*"
-    #     roles:
-    #       - "*"
-    #     source:
-    #       externalCluster: kochhaus-pg15
+  # # Note: previousCluster needs to be set to the name of the previous
+  # # cluster when recovering from an existing cnpg cluster
+  # bootstrap:
+  #   recovery:
+  #     source: &previousCluster postgres-v16-v1
+  #   # upgrade or recover from another running instance
+  #   # initdb:
+  #   #   import:
+  #   #     type: monolith
+  #   #     databases:
+  #   #       - "*"
+  #   #     roles:
+  #   #       - "*"
+  #   #     source:
+  #   #       externalCluster: kochhaus-pg15
 
   # Note: externalClusters is needed when recovering from an existing cnpg cluster
   externalClusters:
-    - name: *previousCluster
+    - name: clusterBackup
       barmanObjectStore:
-        <<: *barmanObjectStore
-        serverName: *previousCluster
-    # - name: kochhaus-pg15
-    #   connectionParameters:
-    #     host: kochhaus-v15-ro.dbms
-    #     user: postgres
-    #     dbname: postgres
-    #     sslmode: require
-    #   password:
-    #     name: cloudnative-pg-secret
-    #     key: password
+        destinationPath: s3://pgbackup/
+        endpointURL: http://192.168.8.161:9000
+        serverName: &previouscluster postgres-v2
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg-secret
+            key: AWS_ACCESS_KEY_ID
+          secretAccessKey:
+            name: cloudnative-pg-secret
+            key: AWS_SECRET_ACCESS_KEY
+
