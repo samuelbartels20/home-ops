@@ -4,7 +4,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app grist
-  namespace: &namespace default
+  namespace: &namespace services
 spec:
   targetNamespace: *namespace
   commonMetadata:
@@ -13,7 +13,7 @@ spec:
   components:
     - ../../../../components/gatus/external
     - ../../../../components/volsync
-  path: ./kubernetes/apps/default/grist/app
+  path: ./kubernetes/apps/services/grist/app
   prune: true
   sourceRef:
     kind: GitRepository

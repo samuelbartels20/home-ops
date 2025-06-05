@@ -11,4 +11,4 @@ resources:
   - ./volsync/ks.yaml
   - ./snapshot-controller/ks.yaml
   - ./dragonfly/ks.yaml
-  - ./vernemq/ks.yaml
+  # - ./vernemq/ks.yaml

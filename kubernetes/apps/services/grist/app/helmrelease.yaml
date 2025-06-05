@@ -55,7 +55,7 @@ spec:
     route:
       app:
         hostnames:
-          - "sheets.${SECRET_DOMAIN}"
+          - "sheets.samcloud.online"
         parentRefs:
           - name: external
             namespace: network
