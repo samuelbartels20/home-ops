@@ -75,4 +75,4 @@ spec:
       backup:
         type: nfs
         server: 192.168.8.161:=fnord}
-        path: /hoemlab/backup/data/k8s/postgres/backup
+        path: /mnt/hoemlab/backup/data/k8s/postgres/backup
