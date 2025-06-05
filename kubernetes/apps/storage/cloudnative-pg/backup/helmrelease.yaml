@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: cnpg-backup
+  namespace: storage  # Make sure this matches your intended namespace
 spec:
   interval: 30m
   chart:
@@ -29,8 +30,13 @@ spec:
         cronjob:
           concurrencyPolicy: Forbid
           schedule: "59 * * * *"
+          timeZone: "Etc/UTC"
+          successfulJobsHistoryLimit: 3
+          failedJobsHistoryLimit: 1
+          startingDeadlineSeconds: 600
         pod:
           restartPolicy: OnFailure
+          automountServiceAccountToken: true
           securityContext:
             fsGroup: 1022
             runAsGroup: 1022
@@ -64,7 +70,57 @@ spec:
               - "/bin/sh"
             args:
               - "-c"
-              - "pg_dumpall -U $PGUSER | gzip > /mnt/hoemlab/backup/data/k8s/postgres/backup/postgres-cluster.dump.gz"
+              - |
+                echo "=== PostgreSQL Backup Started ==="
+                echo "Target: $PGHOST:$PGPORT"
+                echo "User: $PGUSER"
+                echo "Timestamp: $(date)"
+
+                # Test database connection first
+                echo "Testing database connection..."
+                pg_isready -h $PGHOST -p $PGPORT -U $PGUSER
+                if [ $? -ne 0 ]; then
+                  echo "ERROR: Cannot connect to database"
+                  exit 1
+                fi
+
+                # Generate timestamped filename
+                TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                BACKUP_FILE="/backup/postgres-cluster_${TIMESTAMP}.dump.gz"
+                LATEST_LINK="/backup/postgres-cluster.dump.gz"
+
+                echo "Creating backup: $BACKUP_FILE"
+
+                # Create the backup using pg_dumpall
+                pg_dumpall -U $PGUSER -h $PGHOST -p $PGPORT --no-password | gzip > "$BACKUP_FILE"
+                BACKUP_EXIT_CODE=$?
+
+                if [ $BACKUP_EXIT_CODE -eq 0 ]; then
+                  if [ -s "$BACKUP_FILE" ]; then
+                    echo "Backup created successfully"
+
+                    # Create/update symlink to latest backup
+                    ln -sf "$(basename "$BACKUP_FILE")" "$LATEST_LINK"
+
+                    # Show backup details
+                    BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+                    echo "Backup size: $BACKUP_SIZE"
+
+                    # Clean up old backups (keep last 30 days)
+                    echo "Cleaning up old backups (keeping last 30 days)..."
+                    find /backup -name "postgres-cluster_*.dump.gz" -type f -mtime +30 -delete
+
+                    echo "=== Backup completed successfully ==="
+                  else
+                    echo "ERROR: Backup file is empty or was not created"
+                    rm -f "$BACKUP_FILE"
+                    exit 1
+                  fi
+                else
+                  echo "ERROR: Backup failed with exit code $BACKUP_EXIT_CODE"
+                  rm -f "$BACKUP_FILE"
+                  exit 1
+                fi
             resources:
               requests:
                 cpu: 50m
@@ -74,5 +130,7 @@ spec:
     persistence:
       backup:
         type: nfs
-        server: 192.168.8.161:=fnord}
+        server: 192.168.8.161  # Fixed: removed the malformed ":=fnord}" part
         path: /mnt/hoemlab/backup/data/k8s/postgres/backup
+        globalMounts:
+          - path: /backup
