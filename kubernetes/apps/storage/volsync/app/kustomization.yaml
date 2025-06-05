@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - ./helmrelease.yaml
   - ./prometheusrule.yaml
+  - ./mutatingadmissionpolicy.yaml
 configMapGenerator:
   - name: volsync-dashboard
     files:
