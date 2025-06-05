@@ -10,7 +10,7 @@ spec:
       automountServiceAccountToken: true
       restartPolicy: OnFailure
       volumes:
-        - name: backup
+        - name: pg-backup
           nfs:
             server: 192.168.8.161
             path: /mnt/hoemlab/backup/data/k8s/postgres/backup
