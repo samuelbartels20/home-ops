@@ -45,7 +45,7 @@ spec:
               value: ${TIMEZONE:=Etc/UTC}
           volumeMounts:
             - name: backup
-              mountPath: /backup
+              mountPath: /mnt/hoemlab/backup/data/k8s/postgres/backup
           resources:
             requests:
               memory: "128Mi"
