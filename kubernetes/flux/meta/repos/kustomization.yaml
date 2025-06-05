@@ -7,7 +7,7 @@ resources:
   - ./openebs.yaml
   - ./externalsecrets.yaml
   - ./bjw-s.yaml
-  - ./cloudnative-pg.yaml
+  # - ./cloudnative-pg.yaml
   - ./kube-prometheus-stack.yaml
   - ./grafana.yaml
   - ./loki.yaml

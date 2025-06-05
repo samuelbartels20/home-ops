@@ -1,10 +1,12 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: vernemq-auth-secret
+  name: cloudnative-pg-secret
   namespace: storage
 type: Opaque
 stringData:
-  DOCKER_VERNEMQ_USER_ADMIN: postgres
-  DOCKER_VERNEMQ_USER_MQTT: postgres
+  AWS_ACCESS_KEY_ID: v0ZJEQoJHrS1UDxgFlqV
+  AWS_SECRET_ACCESS_KEY: SEyj08DIivqOHuYNLTD0ZtvGNBkLXJVFsc7fdxpE
+  username: postgres
+  password: postgres
 
