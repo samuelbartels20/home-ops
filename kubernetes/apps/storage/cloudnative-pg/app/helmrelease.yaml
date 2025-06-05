@@ -31,7 +31,15 @@ spec:
       create: true
     replicaCount: 2
     monitoring:
-      podMonitorEnabled: false
+      podMonitorEnabled: true
+      serviceMonitorEnabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
       grafanaDashboard:
         create: true
     podAnnotations:
