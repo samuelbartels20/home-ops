@@ -28,7 +28,7 @@ spec:
           command: ["/bin/sh"]
           args:
             - "-c"
-            - "gunzip < //mnt/hoemlab/backup/data/k8s/postgres/backup/postgres-cluster.dump.gz | pg_restore -U $PGUSER -f -"
+            - "gunzip < /mnt/hoemlab/backup/data/k8s/postgres/backup/postgres-cluster.dump.gz | pg_restore -U $PGUSER -f -"
           env:
             - name: PGHOST
               value: 192.168.8.101
@@ -45,7 +45,7 @@ spec:
               value: ${TIMEZONE:=Etc/UTC}
           volumeMounts:
             - name: pg-backup  # Changed from "backup" to "pg-backup"
-              mountPath: /backup  # Updated mount path to match command
+              mountPath: /mnt/hoemlab/backup/data/k8s/postgres/backup  # Updated mount path to match command
           resources:
             requests:
               memory: "128Mi"
