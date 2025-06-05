@@ -12,7 +12,7 @@ spec:
       volumes:
         - name: backup
           nfs:
-            server: 192.168.8.101
+            server: 192.168.8.161
             path: /backup/data/k8s/postgres
 
       securityContext:
