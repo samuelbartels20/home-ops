@@ -9,4 +9,3 @@ resources:
   - ./external-secrets/ks.yaml
   - ./onepassword/ks.yaml
   - ./tailscale/ks.yaml
-
