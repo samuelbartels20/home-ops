@@ -15,7 +15,7 @@ spec:
     - name: volsync
       namespace: storage
   interval: 30m
-  path: ./kubernetes/apps/jenkins/jenkins/app
+  path: ./kubernetes/apps/ci-cd/jenkins/app
   postBuild:
     substitute:
       APP: jenkins
