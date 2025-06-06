@@ -9,4 +9,5 @@ resources:
   - ./echo/ks.yaml
   - ./trilium/ks.yaml
   - ./kafka/schema-registry/ks.yaml
+  - ./openbooks/ks.yaml
   # - ./actual/ks.yaml

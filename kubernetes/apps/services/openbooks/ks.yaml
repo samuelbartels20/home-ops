@@ -4,20 +4,20 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app openbooks
-  namespace: &namespace media
+  namespace: &namespace services
 spec:
   targetNamespace: *namespace
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/main/apps/media/openbooks/app
+  path: ./kubernetes/apps/services/openbooks/app
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
   dependsOn:
     - name: volsync
-      namespace: system
+      namespace: storage
   components:
     - ../../../../components/volsync
   postBuild:
