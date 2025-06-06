@@ -22,15 +22,17 @@ spec:
       strategy: rollback
       retries: 3
   valuesFrom:
-    secretKeyRef:
-      - kind: Secret
-        name: tailscale-secret
-        namespace: security
-        key: client_id
-      - kind: Secret
-        name: tailscale-secret
-        namespace: security
-        key: client_secret
+        accessKeyId:
+          secretRef:
+            name: tailscale-secret
+            key: client_id
+        secretAccessKey:
+          secretRef:
+            name: tailscale-secret
+            key: client_secret
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: storage
   values:
     fullnameOverride: *app
     installCRDs: true
@@ -47,3 +49,6 @@ spec:
       defaultTags: "tag:hive"
     apiServerProxyConfig:
       mode: "true"
+
+
+
