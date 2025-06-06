@@ -1,0 +1,78 @@
+# If using Auth0, https://auth.domain.com/oauth2/callback needs to be added as callback in auth0
+# TODO: Add toleration to ARM devices since the image in this release will only work on ARM devices
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: oauth2-proxy
+  namespace: networking
+spec:
+  interval: 5m
+  chart:
+    spec:
+      # renovate: registryUrl=https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      version: 7.12.14
+      sourceRef:
+        kind: HelmRepository
+        name: oauth2-proxy-charts
+        namespace: flux-system
+      interval: 5m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    image:
+      repository: "quay.io/oauth2-proxy/oauth2-proxy"
+      tag: "v7.6.0"
+
+    config:
+      existingSecret: oauth2-proxy-client-secrets
+      # Override configFile to disable all email domains to be used
+      configFile: |-
+        email_domains = []
+        upstreams = [ "file:///dev/null" ]
+
+    replicaCount: 1
+
+    # Won't work if email_domains = "*"
+    authenticatedEmailsFile:
+      enabled: true
+      # One email per line
+      restricted_access: |
+        ${SECRET_EMAIL}
+
+    ingress:
+      enabled: true
+      className: external
+      path: /oauth2
+      hosts: [ "auth.${SECRET_DOMAIN}" ]
+      tls:
+        - hosts:
+            - "auth.${SECRET_DOMAIN}"
+      annotations:
+        external-dns/is-public: "true"
+        external-dns.alpha.kubernetes.io/target: "ipv4.${SECRET_DOMAIN}"
+
+    # TODO: Check if --reverse-proxy flag is useful or not
+    extraArgs:
+      provider: google
+      provider-display-name: "an authenticated email"
+      skip-provider-button: "false"
+      pass-basic-auth: "false"
+      cookie-domain: ".${SECRET_DOMAIN}"
+      whitelist-domain: ".${SECRET_DOMAIN}"
+      exclude-logging-path: "/ping"
+
+#    affinity:
+#      nodeAffinity:
+#        requiredDuringSchedulingIgnoredDuringExecution:
+#          nodeSelectorTerms:
+#            - matchExpressions:
+#                - key: beta.kubernetes.io/arch
+#                  operator: In
+#                  values:
+#                    - arm64

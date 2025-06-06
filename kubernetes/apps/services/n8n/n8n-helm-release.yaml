@@ -1,0 +1,103 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: n8n
+  namespace: default
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: n8n
+      version: 0.13.0
+      interval: 15m
+      sourceRef:
+        kind: HelmRepository
+        name: open-8gears-charts
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  dependsOn:
+    - name: longhorn
+      namespace: longhorn-system
+  values:
+    image:
+      repository: n8nio/n8n
+      pullPolicy: IfNotPresent
+      tag: 1.94.0
+
+    deploymentStrategy:
+      type: "Recreate"
+
+    replicaCount: 1
+
+    ingress:
+      enabled: true
+      className: internal
+      annotations:
+        nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.networking.svc.cluster.local/oauth2/auth"
+        nginx.ingress.kubernetes.io/auth-signin: "https://auth.${SECRET_DOMAIN}/oauth2/sign_in"
+        external-dns/is-public: "false"
+        external-dns.alpha.kubernetes.io/target: "ipv4.${SECRET_DOMAIN}"
+      hosts:
+        - host: "n8n.${SECRET_DOMAIN}"
+          paths:
+            - /
+
+      tls:
+        - hosts:
+            - "n8n.${SECRET_DOMAIN}"
+
+    config:
+      database:
+        type: postgresdb
+      generic:
+        timezone: Africa/Cairo
+      executions:
+        pruneData: "true" # prune executions by default
+        pruneDataMaxAge: 3760 # Per defaut we store 1 year of history
+      ai:
+        enabled: true
+      port: 443
+      protocol: https
+
+
+    extraEnvSecrets:
+      DB_POSTGRESDB_USER:
+        name: n8n-secrets
+        key: DB_POSTGRESDB_USER
+      DB_POSTGRESDB_PASSWORD:
+        name: n8n-secrets
+        key: DB_POSTGRESDB_PASSWORD
+      DB_POSTGRESDB_DATABASE:
+        name: n8n-secrets
+        key: DB_POSTGRESDB_DATABASE
+      DB_POSTGRESDB_HOST:
+        name: n8n-secrets
+        key: DB_POSTGRESDB_HOST
+      DB_POSTGRESDB_SCHEMA:
+        name: n8n-secrets
+        key: DB_POSTGRESDB_SCHEMA
+      N8N_HOST:
+        name: n8n-secrets
+        key: N8N_HOST
+
+# Removed persistence because n8n-pvc was not even used.
+# Have a hunch it isn't used because we're using a PSQL database for persistence
+#    persistence:
+#      enabled: true
+#      existingClaim: n8n-pvc
+
+    resources:
+      requests:
+        cpu: 14m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+
+    scaling:
+      enabled: false

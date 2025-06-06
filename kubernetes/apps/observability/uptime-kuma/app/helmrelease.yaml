@@ -1,0 +1,49 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: uptime-kuma
+  namespace: monitoring
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: uptime-kuma
+      version: 1.4.2
+      sourceRef:
+        kind: HelmRepository
+        name: k8s-at-home
+        namespace: flux-system
+  values:
+    env:
+      TZ: "${TIMEZONE}"
+      PGID: ${PGID}
+      PUID: ${PUID}
+    image:
+      repository: louislam/uptime-kuma
+      tag: 1.23.16
+    persistence:
+      data:
+        enabled: true
+        existingClaim: monitoring
+        subPath: uptime-kuma
+    ingress:
+      main:
+        enabled: true
+        ingressClassName: external
+        annotations:
+          external-dns.home.arpa/enabled: "true"
+          auth.home.arpa/enabled: "true"
+          hajimari.io/enable: "true"
+          hajimari.io/icon: "eos-icons:monitoring"
+          hajimari.io/group: Monitoring
+          hajimari.io/appName: Uptime-Kuma
+        hosts:
+          - host: &host "status.${SECRET_DOMAIN}"
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - *host
+            secretName: uptime-kuma-production-tls

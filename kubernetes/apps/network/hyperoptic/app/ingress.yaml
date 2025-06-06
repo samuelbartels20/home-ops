@@ -1,0 +1,29 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hyperoptic
+  namespace: networking
+  annotations:
+    external-dns.home.arpa/enabled: "true"
+    auth.home.arpa/enabled: "true"
+    hajimari.io/enable: "true"
+    hajimari.io/icon: "mdi:router-wireless"
+    hajimari.io/group: "Nodes"
+spec:
+  ingressClassName: external
+  rules:
+    - host: &host "hyperoptic.${SECRET_DOMAIN}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hyperoptic
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - *host
+      secretName: hyperoptic-production-tls
