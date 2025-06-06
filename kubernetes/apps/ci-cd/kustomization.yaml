@@ -2,11 +2,9 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: actions-runner-system
+namespace: ci-cd
 components:
-  - ../../components/alerts
+  # - ../../components/alerts
   - ../../components/common
 resources:
-  - ./gha-runner-scale-set-controller/ks.yaml
-  - ./gha-runner-scale-set/ks.yaml
-  - ./java-runner/ks.yaml
+  - ./jenkins/ks.yaml
