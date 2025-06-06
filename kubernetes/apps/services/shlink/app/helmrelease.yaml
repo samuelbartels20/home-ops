@@ -1,0 +1,112 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: shlink
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      main:
+        annotations:
+          secret.reloader.stakater.com/reload: shlink-secret
+        containers:
+          api:
+            image:
+              repository: ghcr.io/shlinkio/shlink
+              tag: 4.4.6@sha256:1a697baca56ab8821783e0ce53eb4fb22e51bb66749ec50581adc0cb6d031d7a
+            env:
+              USER_ID: "2000"
+              SHLINK_SERVER_NAME: "HomeLab"
+              DEFAULT_DOMAIN: &api-host "ln.zinn.ca"
+              DISABLE_TRACKING_FROM: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+              ENABLE_PERIODIC_VISIT_LOCATE: "true"
+              IS_HTTPS_ENABLED: "true"
+              PORT: &api-port 8081
+              TIMEZONE: "America/Toronto"
+            envFrom:
+              - secretRef:
+                  name: shlink-secret
+            securityContext:
+              runAsUser: 2000
+              runAsGroup: 2000
+              runAsNonRoot: true
+              fsGroup: 2000
+              fsGroupChangePolicy: OnRootMismatch
+          web:
+            image:
+              repository: ghcr.io/shlinkio/shlink-web-client
+              tag: 4.4.0@sha256:99988516ee0caf2059a485edaacab9759db0a3140c5a5c2634e0a97ac4d194bf
+            env:
+              UID: "2000"
+              SHLINK_SERVER_URL: "https://ln.zinn.ca"
+            envFrom:
+              - secretRef:
+                  name: shlink-secret
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities: { drop: ["ALL"] }
+
+    service:
+      main:
+        controller: main
+        ports:
+          api:
+            port: *api-port
+          http:
+            port: &web-port 8080
+            primary: true
+
+    route:
+      external:
+        annotations:
+          external-dns/is-public: "true"
+          external-dns.alpha.kubernetes.io/target: external.zinn.ca
+        hostnames: [*api-host]
+        parentRefs:
+          - name: external
+            namespace: kube-system
+            sectionName: https
+        rules:
+          - backendRefs:
+              - identifier: main
+                port: *api-port
+      internal:
+        hostnames: ["shlink.zinn.ca"]
+        parentRefs:
+          - name: internal
+            namespace: kube-system
+            sectionName: https
+        rules:
+          - backendRefs:
+              - identifier: main
+                port: *web-port
+
+    persistence:
+      data:
+        enabled: true
+        existingClaim: "${VOLSYNC_CLAIM}"
+        advancedMounts:
+          main:
+            api:
+              - path: /etc/shlink/data
+      log:
+        type: emptyDir
+        globalMounts:
+          - path: /etc/shlink/data/log

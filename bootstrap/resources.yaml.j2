@@ -1,10 +1,13 @@
 {% for namespace in ["external-secrets", "flux-system", "network"] %}
+
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ namespace }}
 {% endfor %}
+
+
 ---
 # onepassword secret
 apiVersion: v1
@@ -15,6 +18,18 @@ metadata:
 stringData:
   token: op://K8s/1password-token/password
   1password-credentials.json: op://K8s/1password-json/1password-credentials.json
+
+
+---
+# tailscale secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: operator-oauth
+  namespace: security
+stringData:
+  client_id: op://K8s/tailscale-operator/CLIENT_ID
+  client_secret: op://K8s/tailscale-operator/CLIENT_SECRET
 
 ---
 # databases/cloudnative-pg/operator/externalsecret.yaml
@@ -59,6 +74,18 @@ data:
     admin-password: op://K8s/grafana-admin/GRAFANA_ADMIN_PASSWORD
     admin-user: op://K8s/grafana-admin/GRAFANA_ADMIN_USERNAME
 
+
+---
+# vernemq/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: vernemq-auth
+    namespace: storage
+data:
+    DOCKER_VERNEMQ_USER_ADMIN: op://K8s/vernemq-auth/vernemq_password
+    DOCKER_VERNEMQ_USER_MQTT: op://K8s/vernemq-auth/vernemq_user_mqtt_password
+
 ---
 apiVersion: v1
 kind: Secret
@@ -67,6 +94,8 @@ metadata:
   namespace: flux-system
 stringData:
   age.agekey: op://kubernetes/sops/SOPS_PRIVATE_KEY
+
+
 ---
 apiVersion: v1
 kind: Secret
@@ -88,6 +117,8 @@ type: kubernetes.io/tls
 data:
   tls.crt: op://kubernetes/samcloud.online-tls/tls.crt
   tls.key: op://kubernetes/samcloud.online-tls/tls.key
+
+
 ---
 apiVersion: v1
 kind: Secret

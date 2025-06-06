@@ -1,0 +1,11 @@
+apiVersion: gravitee.io/v1alpha1
+kind: ManagementContext
+metadata:
+  name: default-context
+spec:
+  baseUrl: http://gravitee-apim-api.gravitee.svc.cluster.local:83
+  environmentId: DEFAULT
+  organizationId: DEFAULT
+  auth:
+    secretRef:
+      name: gravitee-gko-secret

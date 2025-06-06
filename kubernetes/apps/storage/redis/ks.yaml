@@ -1,0 +1,44 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.trux.dev/kustomization_v1beta2.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-redis
+  namespace: flux-system
+spec:
+  path: './cluster/apps/data/redis/app/'
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  interval: 30m
+  retryInterval: 1m
+  timeout: 3m
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+      kind: HelmRelease
+      name: redis
+      namespace: data
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.ok8.sh/kustomization_v1beta2.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-redis-lb
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cluster-apps-redis
+  path: ./cluster/apps/data/redis/lb
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2beta1
+      kind: HelmRelease
+      name: redis-lb
+      namespace: data
+  interval: 30m
+  retryInterval: 1m
+  timeout: 3m

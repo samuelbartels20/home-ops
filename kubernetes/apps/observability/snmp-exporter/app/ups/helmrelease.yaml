@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app snmp-exporter-ups
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: prometheus-snmp-exporter
+      version: 9.3.1
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    fullnameOverride: *app
+    image:
+      repository: quay.io/prometheus/snmp-exporter
+    extraArgs: ["--config.file=/config/snmp.yaml"]
+    extraConfigmapMounts:
+      - name: &name rfc1628-ups-configmap
+        mountPath: /config/snmp.yaml
+        subPath: snmp.yaml
+        configMap: *name
+        readOnly: true
+        defaultMode: 420
+    serviceMonitor:
+      enabled: true
+      params:
+        - name: ups-0
+          auth: ["public_v1"]
+          module: ["rfc1628_ups"]
+          target: ${SECRET_UPS_IP:=temp}
+      path: /snmp
+      scrapeTimeout: 10s
+      relabelings:
+        - { sourceLabels: ["__param_target"], targetLabel: instance }

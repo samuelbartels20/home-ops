@@ -1,0 +1,66 @@
+# theme:
+#   background-color: 240 21 15
+#   contrast-multiplier: 1.2
+#   primary-color: 217 92 83
+#   positive-color: 115 54 76
+#   negative-color: 347 70 65
+pages:
+  - name: Home
+    columns:
+      - size: small
+        widgets:
+          - type: rss
+            limit: 10
+            collapse-after: 3
+            cache: 3h
+            feeds:
+              - url: https://rss.${SECRET_DOMAIN}
+
+          - type: monitor
+            cache: 1m
+            title: Services
+            sites:
+              - title: Home Assistant
+                url: https://hass.${SECRET_DOMAIN}
+              - title: Grafana
+                url: https://grafana.${SECRET_DOMAIN}
+              - title: Plex
+                url: https://plex.${SECRET_DOMAIN}
+
+          - type: markets
+            markets:
+              - symbol: SPY
+                name: S&P 500
+              - symbol: TSLA
+                name: Tesla
+              - symbol: BTC-USD
+                name: Bitcoin
+                chart-link: https://www.tradingview.com/chart/?symbol=INDEX:BTCUSD
+              - symbol: ^STOXX
+                name: STOXX 600
+
+      - size: full
+        widgets:
+          - type: hacker-news
+
+          - type: videos
+            channels:
+              - UCR-DXc1voovS8nhAvccRZhg # Jeff Geerling
+              - UCv6J_jJa8GJqFwQNgNrMuww # ServeTheHome
+              - UCOk-gHyjcWZNj3Br4oxwh0A # Techno Tim
+
+          - type: reddit
+            subreddit: selfhosted
+
+      - size: small
+        widgets:
+          - type: clock
+            hour-format: 24h
+            timezones:
+              - timezone: Europe/Vilnius
+                label: Vilnius
+
+          - type: calendar
+
+          - type: weather
+            location: Vilnius, Lithuania

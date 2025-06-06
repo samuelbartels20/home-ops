@@ -1,0 +1,29 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pihole
+  namespace: networking
+  annotations:
+    external-dns.home.arpa/enabled: "true"
+    auth.home.arpa/enabled: "true"
+    hajimari.io/enable: "true"
+    hajimari.io/icon: "mdi:pi-hole"
+    hajimari.io/group: "Network"
+spec:
+  ingressClassName: external
+  rules:
+    - host: &host "pihole.${SECRET_DOMAIN}"
+      http:
+        paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: pihole
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - *host
+      secretName: pihole-production-tls

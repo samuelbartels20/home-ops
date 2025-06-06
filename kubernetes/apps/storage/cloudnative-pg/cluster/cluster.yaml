@@ -1,37 +1,45 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/postgresql.cnpg.io/cluster_v1.json
+# yaml-language-server: $schema=https://kochhaus-schemas.pages.dev/postgresql.cnpg.io/cluster_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres
+  name: postgres-v16
+  annotations:
+    kyverno.io/ignore: "true"
 spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.9-5
   instances: 3
-  # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
   primaryUpdateStrategy: unsupervised
   storage:
-    size: 30Gi
+    size: 10Gi
     storageClass: openebs-hostpath
-    resizeInUseVolumes: false
   superuserSecret:
     name: cloudnative-pg-secret
   enableSuperuserAccess: true
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     parameters:
-      max_connections: "200"
+      max_connections: "400"
       shared_buffers: 256MB
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
   resources:
     requests:
-      cpu: 300m
+      cpu: 50m
+      memory: 256Mi
     limits:
-      memory: 1Gi
+      memory: 640Mi
   monitoring:
     enablePodMonitor: true
+    # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
+    podMonitorMetricRelabelings:
+      - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
+      - { regex: cluster, action: labeldrop }
   backup:
-    retentionPolicy: 10d
+    retentionPolicy: 30d
     barmanObjectStore: &barmanObjectStore
       data:
         compression: bzip2
@@ -40,9 +48,9 @@ spec:
         maxParallel: 8
       destinationPath: s3://pgbackup/
       endpointURL: http://192.168.8.161:9000
-      # Note: serverName version needs to be inclemented
+      # Note: serverName version needs to be incremented
       # when recovering from an existing cnpg cluster
-      serverName: &currentCluster postgres-v3
+      serverName: &currentCluster postgres-v16-v2
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg-secret
@@ -50,6 +58,8 @@ spec:
         secretAccessKey:
           name: cloudnative-pg-secret
           key: AWS_SECRET_ACCESS_KEY
+
+  # Note: externalClusters is needed when recovering from an existing cnpg cluster
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
@@ -64,22 +74,3 @@ spec:
             name: cloudnative-pg-secret
             key: AWS_SECRET_ACCESS_KEY
 
----
-# yaml-language-server: $schema=https://kubernetesjsonschema.dev/v1.10.3-standalone/service-v1.json
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-lb
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
-    lbipam.cilium.io/ips: 192.168.8.101
-spec:
-  type: LoadBalancer
-  ports:
-    - name: postgres
-      port: 5432
-      protocol: TCP
-      targetPort: 5432
-  selector:
-    cnpg.io/cluster: postgres
-    role: primary

@@ -1,0 +1,46 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app redis
+  namespace: data
+spec:
+  interval: 15m
+  chart:
+    spec:
+      # renovate: registryUrl=https://charts.bitnami.com/bitnami
+      chart: redis
+      version: 20.13.3
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami-charts
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 5
+  upgrade:
+    remediation:
+      retries: 5
+  values:
+    auth:
+      enabled: false
+      sentinel: false
+    master:
+      persistence:
+        enabled: false
+    replica:
+      persistence:
+        enabled: false
+    sentinel:
+      enabled: true
+      masterSet: redis-master
+      getMasterTimeout: 10
+      startupProbe:
+        failureThreshold: 2
+      persistence:
+        enabled: false
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true

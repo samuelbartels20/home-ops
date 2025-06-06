@@ -1,0 +1,30 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-hyperoptic
+  namespace: flux-system
+  labels:
+    substitution.flux.home.arpa/enabled: "true"
+spec:
+  path: ./kubernetes/apps/networking/hyperoptic/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: home-kubernetes
+  healthChecks:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      name: hyperoptic
+      namespace: networking
+    - apiVersion: v1
+      kind: Endpoints
+      name: hyperoptic
+      namespace: networking
+    - apiVersion: v1
+      kind: Service
+      name: hyperoptic
+      namespace: networking
+  interval: 30m
+  retryInterval: 1m
+  timeout: 3m

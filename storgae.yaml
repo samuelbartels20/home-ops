@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: loki-s3-credentials
-  namespace: observability
-type: Opaque
-stringData:
-  accessKey: cQY7QVBJIgVgsAVid4Pn
-  secretKey: G4k80oDO4CimiD3UydmkrUCia4Ll4SKNJm2mOOyL

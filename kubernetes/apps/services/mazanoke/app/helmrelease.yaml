@@ -1,0 +1,96 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mazanoke
+  namespace: default
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: app-template
+      version: 3.7.3
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+
+  values:
+    controllers:
+      mazanoke:
+        type: deployment
+        replicas: 1
+        containers:
+          main:
+            image:
+              repository: ghcr.io/civilblur/mazanoke
+              tag: v1.1.4@sha256:7b2840065c2422f44bfc3a0b6baae27ee7d9b5944672cdca78ba14ee2eb4b86f
+            env:
+              TZ: ${TIMEZONE}
+              ENVIRONMENT: "production"
+              MAZANOKE_CONFIG_DIR: &datadir /config
+            securityContext:
+              runAsUser: 568
+              runAsGroup: 568
+              fsGroup: 568
+              fsGroupChangePolicy: "OnRootMismatch"
+              supplementalGroups:
+                - 100
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "512Mi"
+              limits:
+                cpu: "1"
+                memory: 1Gi
+
+    service:
+      mazanoke:
+        controller: mazanoke
+        ports:
+          http:
+            port: 80
+
+    ingress:
+      main:
+        className: external
+        annotations:
+          external-dns.home.arpa/enabled: "true"
+          auth.home.arpa/enabled: "true"
+          hajimari.io/enable: "true"
+          hajimari.io/group: "Tools"
+          hajimari.io/icon: "mdi:image-edit-outline"
+          external-dns.alpha.kubernetes.io/target: external.samcloud.online
+        hosts:
+          - host: &host "mazanoke.samcloud.online"
+            paths: &paths
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: mazanoke
+                  port: http
+        tls:
+          - hosts:
+              - *host
+            secretName: mazanoke-production-tls
+    persistence:
+      config:
+        enabled: true
+        existingClaim: mazanoke-pvc
+        globalMounts:
+          - path: *datadir
+          - path: /var/cache/nginx/
+            subPath: client_temp
+          - path: /var/log/nginx
+          - path: /run

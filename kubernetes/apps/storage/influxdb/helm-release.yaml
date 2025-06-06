@@ -1,0 +1,49 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: influxdb
+  namespace: data
+spec:
+  interval: 5m
+  chart:
+    spec:
+      # renovate: registryUrl=https://helm.influxdata.com/
+      chart: influxdb2
+      version: 2.1.2
+      sourceRef:
+        kind: HelmRepository
+        name: influxdata-charts
+        namespace: flux-system
+      interval: 5m
+  values:
+    image:
+      repository: "influxdb"
+      tag: "2.7.11"
+    adminUser:
+      organization: "Home"
+      bucket: "HomeAssistant"
+      user: "${SECRET_INFLUXDB_USERNAME}"
+      retention_policy: "0s"
+      ## Leave empty to generate a random password and token.
+      ## Or fill any of these values to use fixed values.
+      password: "${SECRET_INFLUXDB_PASSWORD}"
+      token: "${SECRET_INFLUXDB_TOKEN}"
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hostname: influxdb.${SECRET_DOMAIN}
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-production"
+      tls: true
+      secretName: influxdb-tls
+    persistence:
+      enabled: true
+      useExisting: true
+      name: influxdb-pvc-v2
+    resources:
+      requests:
+        memory: 500Mi
+        cpu: 100m
+      limits:
+        memory: 3000Mi

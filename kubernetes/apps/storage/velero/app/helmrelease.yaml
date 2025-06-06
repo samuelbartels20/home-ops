@@ -1,0 +1,85 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: velero
+spec:
+  interval: 1m
+  chart:
+    spec:
+      chart: velero
+      version: 10.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: velero
+        namespace: flux-system
+      interval: 15m
+  maxHistory: 2
+  install:
+    remediation:
+      retries: 3
+    crds: Create
+  upgrade:
+    cleanupOnFail: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    credentials:
+      existingSecret: velero-secret
+    configuration:
+      backupStorageLocation:
+        - name: default
+          bucket: k8s-velero
+          provider: aws
+          default: true
+          config:
+            region: eu-central-1
+            s3Url: http://minio.storage-system.svc.cluster.local:9000
+            publicUrl: https://s3.${SECRET_DOMAIN}
+            s3ForcePathStyle: "true"
+            signatureVersion: "v4"
+      volumeSnapshotLocation:
+        - name: default
+          provider: csi
+          config:
+            snapshotClass: nas-nfs-snap
+      extraEnvVars:
+        TZ: "${TIMEZONE}"
+    schedules:
+      daily-snapshot:
+        # At 1:00am every day
+        schedule: "00 01 * * *"
+        template:
+          ttl: "72h" # 3 days retention
+          includedNamespaces:
+            - productivity
+          snapshotVolumes: true
+      weekly-backup:
+        # At the end of the week on a Sunday at 3:00am
+        schedule: "00 03 * * 0"
+        template:
+          ttl: "72h" # 3 days retention
+    initContainers:
+      - name: velero-plugin-for-aws
+        image: velero/velero-plugin-for-aws:v1.12.1
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+          - mountPath: /target
+            name: plugins
+    snapshotsEnabled: true
+    backupsEnabled: true
+    deployNodeAgent: false
+    upgradeCRDs: true
+    cleanUpCRDs: true
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+    resources:
+      requests:
+        memory: 300Mi
+        cpu: 25m
+      limits:
+        memory: 1500Mi
