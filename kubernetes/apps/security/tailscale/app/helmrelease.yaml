@@ -1,19 +1,10 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/helmrepository_v1beta2.json
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: tailscale
-  namespace: security
-spec:
-  interval: 1h
-  url: https://pkgs.tailscale.com/helmcharts
----
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app tailscale
+  namespace: security
 spec:
   interval: 1h
   chart:
@@ -24,7 +15,6 @@ spec:
         kind: HelmRepository
         name: tailscale
         namespace: flux-system
-  targetNamespace: security
   install:
     remediation:
       retries: 3
@@ -33,18 +23,20 @@ spec:
     remediation:
       strategy: rollback
       retries: 3
+  valuesFrom:
+    - kind: Secret
+      name: operator-oauth
+      valuesKey: client_id
+      targetPath: oauth.clientId
+    - kind: Secret
+      name: operator-oauth
+      valuesKey: client_secret
+      targetPath: oauth.clientSecret
   values:
-    # TODO: currently not supported by the operator
     fullnameOverride: *app
-
     installCRDs: true
-
     ingressClass:
       enabled: false
-
-    oauthSecretVolume:
-      secret:
-        secretName: operator-oauth
     operatorConfig:
       logging: debug
       hostname: "hive-operator"
@@ -52,9 +44,7 @@ spec:
         reloader.stakater.com/auto: "true"
       defaultTags:
         - "tag:hive-operator"
-
     proxyConfig:
       defaultTags: "tag:hive"
-
     apiServerProxyConfig:
       mode: "true"
