@@ -53,7 +53,7 @@ spec:
               - --searchbot
               - searchook
             env:
-              TZ: America/Toronto
+              TZ: UTC
     service:
       main:
         controller: main
