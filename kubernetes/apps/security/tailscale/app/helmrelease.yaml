@@ -44,8 +44,7 @@ spec:
 
     oauthSecretVolume:
       secret:
-        secretName: tailscale-oauth
-
+        secretName: operator-oauth
     operatorConfig:
       logging: debug
       hostname: "hive-operator"
