@@ -25,9 +25,21 @@ spec:
       retries: 3
   values:
     oauth:
-      secret: operator-oauth
+        clientSecret:
+          valueFrom:
+            secretKeyRef:
+              name: operator-oauth
+              key: client_secret
+        clientId:
+          valueFrom:
+            secretKeyRef:
+              name: operator-oauth
+              key: client_id
     installCRDs: "true"
     proxyConfig:
       firewallMode: auto
     apiServerProxyConfig:
       mode: "true" # "true", "false", "noauth"
+
+
+
