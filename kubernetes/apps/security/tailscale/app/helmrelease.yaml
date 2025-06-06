@@ -22,14 +22,15 @@ spec:
       strategy: rollback
       retries: 3
   valuesFrom:
-    - kind: Secret
-      name: tailscale-secret
-      valuesKey: client_id
-      # targetPath: oauth.clientId
-    - kind: Secret
-      name: tailscale-secret
-      valuesKey: client_secret
-      # targetPath: oauth.clientSecret
+    secretKeyRef:
+      - kind: Secret
+        name: tailscale-secret
+        namespace: security
+        key: client_id
+      - kind: Secret
+        name: tailscale-secret
+        namespace: security
+        key: client_secret
   values:
     fullnameOverride: *app
     installCRDs: true
