@@ -4,7 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
   name: tailscale
-  namespace: network
+  namespace: security
 spec:
   interval: 1h
   url: https://pkgs.tailscale.com/helmcharts
@@ -23,7 +23,8 @@ spec:
       sourceRef:
         kind: HelmRepository
         name: tailscale
-        namespace: network
+        namespace: flux-system
+  targetNamespace: security
   install:
     remediation:
       retries: 3
