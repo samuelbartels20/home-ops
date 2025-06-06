@@ -48,3 +48,6 @@ spec:
       defaultTags: "tag:hive"
     apiServerProxyConfig:
       mode: "true"
+    oauthSecretVolume:
+      secret:
+        secretName: operator-oauth
