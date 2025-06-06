@@ -23,11 +23,11 @@ spec:
       retries: 3
   valuesFrom:
     - kind: Secret
-      name: operator-oauth
+      name: operator
       valuesKey: client_id
       targetPath: oauth.clientId
     - kind: Secret
-      name: operator-oauth
+      name: operator
       valuesKey: client_secret
       targetPath: oauth.clientSecret
   values:
