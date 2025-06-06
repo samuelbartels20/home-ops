@@ -64,7 +64,7 @@ spec:
             port: &port 8080
     route:
       internal:
-        hostnames: ["{{ .Release.Name }}.samcloud.online"]
+        hostnames: ["openbooks.samcloud.online"]
         parentRefs:
           - name: external
             namespace: kube-system
