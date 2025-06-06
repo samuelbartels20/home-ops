@@ -11,7 +11,6 @@ spec:
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: 72.9.1
       version: 73.2.0
       sourceRef:
         kind: HelmRepository
