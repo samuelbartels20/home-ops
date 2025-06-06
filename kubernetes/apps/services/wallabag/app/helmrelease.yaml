@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app wallabag
+  namespace: services
 spec:
   interval: 30m
   chartRef:
@@ -48,9 +49,9 @@ spec:
             env:
               SYMFONY__ENV__FOSUSER_REGISTRATION: "true"
               SYMFONY__ENV__FOSUSER_CONFIRMATION: "true"
-              SYMFONY__ENV__FROM_EMAIL: wallabag@${SECRET_DOMAIN}
+              SYMFONY__ENV__FROM_EMAIL: wallabag@samcloud.online
               SYMFONY__ENV__MAILER_DSN: smtp://smtp-relay.infrastructure.svc.cluster.local:2525
-              SYMFONY__ENV__DOMAIN_NAME: https://wallabag.${SECRET_DOMAIN}
+              SYMFONY__ENV__DOMAIN_NAME: https://wallabag.samcloud.online
               SYMFONY__ENV__SERVER_NAME: Wallabag
               POPULATE_DATABASE: "false"
 
@@ -71,7 +72,7 @@ spec:
     route:
       app:
         hostnames:
-          - "{{ .Release.Name }}.${SECRET_DOMAIN}"
+          - "{{ .Release.Name }}.samcloud.online"
         parentRefs:
           - name: external
             namespace: network
