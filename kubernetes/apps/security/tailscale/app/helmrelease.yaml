@@ -22,14 +22,14 @@ spec:
       strategy: rollback
       retries: 3
   valuesFrom:
-        accessKeyId:
-          secretRef:
-            name: tailscale-secret
-            key: client_id
-        secretAccessKey:
-          secretRef:
-            name: tailscale-secret
-            key: client_secret
+    - kind: Secret
+      name: tailscale-secret
+      valuesKey: client_id
+      targetPath: accessKeyId
+    - kind: Secret
+      name: tailscale-secret
+      valuesKey: client_secret
+      targetPath: secretAccessKey
   dependsOn:
     - name: cloudnative-pg
       namespace: storage
@@ -49,6 +49,3 @@ spec:
       defaultTags: "tag:hive"
     apiServerProxyConfig:
       mode: "true"
-
-
-
