@@ -19,6 +19,18 @@ stringData:
   token: op://K8s/1password-token/password
   1password-credentials.json: op://K8s/1password-json/1password-credentials.json
 
+
+---
+# tailscale secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: operator-oauth
+  namespace: security
+stringData:
+  client_id: op://K8s/tailscale-operator/CLIENT_ID
+  client_secret: op://K8s/tailscale-operator/CLIENT_SECRET
+
 ---
 # databases/cloudnative-pg/operator/externalsecret.yaml
 apiVersion: v1
