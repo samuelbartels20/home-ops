@@ -23,13 +23,13 @@ spec:
       retries: 3
   valuesFrom:
     - kind: Secret
-      name: operator
+      name: tailscale-secret
       valuesKey: client_id
-      targetPath: oauth.clientId
+      # targetPath: oauth.clientId
     - kind: Secret
-      name: operator
+      name: tailscale-secret
       valuesKey: client_secret
-      targetPath: oauth.clientSecret
+      # targetPath: oauth.clientSecret
   values:
     fullnameOverride: *app
     installCRDs: true
