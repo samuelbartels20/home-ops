@@ -24,7 +24,8 @@ spec:
       strategy: rollback
       retries: 3
   values:
-    oauth: {}
+    oauth:
+      secret: operator-oauth
     installCRDs: "true"
     proxyConfig:
       firewallMode: auto
