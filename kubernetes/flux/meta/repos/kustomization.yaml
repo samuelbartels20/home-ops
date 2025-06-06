@@ -16,5 +16,5 @@ resources:
   - ./backube.yaml
   - ./piraeus.yaml
   # - ./alloy.yaml
-  - ./tailscale.yaml
+  # - ./tailscale.yaml
 
