@@ -1,0 +1,108 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: radicale
+  namespace: productivity
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 3.7.3
+      interval: 30m
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+
+  values:
+    controllers:
+      radicale:
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        pod:
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            fsGroupChangePolicy: "OnRootMismatch"
+
+        containers:
+          app:
+            image:
+              repository: jank.ing/jjgadgets/radicale
+              tag: 3.5.3@sha256:f5f75f3784bd9ff50c62dbde33acf5bddffcf1f81414f63aef23f77f2438e527
+            probes:
+              liveness:
+                enabled: true
+              readiness:
+                enabled: true
+              startup:
+                enabled: true
+                spec:
+                  failureThreshold: 30
+                  periodSeconds: 5
+            resources:
+              requests:
+                cpu: 21m
+                memory: 192Mi
+              limits:
+                memory: 1024Mi
+
+    service:
+      app:
+        controller: radicale
+        ports:
+          http:
+            port: 5232
+
+    ingress:
+      app:
+        className: nginx
+        hosts:
+          - host: &host radicale.${SECRET_DOMAIN}
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts: [*host]
+        annotations:
+          nginx.ingress.kubernetes.io/auth-url: |-
+            http://ak-outpost-authentik-embedded-outpost.security.svc.cluster.local:9000/outpost.goauthentik.io/auth/nginx
+          nginx.ingress.kubernetes.io/auth-signin: |-
+            https://radicale.${SECRET_DOMAIN}/outpost.goauthentik.io/start?rd=$escaped_request_uri
+          nginx.ingress.kubernetes.io/auth-response-headers: |-
+            Set-Cookie,X-authentik-username,X-Remote-User,WWW-Authenticate
+          nginx.ingress.kubernetes.io/auth-snippet: |
+            proxy_set_header X-Forwarded-Host $http_host;
+          nginx.ingress.kubernetes.io/configuration-snippet:
+            | # authentik's 401 doesn't have this header, needed for at least iOS
+            if ($http_authorization = "") {
+                add_header 'WWW-Authenticate' 'Basic realm="bye"' always;
+            }
+    persistence:
+      config:
+        type: configMap
+        name: radicale-config
+        globalMounts:
+          - path: /config/config
+            subPath: config.cfg
+            readOnly: true
+      data:
+        existingClaim: radicale-config-v1
+        advancedMounts:
+          radicale:
+            app:
+              - path: /data
+      auth:
+        type: secret
+        name: radicale-secret
+        globalMounts:
+          - path: /config/users
+            subPath: users
+            readOnly: true

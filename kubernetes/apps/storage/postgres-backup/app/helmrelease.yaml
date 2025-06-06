@@ -1,0 +1,68 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: postgres-backup
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 4.0.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      postgres-backup:
+        type: cronjob
+        cronjob:
+          concurrencyPolicy: Forbid
+          schedule: "0 17 * * *"
+        pod:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 1022
+            runAsGroup: 1022
+            fsGroup: 1022
+        containers:
+          app:
+            image:
+              repository: docker.io/prodrigestivill/postgres-backup-local
+              tag: 17@sha256:483fa15ecd998302bd312fc380cb1b3683a940881d9099d6dfe65bcc1e2714e8
+            command:
+              - /bin/bash
+              - -x
+              - /backup.sh
+            env:
+              - { name: TZ, value: "${TIMEZONE:=Etc/UTC}" }
+              - { name: POSTGRES_DB, value: "authelia,dmarc,gatus,grafana,lldap,miniflux,nextcloud,outline,paperless" }
+              - { name: POSTGRES_HOST, value: "postgres-ro.dbms.svc.cluster.local" }
+              - { name: POSTGRES_PORT, value: 5432 }
+              - name: POSTGRES_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: cloudnative-pg-secret
+                    key: username
+              - name: POSTGRES_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: cloudnative-pg-secret
+                    key: password
+    persistence:
+      nas:
+        type: nfs
+        server: ${SECRET_BACKUP_SERVER:=fnord}
+        path: /backup/data/k8s/postgres
+        globalMounts:
+          - path: /backups

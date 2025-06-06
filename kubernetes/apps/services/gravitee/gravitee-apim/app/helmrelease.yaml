@@ -1,0 +1,86 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app gravitee-apim
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: apim
+      version: 4.7.6
+      sourceRef:
+        kind: HelmRepository
+        name: graviteeio
+        namespace: gravitee
+  maxHistory: 2
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    es:
+      endpoints:
+        - http://graviteeio-apim-elasticsearch:9200
+
+    elasticsearch:
+      enabled: true
+      master:
+        masterOnly: false
+        replicaCount: 1
+      data:
+        replicaCount: 0
+      coordinating:
+        replicaCount: 0
+      ingest:
+        replicaCount: 0
+
+    mongodb:
+      enabled: false
+
+    management:
+      type: jdbc
+
+    api:
+      autoscaling:
+        enabled: false
+      ingress:
+        management:
+          hosts:
+            - api-management-api.${LIMITED_DOMAIN}
+        portal:
+          hosts:
+            - api-management-api.${LIMITED_DOMAIN}
+
+    gateway:
+      autoscaling:
+        enabled: false
+      ingress:
+        hosts:
+          - api.${LIMITED_DOMAIN}
+
+    portal:
+      ingress:
+        hosts:
+          - portal.${LIMITED_DOMAIN}
+
+    ui:
+      autoscaling:
+        enabled: false
+      ingress:
+        hosts:
+          - api.${LIMITED_DOMAIN}
+
+    jdbc:
+      url: kubernetes://gravitee/secrets/gravitee-apim-secret/jdbc_uri
+      driver: https://jdbc.postgresql.org/download/postgresql-42.2.20.jar
+      username: kubernetes://gravitee/secrets/gravitee-apim-secret/jdbc_username
+      password: kubernetes://gravitee/secrets/gravitee-apim-secret/jdbc_password

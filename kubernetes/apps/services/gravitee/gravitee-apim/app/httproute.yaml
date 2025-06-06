@@ -1,0 +1,80 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gravitee-apim-api-management
+spec:
+  hostnames:
+    - api-management-api.${LIMITED_DOMAIN}
+  parentRefs:
+    - name: internal
+      namespace: network
+      sectionName: https
+  rules:
+    - backendRefs:
+        - name: gravitee-apim-api
+          port: 83
+      matches:
+        - path:
+            type: PathPrefix
+            value: /management
+    - backendRefs:
+        - name: gravitee-apim-api
+          port: 83
+      matches:
+        - path:
+            type: PathPrefix
+            value: /portal
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gravitee-apim
+spec:
+  hostnames:
+    - api.${LIMITED_DOMAIN}
+  parentRefs:
+    - name: internal
+      namespace: network
+      sectionName: https
+  rules:
+    - backendRefs:
+        - name: gravitee-apim-ui
+          port: 8002
+      matches:
+        - path:
+            type: PathPrefix
+            value: /console
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+    - backendRefs:
+        - name: gravitee-apim-gateway
+          port: 82
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gravitee-apim-portal
+spec:
+  hostnames:
+    - portal.${LIMITED_DOMAIN}
+  parentRefs:
+    - name: internal
+      namespace: network
+      sectionName: https
+  rules:
+    - backendRefs:
+        - name: gravitee-apim-portal
+          port: 8003
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

@@ -1,0 +1,104 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2beta1.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app ghost
+  namespace: default
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 2.6.0
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  maxHistory: 2
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      main:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          main:
+            image:
+              repository: ghost
+              # renovate: datasource=docker depName=ghost
+              tag: "5.120.0"
+            env:
+              TZ: "${TIMEZONE}"
+              url: "https://${SECRET_DOMAIN}"
+              admin__url: "https://ghost.${SECRET_DOMAIN}"
+              database__client: mysql
+              database__connection__host: mariadb.data.svc
+              database__connection__database: ghost
+              database__connection__user: ghost
+              database__connection__password: ${GHOST_DB_PASSWORD}
+              mail__transport: SMTP
+              mail__from: ${MAILGUN_FROM_EMAIL}
+              mail__options__service: Mailgun
+              mail__options__host: ${MAILGUN_SMTP_HOST}
+              mail__options__port: ${MAILGUN_SMTP_PORT}
+              mail__options__secure: true
+              mail__options__auth__user: ${MAILGUN_SMTP_USER}
+              mail__options__auth__pass: ${MAILGUN_SMTP_PASSWORD}
+            resources:
+              requests:
+                cpu: 15m
+                memory: 256M
+              limits:
+                memory: 1Gi
+    service:
+      main:
+        ports:
+          http:
+            port: 2368
+    ingress:
+      main:
+        enabled: true
+        className: nginx
+        hosts:
+          - host: &host "${SECRET_DOMAIN}"
+            paths:
+              - path: /
+                service:
+                  name: main
+                  port: http
+        tls:
+          - hosts:
+              - *host
+      admin:
+        enabled: true
+        className: nginx
+        annotations:
+          gethomepage.dev/enabled: "true"
+          gethomepage.dev/group: News
+          gethomepage.dev/name: Ghost
+          gethomepage.dev/description: Personal Blog
+          gethomepage.dev/icon: ghost-light.png
+        hosts:
+          - host: &host "{{ .Release.Name }}.${SECRET_DOMAIN}"
+            paths:
+              - path: /
+                service:
+                  name: main
+                  port: http
+        tls:
+          - hosts:
+              - *host
+    persistence:
+      content:
+        enabled: true
+        existingClaim: ghost-config-v1

@@ -1,0 +1,77 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mariadb
+  namespace: data
+spec:
+  interval: 10m0s
+  chart:
+    spec:
+      # renovate: registryUrl=https://charts.bitnami.com/bitnami
+      chart: mariadb
+      version: 15.2.0
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami-charts
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    primary:
+      extraEnvVars:
+      - name: TZ
+        value: "${TIMEZONE}"
+      persistence:
+        enabled: true
+        existingClaim: mariadb-pvc-v2 
+      readinessProbe:
+        initialDelaySeconds: 35
+        periodSeconds: 5
+        failureThreshold: 10
+      livenessProbe:
+        initialDelaySeconds: 35
+        periodSeconds: 5
+        failureThreshold: 10
+    image:
+      debug: true
+    auth:
+      rootPassword: "${MARIADB_ROOT_PASSWORD}"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+    initdbScripts:
+      create-photoprism.sql: |
+        CREATE DATABASE IF NOT EXISTS photoprism
+        CHARACTER SET = 'utf8mb4'
+        COLLATE = 'utf8mb4_unicode_ci';
+
+        CREATE USER IF NOT EXISTS 'photoprism'@'%' IDENTIFIED BY '${PHOTOPRISM_DB_PASSWORD}';
+        GRANT ALL PRIVILEGES ON photoprism.* to 'photoprism'@'%';
+
+      create-monica.sql: |
+        CREATE DATABASE IF NOT EXISTS monica
+        CHARACTER SET = 'utf8mb4'
+        COLLATE = 'utf8mb4_unicode_ci';
+
+        CREATE USER IF NOT EXISTS 'monica'@'%' IDENTIFIED BY '${MONICA_DB_PASSWORD}';
+        GRANT ALL PRIVILEGES ON monica.* to 'monica'@'%';
+      
+      create-ghost.sql: |
+        CREATE DATABASE IF NOT EXISTS ghost
+        CHARACTER SET = 'utf8mb4'
+        COLLATE = 'utf8mb4_unicode_ci';
+
+        CREATE USER IF NOT EXISTS 'ghost'@'%' IDENTIFIED BY '${GHOST_DB_PASSWORD}';
+        GRANT ALL PRIVILEGES ON ghost.* to 'ghost'@'%';

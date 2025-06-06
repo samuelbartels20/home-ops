@@ -2,14 +2,14 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
 kind: Kustomization
 metadata:
-  name: &app cluster-apps-jellyfin
-  namespace: flux-system
+  name: &app jellyfin
+  namespace: services
   labels:
     substitution.flux.home.arpa/enabled: "true"
 spec:
   suspend: false
-  targetNamespace: default
-  path: ./kubernetes/apps/default/jellyfin/app
+  targetNamespace: services
+  path: ./kubernetes/apps/services/jellyfin/app
   sourceRef:
     kind: GitRepository
     name: flux-system

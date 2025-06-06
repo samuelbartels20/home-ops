@@ -3,73 +3,39 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: &app linkding
-  namespace: default
+  name: linkding
 spec:
   interval: 30m
   chart:
     spec:
       chart: app-template
-      version: 3.7.3
-      interval: 30m
+      version: 3.5.1
       sourceRef:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-  install:
-    remediation:
-      retries: 3
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      strategy: rollback
-      retries: 3
   values:
     controllers:
       linkding:
-        replicas: 2
-        strategy: RollingUpdate
         annotations:
           reloader.stakater.com/auto: "true"
+        # strategy: RollingUpdate
         initContainers:
           init-db:
             image:
-              repository: ghcr.io/onedr0p/postgres-init
-              tag: 16
-            # https://github.com/onedr0p/containers/blob/main/apps/postgres-init/entrypoint.sh
-            env:
-              INIT_POSTGRES_HOST: &dbHost 192.168.8.101
-              INIT_POSTGRES_DBNAME: &dbName postgres
-              INIT_POSTGRES_USER:
-                valueFrom:
-                  secretKeyRef:
-                    name: &secret linkding-secret
-                    key: LD_DB_USER
-              INIT_POSTGRES_PASS:
-                valueFrom:
-                  secretKeyRef:
-                    name: linkding-secret
-                    key: LD_DB_PASSWORD
-              INIT_POSTGRES_SUPER_PASS:
-                valueFrom:
-                  secretKeyRef:
-                    name: linkding-secret
-                    key: LD_DB_SUPER_PASSWORD
-              INIT_POSTGRES_PORT: 5432
-              INIT_POSTGRES_SSLMODE: disable
+              repository: ghcr.io/home-operations/postgres-init
+              tag: 17
+            envFrom: &envFrom
+              - secretRef:
+                  name: linkding-secret
         containers:
           app:
             image:
               repository: docker.io/sissbruecker/linkding
-              tag: 1.36.0-plus-alpine
+              tag: 1.40.0-plus-alpine
             env:
-              LD_DB_ENGINE: postgres
-              LD_DB_DATABASE: *dbName
-              LD_DB_HOST: *dbHost
-              LD_DB_PORT: 5432
-            envFrom:
-              - secretRef:
-                  name: *secret
+              TZ: ${TIMEZONE}
+            envFrom: *envFrom
             probes:
               liveness: &probes
                 enabled: true
@@ -78,18 +44,19 @@ spec:
                   httpGet:
                     path: /health
                     port: &port 9090
-                  initialDelaySeconds: 10
-                  periodSeconds: 5
-                  timeoutSeconds: 10
-                  failureThreshold: 30
+                  initialDelaySeconds: 0
+                  periodSeconds: 10
+                  timeoutSeconds: 1
+                  failureThreshold: 3
               readiness: *probes
+              startup:
+                enabled: false
             resources:
               requests:
-                cpu: 12m
-                memory: 512M
+                cpu: 50m
+                memory: 300Mi
               limits:
-                # For HTML snapshot spike
-                memory: 4Gi
+                memory: 400Mi
     service:
       app:
         controller: linkding
@@ -98,22 +65,20 @@ spec:
             port: *port
     ingress:
       app:
-        className: external
-        annotations:
-          external-dns.alpha.kubernetes.io/target: "external.samcloud.online"
-          gethomepage.dev/enabled: "true"
-          gethomepage.dev/group: Services
-          gethomepage.dev/name: Bookmarks
-          gethomepage.dev/icon: mdi-bookmark
+        className: nginx
         hosts:
-          - host: "bookmarks.samcloud.online"
+          - host: &host linkding.${SECRET_DOMAIN}
             paths:
               - path: /
                 service:
                   identifier: app
                   port: http
+        tls:
+          - hosts:
+              - *host
     persistence:
       data:
-        existingClaim: linkding-pvc
+        enabled: true
+        existingClaim: linkding-config-v1
         globalMounts:
           - path: /etc/linkding/data
