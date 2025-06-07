@@ -86,7 +86,7 @@ spec:
               PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "true"
               PAPERLESS_OCR_LANGUAGE: fra+eng
               PAPERLESS_DBHOST: 192.168.8.101
-              PAPERLESS_REDIS: redis://dragonfly.database.svc.cluster.local:6379/3
+              PAPERLESS_REDIS: redis://dragonfly.storage.svc.cluster.local:6379/3
             envFrom:
               - secretRef:
                   name: paperless-secrets
