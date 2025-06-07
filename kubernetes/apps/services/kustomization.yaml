@@ -8,7 +8,5 @@ components:
 resources:
   - ./echo/ks.yaml
   - ./trilium/ks.yaml
-  - ./kafka/schema-registry/ks.yaml
   - ./openbooks/ks.yaml
   - ./stirling-pdf/ks.yaml
-  # - ./actual/ks.yaml
