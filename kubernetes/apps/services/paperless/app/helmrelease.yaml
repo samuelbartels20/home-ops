@@ -125,8 +125,8 @@ spec:
             app:
               - path: /data/local
                 subPath: paperless
-      nas:
-        enabled: false
+      # nas:
+      #   enabled: false
         # Uncomment when ready to use NAS
         # existingClaim: paperless-nas-pvc
         # advancedMounts:
