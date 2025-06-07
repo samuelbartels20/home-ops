@@ -47,8 +47,8 @@ spec:
             env:
               TZ: UTC
               STIRLING_PDF_DATA_DIR: &datadir /data
-              USER_UID: 1000
-              USER_GID: 1000
+              # USER_UID: 1000
+              # USER_GID: 1000
 
             resources:
               requests:
