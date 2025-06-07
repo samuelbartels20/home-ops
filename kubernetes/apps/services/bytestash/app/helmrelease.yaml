@@ -27,7 +27,7 @@ spec:
           main:
             image:
               repository: ghcr.io/jordan-dalby/bytestash
-              tag: 1.5.7
+              tag: 1.5.8
 
             env:
               BASE_PATH: ""
