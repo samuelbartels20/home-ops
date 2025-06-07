@@ -13,7 +13,7 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  targetNamespace: default
+  targetNamespace: services
   interval: 30m
   retryInterval: 1m
   timeout: 3m
