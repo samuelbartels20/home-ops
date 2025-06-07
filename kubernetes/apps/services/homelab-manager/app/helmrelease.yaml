@@ -65,7 +65,7 @@ spec:
           main:
             image:
               repository: alpine/curl
-              tag: 8.12.1
+              tag: 8.14.1
             args:
               - -X POST
               - http://homelab-manager.default.svc.cluster.local/api/notifications/send-whats-next-report
