@@ -105,7 +105,7 @@ spec:
             port: &port 8000
 
     route:
-      external:
+      paperless:
         enabled: true
         annotations:
           reloader.stakater.com/auto: "true"
