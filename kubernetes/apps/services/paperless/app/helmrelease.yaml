@@ -7,7 +7,7 @@ metadata:
 spec:
   interval: 30m
   chartRef:
-    kind: OCIRepository
+    kind: helmRepository
     name: bjw-s
     namespace: flux-system
   targetNamespace: services
