@@ -103,9 +103,13 @@ spec:
         ports:
           http:
             port: &port 8000
-
+    serviceMonitor:
+      app:
+        serviceName: paperless
+        endpoints:
+          - port: http
     route:
-      paperless:
+      app:
         enabled: true
         annotations:
           reloader.stakater.com/auto: "true"
