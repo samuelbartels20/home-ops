@@ -98,7 +98,8 @@ spec:
                 memory: 2Gi
 
     service:
-      app:
+      paperless:
+        enabled: true
         controller: paperless
         ports:
           http:
