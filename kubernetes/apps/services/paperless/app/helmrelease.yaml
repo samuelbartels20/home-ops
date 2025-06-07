@@ -4,57 +4,70 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: paperless
-  namespace: default
+  namespace: services
 spec:
   interval: 30m
+  chartRef:
+    kind: HelmRepository
+    name: bjw-s
+    namespace: flux-system
+  targetNamespace: services
+  maxHistory: 3
   chart:
     spec:
       chart: app-template
       version: 3.7.3
-      sourceRef:
-        kind: HelmRepository
-        name: bjw-s
-        namespace: flux-system
   install:
+    createNamespace: true
     remediation:
       retries: 3
   upgrade:
     cleanupOnFail: true
     remediation:
-      strategy: rollback
       retries: 3
+  uninstall:
+    keepHistory: false
   dependsOn:
     - name: cloudnative-pg
-      namespace: database
+      namespace: storage
   values:
     controllers:
       paperless:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        pod:
+          securityContext:
+            runAsUser: 568
+            runAsGroup: 568
+            runAsNonRoot: true
+            fsGroup: 568
+            fsGroupChangePolicy: OnRootMismatch
         initContainers:
           01-init-db:
-              image:
-                repository: ghcr.io/home-operations/postgres-init
-                tag: 17
-                pullPolicy: IfNotPresent
-              env:
-                INIT_POSTGRES_DBNAME: paperless
-                INIT_POSTGRES_HOST: 192.168.8.101
-                INIT_POSTGRES_USER:
-                  valueFrom:
-                    secretKeyRef:
-                      name: paperless-secrets
-                      key: PAPERLESS_DBUSER
-                INIT_POSTGRES_PASS:
-                  valueFrom:
-                    secretKeyRef:
-                      name: paperless-secrets
-                      key: PAPERLESS_DBPASS
-                INIT_POSTGRES_SUPER_PASS:
-                  valueFrom:
-                    secretKeyRef:
-                      name: paperless-secrets
-                      key: PAPERLESS_SUPERPASS
-                INIT_POSTGRES_PORT: 5432
-                INIT_POSTGRES_SSLMODE: disable
+            image:
+              repository: ghcr.io/home-operations/postgres-init
+              tag: 17
+              pullPolicy: IfNotPresent
+            env:
+              INIT_POSTGRES_DBNAME: paperless
+              INIT_POSTGRES_HOST: 192.168.8.101
+              INIT_POSTGRES_USER:
+                valueFrom:
+                  secretKeyRef:
+                    name: paperless-secrets
+                    key: PAPERLESS_DBUSER
+              INIT_POSTGRES_PASS:
+                valueFrom:
+                  secretKeyRef:
+                    name: paperless-secrets
+                    key: PAPERLESS_DBPASS
+              INIT_POSTGRES_SUPER_PASS:
+                valueFrom:
+                  secretKeyRef:
+                    name: paperless-secrets
+                    key: PAPERLESS_SUPERPASS
+              INIT_POSTGRES_PORT: 5432
+              INIT_POSTGRES_SSLMODE: disable
         containers:
           app:
             image:
@@ -78,8 +91,6 @@ spec:
               PAPERLESS_OCR_LANGUAGE: fra+eng
               PAPERLESS_DBHOST: 192.168.8.101
               PAPERLESS_REDIS: redis://dragonfly.database.svc.cluster.local:6379/3
-              USERMAP_UID: "568"
-              USERMAP_GID: "568"
             envFrom:
               - secretRef:
                   name: paperless-secrets
@@ -95,36 +106,34 @@ spec:
         controller: paperless
         ports:
           http:
-            port: 8000
+            port: &port 8000
 
-    ingress:
-      app:
-        className: external
-        annotations:
-          external-dns.home.arpa/enabled: "true"
-          hajimari.io/enable: "true"
-          hajimari.io/group: "Tools"
-          hajimari.io/icon: "arcticons:paperless"
-          external-dns.alpha.kubernetes.io/target: external.samcloud.online
-        hosts:
-          - host: &host paperless.samcloud.online
-            paths:
-              - path: /
-                service:
-                  identifier: app
-                  port: http
-        tls:
-          - hosts:
-              - *host
-            secretName: paperless-production-tls
+    route:
+      internal:
+        hostnames: ["paperless.samcloud.online"]
+        parentRefs:
+          - name: external
+            namespace: kube-system
+            sectionName: https
+        rules:
+          - backendRefs:
+              - identifier: app
+                port: *port
+
     persistence:
       data:
-        existingClaim: paperless-pvc # this directory is backup every so often
-        globalMounts:
-          - subPath: paperless
-            path: /data/local
+        enabled: true
+        existingClaim: paperless-pvc
+        advancedMounts:
+          app:
+            app:
+              - path: /data/local
+                subPath: paperless
       # nas:
-      #   existingClaim: paperless-pvc # this directory is backup every so
-      #   globalMounts:
-      #     - subPath: paperless
-      #       path: /data/nas
+      #   enabled: true
+      #   existingClaim: paperless-pvc
+      #   advancedMounts:
+      #     app:
+      #       app:
+      #         - path: /data/nas
+      #           subPath: paperless
