@@ -7,6 +7,7 @@ metadata:
   namespace: services
 spec:
   interval: 30m
+  chart: app-template
   chartRef:
     kind: HelmRepository
     name: bjw-s
