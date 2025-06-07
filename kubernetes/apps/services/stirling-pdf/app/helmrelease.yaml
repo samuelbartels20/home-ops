@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: app-template
-      version: "0.1.0"  # Update this to your desired chart version
+      version: "0.2.2"  # Update this to your desired chart version
       sourceRef:
         kind: HelmRepository
         name: bjw-s
