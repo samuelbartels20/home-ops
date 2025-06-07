@@ -7,9 +7,14 @@ metadata:
 spec:
   interval: 30m
   chartRef:
-    kind: helmRepository
-    name: bjw-s
+    kind: OCIRepository
+    name: app-template
     namespace: flux-system
+  chart:
+    spec:
+      chart: paperless  # Update this to your desired chart version
+      sourceRef:
+        kind: HelmRepository
   targetNamespace: services
   maxHistory: 3
   install:
