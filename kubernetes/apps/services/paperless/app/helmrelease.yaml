@@ -105,7 +105,10 @@ spec:
             port: &port 8000
 
     route:
-      internal:
+      external:
+        enabled: true
+        annotations:
+          reloader.stakater.com/auto: "true"
         hostnames: ["paperless.samcloud.online"]
         parentRefs:
           - name: external
