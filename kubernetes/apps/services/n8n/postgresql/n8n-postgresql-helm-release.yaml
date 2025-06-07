@@ -20,7 +20,7 @@ spec:
   values:
     image:
       repository: bitnami/postgresql
-      tag: 15.4.0-debian-11-r39
+      tag: 15.10.0-debian-12-r2
     auth:
       enablePostgresUser: false
       username: n8n
