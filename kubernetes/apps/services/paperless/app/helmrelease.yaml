@@ -8,15 +8,11 @@ metadata:
 spec:
   interval: 30m
   chartRef:
-    kind: HelmRepository
-    name: bjw-s
+    kind: OCIRepository
+    name: app-template
     namespace: flux-system
   targetNamespace: services
   maxHistory: 3
-  chart:
-    spec:
-      chart: app-template
-      version: 3.7.3
   install:
     createNamespace: true
     remediation:
