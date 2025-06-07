@@ -28,7 +28,7 @@ spec:
   values:
     defaultPodOptions:
       securityContext:
-        runAsUser: 1000
+        # runAsUser: 1000
 
     controllers:
       stirling-pdf:
