@@ -7,4 +7,4 @@ components:
   # - ../../components/alerts
   - ../../components/common
 resources:
-  - ./jenkins/ks.yaml
+  # - ./jenkins/ks.yaml
