@@ -4,7 +4,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cloudnative-pg
-  namespace: flux-system
+  namespace: storage
 spec:
   interval: 10m
   path: "./kubernetes/apps/storage/cloudnative-pg/app"
@@ -20,7 +20,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cloudnative-pg-cluster
-  namespace: flux-system
+  namespace: storage
 spec:
   interval: 10m
   path: "./kubernetes/apps/storage/cloudnative-pg/cluster"
@@ -32,13 +32,14 @@ spec:
   wait: true
   dependsOn:
     - name: cloudnative-pg
+      namespace: storage
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/kustomization-kustomize-v1.json
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cloudnative-pg-backup
-  namespace: flux-system
+  namespace: storage
 spec:
   interval: 10m
   path: "./kubernetes/apps/storage/cloudnative-pg/backup"
@@ -50,3 +51,5 @@ spec:
   wait: true
   dependsOn:
     - name: cloudnative-pg-cluster
+      namespace: storage
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/kustomization-kustomize-v1.json
