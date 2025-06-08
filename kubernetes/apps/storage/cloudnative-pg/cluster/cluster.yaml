@@ -3,7 +3,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-v16
+  name: postgres-v17
   annotations:
     kyverno.io/ignore: "true"
 spec:
@@ -50,7 +50,7 @@ spec:
       endpointURL: http://192.168.8.161:9000
       # Note: serverName version needs to be incremented
       # when recovering from an existing cnpg cluster
-      serverName: &currentCluster postgres-v16-v2
+      serverName: &currentCluster postgres-v17-v2
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg-secret
