@@ -9,9 +9,9 @@ metadata:
 spec:
   type: LoadBalancer
   externalIPs: [192.168.8.101]
-  # externalTrafficPolicy: Local
-  # ipFamilies: [IPv4]
-  # ipFamilyPolicy: PreferDualStack
+  externalTrafficPolicy: Local
+  ipFamilies: [IPv4]
+  ipFamilyPolicy: PreferDualStack
   ports:
     - name: postgres
       port: 5432
@@ -59,7 +59,7 @@ metadata:
   #   external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
   #   lbipam.cilium.io/ips: 192.168.8.101
 spec:
-  type: clusterIP
+  type: ClusterIP
   ports:
     - name: postgres
       port: 5432
