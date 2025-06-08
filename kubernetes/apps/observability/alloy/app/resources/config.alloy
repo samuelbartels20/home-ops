@@ -27,13 +27,6 @@ discovery.relabel "pod_logs" {
     target_label = "namespace"
   }
 
-  // Label creation - "pod" field from "__meta_kubernetes_pod_node_name"
-  rule {
-    source_labels = ["__meta_kubernetes_pod_node_name"]
-    action = "replace"
-    target_label = "node"
-  }
-
   // Label creation - "pod" field from "__meta_kubernetes_pod_name"
   rule {
     source_labels = ["__meta_kubernetes_pod_name"]
@@ -96,7 +89,7 @@ loki.source.kubernetes "pod_logs" {
 loki.process "pod_logs" {
   stage.static_labels {
       values = {
-        cluster = "main",
+        cluster = "kubernetes",
       }
   }
 
@@ -120,7 +113,7 @@ loki.process "cluster_events" {
 
   stage.static_labels {
     values = {
-      cluster = "main",
+      cluster = "kubernetes",
     }
   }
 
