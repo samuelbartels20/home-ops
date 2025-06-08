@@ -15,6 +15,7 @@ resources:
   - ./alloy/ks.yaml
   - ./keda/ks.yaml
   - ./graphite-exporter/ks.yaml
+  - ./opentelemetry/ks.yaml
 
 
 

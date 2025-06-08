@@ -23,8 +23,8 @@ spec:
       strategy: rollback
       retries: 3
   dependsOn:
-    - name: rook-ceph-cluster
-      namespace: rook-ceph
+    - name: openebs
+      namespace: storage
   values:
     global:
       # -- Common environment variables to add to all pods directly managed by this chart.
@@ -132,7 +132,7 @@ spec:
         enabled: true
       persistentVolume:
         enabled: true
-        storageClass: "ceph-block"
+        storageClass: "openebs-hostpath"
         enableRetentionPolicy: true
         whenDeleted: Delete
         whenScaled: Retain
@@ -178,7 +178,7 @@ spec:
 
       zoneAwareReplication:
         topologyKey: 'kubernetes.io/hostname'
-        storageClass: "ceph-block"
+        storageClass: "openebs-hostpath"
 
     ruler:
       replicas: 1
@@ -212,7 +212,7 @@ spec:
     store_gateway:
       persistentVolume:
         size: 10Gi
-        storageClass: ceph-block
+        storageClass: openebs-hostpath
       replicas: 2
       resources:
         limits:
@@ -251,7 +251,7 @@ spec:
       persistentVolume:
         enabled: true
         size: 20Gi
-        storageClass: ceph-block
+        storageClass: openebs-hostpath
 
     admin-cache:
       enabled: false
