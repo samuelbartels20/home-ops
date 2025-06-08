@@ -44,7 +44,7 @@ spec:
       # endpointURL: https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com
       # Note: serverName version needs to be incremented
       # when recovering from an existing cnpg cluster
-      serverName: &currentCluster postgres17-v1
+      serverName: &currentCluster postgres-v1
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg-secret
@@ -58,7 +58,7 @@ spec:
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.161:9000
-        serverName: &previouscluster postgres17-v2
+        serverName: &previouscluster postgres-v2
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg-secret
