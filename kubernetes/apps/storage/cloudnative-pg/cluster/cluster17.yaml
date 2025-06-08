@@ -15,9 +15,6 @@ spec:
   enableSuperuserAccess: true
   superuserSecret:
     name: cloudnative-pg-secret
-  affinity:
-    nodeSelector:
-      node-role.kubernetes.io/worker: ""
   postgresql:
     parameters:
       max_connections: "800"
