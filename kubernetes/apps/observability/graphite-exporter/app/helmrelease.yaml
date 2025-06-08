@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: graphite-exporter
+  namespace: observability
 spec:
   interval: 30m
   chart:
@@ -26,7 +27,7 @@ spec:
     keepHistory: false
   dependsOn:
     - name: kube-prometheus-stack
-      namespace: monitoring
+      namespace: observability
   values:
     controllers:
       graphite-exporter:
@@ -75,7 +76,7 @@ spec:
         controller: graphite-exporter
         type: LoadBalancer
         annotations:
-          io.cilium/lb-ipam-ips: 192.168.1.205
+          io.cilium/lb-ipam-ips: 192.168.8.109
         ports:
           graphite-tcp:
             protocol: TCP
