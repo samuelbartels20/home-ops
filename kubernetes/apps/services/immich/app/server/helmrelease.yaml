@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app immich-server
+  namespace:  services
 spec:
   interval: 30m
   chartRef:
@@ -32,7 +33,7 @@ spec:
               tag: v1.134.0@sha256:073fc04c7e3d18ace466c20763809cf17aa55765ed610f12971b392a6a80b50c
 
             env:
-              TZ: ${TIMEZONE}
+              TZ: UTC
               IMMICH_WORKERS_INCLUDE: api
               SERVER_PORT: &port 2283
 
@@ -106,7 +107,7 @@ spec:
     route:
       app:
         hostnames:
-          - "photos.${SECRET_DOMAIN}"
+          - "photos.samcloud.online"
         parentRefs:
           - name: external
             namespace: network
@@ -119,7 +120,7 @@ spec:
     persistence:
       library:
         type: nfs
-        server: "truenas.${INTERNAL_DOMAIN}"
+        server: "truenas.samcloud.online"
         path: /mnt/tank/Photos
         globalMounts:
           - path: /usr/src/app/upload
