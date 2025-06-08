@@ -13,7 +13,7 @@ spec:
       version: 0.88.7
       sourceRef:
         kind: HelmRepository
-        name: open-telemetry
+        name: opentelemetry
         namespace: flux-system
       interval: 5m
   install:
