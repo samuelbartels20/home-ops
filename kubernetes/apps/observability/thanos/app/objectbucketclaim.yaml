@@ -6,4 +6,4 @@ metadata:
   name: thanos-bucket
 spec:
   bucketName: thanos
-  storageClassName: ceph-bucket
+  storageClassName: openebs-hostpath

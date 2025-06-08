@@ -6,4 +6,4 @@ metadata:
   name: tempo-bucket
 spec:
   bucketName: tempo-bucket
-  storageClassName: ceph-bucket
+  storageClassName: openebs-hostpath

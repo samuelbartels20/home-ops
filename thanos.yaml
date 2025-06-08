@@ -8,8 +8,8 @@ stringData:
     objstore.yml: |
         type: S3
         config:
-            bucket: "thanos"
-            endpoint: "http://192.168.8.1619000"
+            bucket: thanos
+            endpoint: http://192.168.8.161:9000
             insecure: true
-            access_key: "${MINIO_ACCESS_KEY}"
-            secret_key: "${MINIO_SECRET_KEY}"
+            access_key: cQY7QVBJIgVgsAVid4Pn
+            secret_key: G4k80oDO4CimiD3UydmkrUCia4Ll4SKNJm2mOOyL

@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: tempo
+  namespace: observability
 spec:
   interval: 15m
   chart:
@@ -26,8 +27,8 @@ spec:
   uninstall:
     keepHistory: false
   dependsOn:
-    - name: rook-ceph-cluster
-      namespace: rook-ceph
+    - name: openebs
+      namespace: storage
   values:
     replicas: 2
     tempo:
@@ -45,12 +46,12 @@ spec:
     tempoQuery:
       ingress:
         enabled: true
-        ingressClassName: internal
-        className: internal
+        ingressClassName: external
+        className: external
         annotations:
           cert-manager.io/cluster-issuer: letsencrypt-production
         hosts:
-          - &host "tempo-query.${SECRET_PUBLIC_DOMAIN}"
+          - &host "tempo-query.samcloud.online"
         tls:
           - secretName: istio-prod-cert-tls
             hosts:

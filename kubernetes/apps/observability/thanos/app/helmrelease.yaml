@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: thanos
+  namespace: observability
 spec:
   interval: 30m
   timeout: 15m
@@ -25,9 +26,9 @@ spec:
       retries: 3
   dependsOn:
     - name: openebs
-      namespace: openebs-system
-    - name: rook-ceph-cluster
-      namespace: rook-ceph
+      namespace: storage
+    - name: cloudnative-pg
+      namespace: storage
   valuesFrom:
     - targetPath: objstoreConfig.value.config.bucket
       kind: ConfigMap
@@ -74,7 +75,7 @@ spec:
         size: 10Gi
     query:
       replicas: 2
-      extraArgs: ["--alert.query-url=https://thanos.${SECRET_PUBLIC_DOMAIN}"]
+      extraArgs: ["--alert.query-url=https://thanos.samcloud.online"]
       additionalStores: ["thanos.286k.co:10901"]
     queryFrontend:
       enabled: true
@@ -88,9 +89,9 @@ spec:
       extraArgs: ["--query-range.response-cache-config=$(THANOS_CACHE_CONFIG)"]
       ingress:
         enabled: true
-        ingressClassName: internal
+        ingressClassName: external
         hosts:
-          - &host thanos.${SECRET_PUBLIC_DOMAIN}
+          - &host thanos.samcloud.online
         tls:
           - hosts: [*host]
       podAnnotations: &podAnnotations
