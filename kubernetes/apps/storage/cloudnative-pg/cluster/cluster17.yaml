@@ -1,48 +1,56 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/postgresql.cnpg.io/cluster_v1.json
+# yaml-language-server: $schema=https://kochhaus-schemas.pages.dev/postgresql.cnpg.io/cluster_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: &current postgres-v17-3
-  namespace: storage
+  name: postgres-v17
+  annotations:
+    kyverno.io/ignore: "true"
 spec:
+  imageName:  ghcr.io/cloudnative-pg/postgresql:17.2
   instances: 3
   primaryUpdateStrategy: unsupervised
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
   storage:
-    size: 20Gi
+    size: 10Gi
     storageClass: openebs-hostpath
-  enableSuperuserAccess: true
   superuserSecret:
     name: cloudnative-pg-secret
+  enableSuperuserAccess: true
   postgresql:
+    synchronous:
+      method: any
+      number: 1
     parameters:
-      max_connections: "800"
-      shared_buffers: "512MB"
-  # minor upgrades or recovery from existing s3 backups
-  bootstrap:
-    recovery:
-      source: &previousCluster postgres-v17-2
-  # when doing major upgrade and backup doesn't exist
-  # bootstrap:
-  #   initdb:
-  #     import:
-  #       type: monolith
-  #       databases: ["*"]
-  #       roles: ["*"]
-  #       source:
-  #         externalCluster: &previousCluster postgres-v16-v3
+      max_connections: "400"
+      shared_buffers: 256MB
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 640Mi
+  monitoring:
+    enablePodMonitor: true
+    # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
+    podMonitorMetricRelabelings:
+      - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
+      - { regex: cluster, action: labeldrop }
   backup:
     retentionPolicy: 30d
-    barmanObjectStore:
+    barmanObjectStore: &barmanObjectStore
       data:
         compression: bzip2
       wal:
         compression: bzip2
         maxParallel: 8
-      destinationPath: &s3 s3://pgbackup/
-      endpointURL: &endpoint http://192.168.8.161:9000
-      serverName: *current
+      destinationPath: s3://pgbackup/
+      endpointURL: http://192.168.8.161:9000
+      # Note: serverName version needs to be incremented
+      # when recovering from an existing cnpg cluster
+      serverName: &currentCluster postgres-v17-v2
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg-secret
@@ -50,17 +58,14 @@ spec:
         secretAccessKey:
           name: cloudnative-pg-secret
           key: AWS_SECRET_ACCESS_KEY
-  monitoring:
-    enablePodMonitor: true
+
+  # Note: externalClusters is needed when recovering from an existing cnpg cluster
   externalClusters:
-    # recovering from s3
-    - name: *previousCluster
+    - name: clusterBackup
       barmanObjectStore:
-        wal:
-          compression: bzip2
-          maxParallel: 8
-        destinationPath: *s3
-        endpointURL: *endpoint
+        destinationPath: s3://pgbackup/
+        endpointURL: http://192.168.8.161:9000
+        serverName: &previouscluster postgres-v2
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg-secret
@@ -68,14 +73,3 @@ spec:
           secretAccessKey:
             name: cloudnative-pg-secret
             key: AWS_SECRET_ACCESS_KEY
-    # when directly doing direct upgrades and upgrading when current
-    # postgres is already running
-    # - name: *previousCluster
-    #   connectionParameters:
-    #     host: postgres-lb.database.svc.cluster.local
-    #     user: postgres
-    #     dbname: postgres
-    #     sslmode: require
-    #   password:
-    #     name: postgres-superuser
-    #     key: password
