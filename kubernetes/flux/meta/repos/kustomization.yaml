@@ -15,6 +15,6 @@ resources:
   - ./strimzi.yaml
   - ./backube.yaml
   - ./piraeus.yaml
-  - ./alloy.yaml
+  # - ./alloy.yaml
   - ./tailscale.yaml
 
