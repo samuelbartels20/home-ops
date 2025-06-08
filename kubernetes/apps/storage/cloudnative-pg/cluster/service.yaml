@@ -9,7 +9,7 @@ metadata:
 spec:
   type: LoadBalancer
   # externalIPs: [192.168.8.109]
-  # externalTrafficPolicy: Local
+  externalTrafficPolicy: Local
   # ipFamilies: [IPv4]
   # ipFamilyPolicy: PreferDualStack
   ports:
