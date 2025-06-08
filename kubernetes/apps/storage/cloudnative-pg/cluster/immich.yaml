@@ -44,7 +44,7 @@ spec:
       wal:
         compression: bzip2
         maxParallel: 8
-      destinationPath: s3://cloudnative-pg/
+      destinationPath: s3://immich
       endpointURL: http://192.168.8.161:9000
       # Note: serverName version needs to be incremented
       # when recovering from an existing cnpg cluster
@@ -59,7 +59,7 @@ spec:
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
-        destinationPath: s3://cloudnative-pg
+        destinationPath: s3://immich
         endpointURL: http://192.168.8.161:9000
         serverName: &previousCluster immich-v2
         s3Credentials:
