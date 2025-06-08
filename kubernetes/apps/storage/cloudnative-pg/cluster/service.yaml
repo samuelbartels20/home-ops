@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres17
+  name: postgres-lb
   namespace: storage
   labels:
-    cnpg.io/cluster: postgres17
+    cnpg.io/cluster: postgres
     cnpg.io/instanceRole: primary
   annotations:
     lbipam.cilium.io/ips: 192.168.8.101
@@ -13,7 +13,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    cnpg.io/cluster: postgres17
+    cnpg.io/cluster: postgres
     cnpg.io/instanceRole: primary
   ports:
     - name: postgres
