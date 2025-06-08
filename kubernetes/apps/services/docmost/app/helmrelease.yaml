@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app docmost
+  namespace:  services
 spec:
   interval: 30m
   chart:
@@ -42,13 +43,13 @@ spec:
               tag: 0.20.4
             env:
               TZ: "${TIMEZONE:=Etc/UTC}"
-              APP_URL: "https://{{ .Release.Name }}.${CLUSTER_DOMAIN}"
+              APP_URL: "https://{{ .Release.Name }}.samcloud.online"
               MAIL_DRIVER: smtp
-              MAIL_FROM_ADDRESS: docmost@${CLUSTER_DOMAIN}
+              MAIL_FROM_ADDRESS: docmost@samcloud.online
               MAIL_FROM_NAME: Docmost
               PORT: "3000"
-              REDIS_URL: "redis://dragonfly.dbms:6379"
-              SMTP_HOST: smtp.${CLUSTER_DOMAIN}
+              REDIS_URL: "redis://dragonfly.storage:6379"
+              SMTP_HOST: smtp.samcloud.online
               SMTP_PORT: 25
             envFrom: *envFrom
             probes:
