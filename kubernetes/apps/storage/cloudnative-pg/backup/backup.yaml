@@ -1,12 +1,12 @@
 ---
-# yaml-language-server: $schema=https://kochhaus-schemas.pages.dev/postgresql.cnpg.io/scheduledbackup_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: daily-backup
+  name: postgres
+  namespace: database
 spec:
   schedule: "@daily"
   immediate: true
   backupOwnerReference: self
   cluster:
-    name: postgres
+    name: postgres-v17-3

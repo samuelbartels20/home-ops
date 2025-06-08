@@ -2,12 +2,12 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-v17-2
+  name: postgres-v16
   namespace: database
 spec:
   instances: 3
   primaryUpdateStrategy: unsupervised
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4-5
   storage:
     size: 20Gi
     storageClass: local-hostpath
@@ -21,7 +21,7 @@ spec:
       ssl_min_protocol_version: TLSv1.2
   bootstrap:
     recovery:
-      source: &previousCluster postgres-v17-1
+      source: &previousCluster postgres-v16-v2
   monitoring:
     enablePodMonitor: true
   backup:
@@ -32,7 +32,7 @@ spec:
         maxParallel: 8
       destinationPath: &s3 s3://pgsql/
       endpointURL: &endpoint http://192.168.1.5:9000
-      serverName: postgres-v17-2
+      serverName: postgres-v16-v3
       s3Credentials:
         accessKeyId:
           name: minio-pgsql

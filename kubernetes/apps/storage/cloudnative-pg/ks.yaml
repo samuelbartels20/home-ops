@@ -3,67 +3,50 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app cloudnative-pg
-  namespace: &namespace storage
+  name: cloudnative-pg
+  namespace: flux-system
 spec:
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  interval: 30m
-  path: ./kubernetes/apps/storage/cloudnative-pg/app
+  interval: 10m
+  path: "./kubernetes/apps/storage/cloudnative-pg/app"
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  targetNamespace: *namespace
-  timeout: 5m
   wait: true
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/kustomization-kustomize-v1.json
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app cloudnative-pg-cluster
-  namespace: &namespace storage
+  name: cloudnative-pg-cluster
+  namespace: flux-system
 spec:
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage
-  interval: 30m
-  path: ./kubernetes/apps/storage/cloudnative-pg/cluster
+  interval: 10m
+  path: "./kubernetes/apps/storage/cloudnative-pg/cluster"
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  targetNamespace: *namespace
-  timeout: 5m
   wait: true
-# ---
+  dependsOn:
+    - name: cloudnative-pg
+---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/kustomization-kustomize-v1.json
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: &app cloudnative-pg-backup
-#   namespace: &namespace storage
-# spec:
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: *app
-#   dependsOn:
-#     - name: cloudnative-pg-cluster
-#       namespace: storage
-#   interval: 30m
-#   path: ./kubernetes/apps/storage/cloudnative-pg/backup
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   targetNamespace: *namespace
-#   timeout: 5m
-#   wait: false
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-backup
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: "./kubernetes/apps/storage/cloudnative-pg/backup"
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  wait: true
+  dependsOn:
+    - name: cloudnative-pg-cluster
