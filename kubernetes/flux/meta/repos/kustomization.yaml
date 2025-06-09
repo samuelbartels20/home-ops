@@ -17,5 +17,5 @@ resources:
   - ./piraeus.yaml
   - ./tailscale.yaml
   - ./opentelemetry.yaml
-  # - ./thanos.yaml
+  - ./descheduler.yaml
 
