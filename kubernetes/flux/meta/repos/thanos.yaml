@@ -3,8 +3,8 @@
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: HelmRepository
 metadata:
-  name: stevehipwell
+  name: bitnami-charts
   namespace: flux-system
 spec:
   interval: 12h
-  url: oci://ghcr.io/stevehipwell/helm-charts/
+  url: oci://registry-1.docker.io/bitnamicharts/thanos
