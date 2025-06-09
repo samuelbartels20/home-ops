@@ -12,7 +12,7 @@ spec:
       version: 1.4.2
       sourceRef:
         kind: HelmRepository
-        name: k8s-at-home
+        name: bjw-s
         namespace: flux-system
   values:
     env:
@@ -39,7 +39,7 @@ spec:
           hajimari.io/group: Monitoring
           hajimari.io/appName: Uptime-Kuma
         hosts:
-          - host: &host "status.${SECRET_DOMAIN}"
+          - host: &host "status.samcloud.online"
             paths:
               - path: /
                 pathType: Prefix
