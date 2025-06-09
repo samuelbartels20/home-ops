@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app redisinsight
+  namespace: observability
 spec:
   interval: 30m
   chart:
@@ -33,7 +34,7 @@ spec:
               repository: redis/redisinsight
               tag: 2.68.0@sha256:019fcf7746316312474c2f347a9ee21797a8cb48ebaacb50f3000b4be08a468e
             env:
-              TZ: "${TIMEZONE}"
+              TZ: UTC
               RI_FILES_LOGGER: false
               RI_STDOUT_LOGGER: true
             securityContext:
@@ -62,16 +63,16 @@ spec:
             port: 5540
     ingress:
       app:
-        className: internal
+        className: external
         annotations:
-          external-dns.alpha.kubernetes.io/target: internal.rafaribe.com
+          external-dns.alpha.kubernetes.io/target: external.samcloud.online
           gethomepage.dev/enabled: "true"
           gethomepage.dev/group: Observability
           gethomepage.dev/name: Redis Insight
           gethomepage.dev/icon: https://raw.githubusercontent.com/RedisInsight/RedisInsight/main/resources/logo.svg
           gethomepage.dev/description: Developer GUI for Redis
         hosts:
-          - host: "{{ .Release.Name }}.rafaribe.com"
+          - host: "{{ .Release.Name }}.samcloud.online"
             paths:
               - path: /
                 service:
@@ -79,4 +80,7 @@ spec:
                   port: http
     persistence:
       data:
-        existingClaim: *app
+        existingClaim: redisinsight-data
+        mountPath: /data
+        subPath: redisinsight
+        enabled: true

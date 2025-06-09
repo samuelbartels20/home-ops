@@ -19,6 +19,7 @@ resources:
   - ./descheduler/ks.yaml
   - ./vpa/ks.yaml
   - ./uptime-kuma/ks.yaml
+  - ./redisinsight/ks.yaml
 
 
 
