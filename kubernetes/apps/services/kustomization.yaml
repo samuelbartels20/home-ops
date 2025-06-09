@@ -9,4 +9,4 @@ resources:
   - ./echo/ks.yaml
   - ./trilium/ks.yaml
   - ./openbooks/ks.yaml
-  - ./paperless/ks.yaml
+  # - ./paperless/ks.yaml
