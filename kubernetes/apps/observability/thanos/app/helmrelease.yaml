@@ -7,16 +7,16 @@ metadata:
   namespace: observability
 spec:
   interval: 30m
-  timeout: 15m
   chart:
     spec:
       chart: thanos
-      version: 1.20.0
+      version: 17.0.1
       sourceRef:
         kind: HelmRepository
-        name: stevehipwell
+        name: bitnami-charts
         namespace: flux-system
   install:
+    createNamespace: true
     remediation:
       retries: 3
   upgrade:

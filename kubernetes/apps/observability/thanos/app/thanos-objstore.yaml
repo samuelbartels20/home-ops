@@ -9,7 +9,7 @@ stringData:
         type: S3
         config:
             bucket: "thanos"
-            endpoint: "http://192.168.8.1619000"
+            endpoint: "http://192.168.8.161:9000"
             insecure: true
             access_key: "${MINIO_ACCESS_KEY}"
             secret_key: "${MINIO_SECRET_KEY}"
