@@ -5,7 +5,7 @@ metadata:
   name: vpa
   namespace: observability
 spec:
-  path: ./cluster/apps/observability/vpa/app
+  path: ./kubernetes/apps/observability/vpa/app
   prune: true
   sourceRef:
     kind: GitRepository
