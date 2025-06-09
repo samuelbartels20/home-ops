@@ -18,4 +18,4 @@ resources:
   - ./tailscale.yaml
   - ./opentelemetry.yaml
   - ./descheduler.yaml
-
+  - ./victoria-metrics.yaml

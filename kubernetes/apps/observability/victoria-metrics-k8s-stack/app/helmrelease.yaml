@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: vmks
+  namespace: observability
 spec:
   interval: 30m
   chart:
@@ -21,4 +22,4 @@ spec:
         path: /
         pathType: Prefix
         hosts:
-          - "grafana.${SECRET_DOMAIN}"
+          - "grafana.samcloud.online"
