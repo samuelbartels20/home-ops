@@ -17,7 +17,7 @@ resources:
   - ./graphite-exporter/ks.yaml
   - ./opentelemetry/ks.yaml
   - ./descheduler/ks.yaml
-  - ./victoria-metrics-k8s-stack/ks.yaml
+  # - ./victoria-metrics-k8s-stack/ks.yaml
 
 
 
