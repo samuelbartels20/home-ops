@@ -81,6 +81,8 @@ spec:
     persistence:
       data:
         existingClaim: redisinsight-data
-        mountPath: /data
-        subPath: redisinsight
+        globalMounts:
+          - path: /app/data
+            subPath: redisinsight
+            mountPropagation: HostToContainer
         enabled: true
