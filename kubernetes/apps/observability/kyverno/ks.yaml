@@ -32,7 +32,7 @@ spec:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: kyverno
-      namespace: kyverno
+      namespace: observability
   interval: 30m
   path: ./kubernetes/apps/observability/kyverno/policies
   prune: true
