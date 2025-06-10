@@ -4,13 +4,13 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app kyverno
-  namespace: &namespace kyverno
+  namespace: &namespace observability
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
   interval: 30m
-  path: ./kubernetes/main/apps/kyverno/kyverno/app
+  path: ./kubernetes/apps/observability/kyverno/app
   prune: true
   sourceRef:
     kind: GitRepository
@@ -25,7 +25,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app cluster-policies
-  namespace: &namespace kyverno
+  namespace: &namespace observability
 spec:
   commonMetadata:
     labels:
@@ -34,7 +34,7 @@ spec:
     - name: kyverno
       namespace: kyverno
   interval: 30m
-  path: ./kubernetes/main/apps/kyverno/kyverno/policies
+  path: ./kubernetes/apps/observability/kyverno/policies
   prune: true
   sourceRef:
     kind: GitRepository

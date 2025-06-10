@@ -21,6 +21,7 @@ resources:
   - ./uptime-kuma/ks.yaml
   - ./smartctl-exporter/ks.yaml
   - ./nut-exporter/ks.yaml
+  - ./kyverno/ks.yaml
 
 
 
