@@ -59,7 +59,7 @@ spec:
       resources:
         requests:
           cpu: 50m
-          memory: 128Mi
+          memory: 100Mi
         limits:
           memory: 192Mi
     cleanupController:
@@ -104,6 +104,6 @@ spec:
         resources:
           requests:
             cpu: 500m
-            memory: 384Mi
+            memory: 200Mi
           limits:
             memory: 512Mi
