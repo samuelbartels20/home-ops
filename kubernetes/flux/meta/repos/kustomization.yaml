@@ -20,4 +20,5 @@ resources:
   - ./descheduler.yaml
   - ./vpa.yaml
   - ./kyverno.yaml
+  - ./kured.yaml
 
