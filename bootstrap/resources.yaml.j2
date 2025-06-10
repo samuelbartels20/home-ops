@@ -21,6 +21,17 @@ stringData:
 
 
 ---
+# onepassword secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nut-exporter-secret
+  namespace: observability
+stringData:
+  NUT_EXPORTER_PASSWORD: op://K8s/nut-exporter/NUT_EXPORTER_PASSWORD
+
+
+---
 # tailscale secret
 apiVersion: v1
 kind: Secret

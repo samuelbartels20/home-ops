@@ -20,6 +20,7 @@ resources:
   - ./vpa/ks.yaml
   - ./uptime-kuma/ks.yaml
   - ./smartctl-exporter/ks.yaml
+  - ./nut-exporter/ks.yaml
 
 
 
