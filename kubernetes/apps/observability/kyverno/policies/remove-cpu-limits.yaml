@@ -1,5 +1,5 @@
 ---
-apiVersion: kyverno.io/v1
+apiVersion: kyverno.io/v2beta1
 kind: ClusterPolicy
 metadata:
   name: remove-cpu-limit
@@ -26,7 +26,7 @@ spec:
                 kyverno.io/ignore: "true"
       mutate:
         foreach:
-          - list: "request.object.spec.containers"
+          - list: "request.object.spec.containers[?resources.limits.cpu]"
             patchesJson6902: |-
               - path: /spec/containers/{{elementIndex}}/resources/limits/cpu
                 op: remove
@@ -48,7 +48,7 @@ spec:
             value: 1
       mutate:
         foreach:
-          - list: "request.object.spec.initContainers"
+          - list: "request.object.spec.initContainers[?resources.limits.cpu]"
             patchesJson6902: |-
               - path: /spec/initContainers/{{elementIndex}}/resources/limits/cpu
                 op: remove

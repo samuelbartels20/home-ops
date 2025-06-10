@@ -164,6 +164,25 @@ spec:
         walCompression: true
         retention: 14d
         retentionSize: 30GB
+        # TSDB corruption prevention settings
+        additionalArgs:
+          - --storage.tsdb.wal-segment-size=256MB
+          - --storage.tsdb.max-block-duration=2h
+          - --storage.tsdb.min-block-duration=1h
+          - --storage.tsdb.head-chunks-write-queue-size=1000000
+          - --storage.tsdb.max-block-chunk-segment-size=512MB
+          - --query.timeout=2m
+          - --query.max-concurrency=20
+        terminationGracePeriodSeconds: 300
+        # Thanos sidecar configuration
+        thanos:
+          image: quay.io/thanos/thanos:v0.38.3
+          objectStorageConfig:
+            existingSecret:
+              name: thanos-objstore
+              key: objstore.yml
+          logLevel: info
+          minTime: "-3h"
         storageSpec:
           volumeClaimTemplate:
             spec:

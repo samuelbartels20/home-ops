@@ -10,10 +10,10 @@ spec:
   chart:
     spec:
       chart: thanos
-      version: 17.0.1
+      version: "15.10.2"
       sourceRef:
         kind: HelmRepository
-        name: bitnami-charts
+        name: prometheus-community
         namespace: flux-system
   install:
     createNamespace: true
