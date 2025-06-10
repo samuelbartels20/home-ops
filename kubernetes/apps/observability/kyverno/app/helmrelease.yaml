@@ -32,6 +32,7 @@ spec:
         name: kyverno
         namespace: flux-system
   install:
+    crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
