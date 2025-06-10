@@ -3,8 +3,8 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: thanos-charts
+  name: bitnami
   namespace: flux-system
 spec:
   interval: 12h
-  url: https://charts.thanos.io
+  url: https://charts.bitnami.com/bitnami
