@@ -5,8 +5,7 @@ metadata:
   name: smokeping-config-v1
   namespace: observability
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: ["ReadWriteOnce"]
   resources:
     requests:
       storage: 1Mi
