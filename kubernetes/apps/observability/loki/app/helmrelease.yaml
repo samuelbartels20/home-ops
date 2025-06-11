@@ -75,6 +75,13 @@ spec:
           rule_path: /rules/fake
     singleBinary:
       replicas: 1
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: "2"
+          memory: 2Gi
       persistence:
         enabled: true
         storageClass: openebs-hostpath
@@ -88,11 +95,18 @@ spec:
     write:
       replicas: 0
     chunksCache:
-      enabled: false
+      enabled: true
     resultsCache:
-      enabled: false
+      enabled: true
     lokiCanary:
-      enabled: false
+      enabled: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
     test:
       enabled: false
     sidecar:

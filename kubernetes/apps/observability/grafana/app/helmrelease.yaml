@@ -81,6 +81,27 @@ spec:
             url: http://alertmanager-operated.observability.svc.cluster.local:9093
             jsonData:
               implementation: prometheus
+          - name: Tempo
+            type: tempo
+            uid: tempo
+            access: proxy
+            url: http://tempo-distributor.observability.svc.cluster.local:3200 # Assuming standard Tempo service name and port
+            jsonData:
+              tracesToLogs:
+                datasourceUid: 'loki' # Link to Loki
+                tags: ['job', 'instance', 'pod', 'namespace']
+                mappedTags: [{ key: 'service.name', value: 'service' }]
+                mapTagNamesEnabled: false
+                spanStartTimeShift: '1h'
+                spanEndTimeShift: '1h'
+                filterByTraceID: true
+                filterBySpanID: false
+              serviceMap:
+                datasourceUid: 'prometheus' # Link to Prometheus for service graph
+              search:
+                hide: false
+              nodeGraph:
+                enabled: true
     dashboardProviders:
       dashboardproviders.yaml:
         apiVersion: 1
@@ -262,6 +283,11 @@ spec:
             namespace: kube-system
             sectionName: https
     persistence:
-      enabled: false
+      enabled: true
+      type: pvc
+      size: 10Gi
+      # storageClassName: <your-storage-class> # Uncomment and set if needed
+      accessModes:
+        - ReadWriteOnce
     testFramework:
       enabled: false

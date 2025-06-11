@@ -84,9 +84,9 @@ spec:
               endpoint: "$${BUCKET_HOST}:$${BUCKET_PORT}"
               access_key_id: "$${AWS_ACCESS_KEY_ID}"
               secret_access_key: "$${AWS_SECRET_ACCESS_KEY}"
-              insecure: true
+              insecure: false
               http:
-                insecure_skip_verify: true
+                insecure_skip_verify: false
         blocks_storage:
           s3:
             bucket_name: mimir-blocks
@@ -125,9 +125,9 @@ spec:
       resources:
         limits:
           memory: 1.4Gi
-        # requests:
-        #   cpu: 500m
-        #   memory: 500Mi
+        requests:
+          cpu: 500m
+          memory: 500Mi
       statefulSet:
         enabled: true
       persistentVolume:
@@ -138,24 +138,25 @@ spec:
         whenScaled: Retain
 
     distributor:
+      replicas: 2
       resources:
         limits:
           memory: 5.7Gi
-        # requests:
-        #   cpu: 2
-        #   memory: 2Gi
+        requests:
+          cpu: "1" # Using string as per existing patterns sometimes
+          memory: 2Gi
 
     ingester:
       persistentVolume:
         size: 50Gi
         storageClass: "ceph-block"
-      replicas: 2
+      replicas: 2 # Already 2
       resources:
         limits:
           memory: 12Gi
-        # requests:
-        #   cpu: 1
-        #   memory: 1Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi # Increased from 1Gi for ingesters
       topologySpreadConstraints: {}
       affinity:
         podAntiAffinity:
@@ -181,31 +182,31 @@ spec:
         storageClass: "openebs-hostpath"
 
     ruler:
-      replicas: 1
+      replicas: 2
       resources:
         limits:
           memory: 2.8Gi
-        # requests:
-        #   cpu: 500m
-        #   memory: 500m
+        requests:
+          cpu: 500m
+          memory: 1Gi # Increased from 500m
 
     querier:
-      replicas: 1
+      replicas: 2
       resources:
         limits:
           memory: 5.6Gi
-        # requests:
-        #   cpu: 2
-        #   memory: 2Gi
+        requests:
+          cpu: "1" # Using string
+          memory: 2Gi
 
     query_frontend:
-      replicas: 1
+      replicas: 2
       resources:
         limits:
           memory: 2.8Gi
-        # requests:
-        #   cpu: 2
-        #   memory: 1Gi
+        requests:
+          cpu: "1" # Using string
+          memory: 1Gi
 
 
 
@@ -213,13 +214,13 @@ spec:
       persistentVolume:
         size: 10Gi
         storageClass: openebs-hostpath
-      replicas: 2
+      replicas: 2 # Already 2
       resources:
         limits:
           memory: 2.1Gi
-        # requests:
-        #   cpu: 500m
-        #   memory: 750Mi
+        requests:
+          cpu: 500m
+          memory: 1Gi # Increased from 750Mi
       topologySpreadConstraints: {}
       affinity:
         podAntiAffinity:
@@ -242,35 +243,73 @@ spec:
         topologyKey: 'kubernetes.io/hostname'
 
     compactor:
+      # Replicas usually 1 for compactor
+      replicas: 1
       resources:
         limits:
           memory: 2.1Gi
-        # requests:
-        #   cpu: 1
-        #   memory: 1Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
       persistentVolume:
         enabled: true
         size: 20Gi
         storageClass: openebs-hostpath
 
     admin-cache:
-      enabled: false
-      replicas: 1
+      enabled: true # Enable this as well, often useful.
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
 
     chunks-cache:
-      enabled: false
-      replicas: 1
+      enabled: true
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi # Chunks cache can be larger
+        limits:
+          cpu: "1"
+          memory: 1Gi
 
     index-cache:
-      enabled: false
-      replicas: 1
+      enabled: true
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi # Index cache also benefits from more memory
+        limits:
+          cpu: "1"
+          memory: 1Gi
 
     metadata-cache:
-      enabled: false
+      enabled: true
+      replicas: 2 # For HA, though sometimes 1 is fine. Start with 2.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
 
     results-cache:
-      enabled: false
-      replicas: 1
+      enabled: true
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi # Results cache for queries
+        limits:
+          cpu: "1"
+          memory: 1Gi
 
     # -- Setting for the Grafana Rollout Operator https://github.com/grafana/helm-charts/tree/main/charts/rollout-operator
     rollout_operator:
@@ -290,13 +329,13 @@ spec:
       enabledNonEnterprise: true
 
       # -- Number of replicas for the Deployment
-      replicas: 1
+      replicas: 2
       resources:
         limits:
           memory: 731Mi
-        # requests:
-        #   cpu: 500m
-        #   memory: 256Mi
+        requests:
+          cpu: 500m
+          memory: 256Mi
 
       ingress:
         enabled: false

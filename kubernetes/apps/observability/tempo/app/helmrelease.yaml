@@ -35,12 +35,61 @@ spec:
       reportingEnabled: false
       metricsGenerator:
         enabled: true
-        remoteWriteUrl: "http://mimir-gateway.monitoring.svc:80/api/v1/push"
+        remoteWriteUrl: "http://mimir-nginx.observability.svc.cluster.local:80/api/v1/push"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      distributor:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      ingester:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 1Gi
+          limits:
+            cpu: "1"
+            memory: 2Gi
+      querier:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+      queryFrontend:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      compactor:
+        # Replicas for compactor are often 1, overriding global if necessary
+        # replicas: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
       storage:
         trace:
           backend: s3
           s3:
-            insecure: true                                 # optional. enable if endpoint is http
+            insecure: false                                 # optional. enable if endpoint is http
     persistence:
       enabled: false
     tempoQuery:
