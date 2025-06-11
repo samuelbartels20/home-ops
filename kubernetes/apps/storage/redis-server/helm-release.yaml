@@ -27,7 +27,7 @@ spec:
         reloader.stakater.com/auto: "true"
     image:
       repository: public.ecr.aws/docker/library/redis
-      tag: 7.4.3
+      tag: 8.0.2
     env:
       REDIS_REPLICATION_MODE: master
     command: ["redis-server"]
