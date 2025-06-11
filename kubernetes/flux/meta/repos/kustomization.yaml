@@ -8,7 +8,6 @@ resources:
   - ./externalsecrets.yaml
   - ./bjw-s.yaml
   - ./cloudnative-pg.yaml
-  # - ./kube-prometheus-stack.yaml
   - ./grafana.yaml
   - ./loki.yaml
   - ./keda.yaml
@@ -19,6 +18,5 @@ resources:
   - ./opentelemetry.yaml
   - ./descheduler.yaml
   - ./vpa.yaml
-  # - ./kyverno.yaml
   - ./kured.yaml
 
