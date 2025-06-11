@@ -19,6 +19,6 @@ resources:
   - ./opentelemetry.yaml
   - ./descheduler.yaml
   - ./vpa.yaml
-  - ./kyverno.yaml
+  # - ./kyverno.yaml
   - ./kured.yaml
 
