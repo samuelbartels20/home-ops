@@ -5,7 +5,7 @@ namespace: observability
 components:
   - ../../components/common
 resources:
-  - ./kube-prometheus-stack/ks.yaml
+  # - ./kube-prometheus-stack/ks.yaml
   - ./grafana/ks.yaml
   - ./gatus/ks.yaml
   - ./loki/ks.yaml
@@ -21,7 +21,7 @@ resources:
   - ./uptime-kuma/ks.yaml
   - ./smartctl-exporter/ks.yaml
   - ./nut-exporter/ks.yaml
-  - ./kyverno/ks.yaml
+  # - ./kyverno/ks.yaml
   - ./kured/ks.yaml
 
 
