@@ -60,6 +60,13 @@ spec:
           global:
             resolveTimeout: 5m
         externalUrl: https://alertmanager.samcloud.online
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 512Mi
         storage:
           volumeClaimTemplate:
             spec:
@@ -161,6 +168,19 @@ spec:
         probeSelectorNilUsesHelmValues: false
         scrapeConfigSelectorNilUsesHelmValues: false
         enableAdminAPI: true
+        resources: # Added for Prometheus
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        remoteWrite: # Added for Mimir integration
+          - url: "http://mimir-nginx.observability.svc.cluster.local:80/api/v1/push"
+            queueConfig:
+              maxSamplesPerSend: 1000
+              maxShards: 20
+              capacity: 2500
         walCompression: true
         retention: 14d
         retentionSize: 30GB

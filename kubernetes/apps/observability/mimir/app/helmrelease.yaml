@@ -29,7 +29,17 @@ spec:
     global:
       # -- Common environment variables to add to all pods directly managed by this chart.
       # scope: admin-api, alertmanager, compactor, continuous-test, distributor, gateway, graphite-proxy, ingester, memcached, nginx, overrides-exporter, querier, query-frontend, query-scheduler, ruler, store-gateway, smoke-test, tokengen
-      extraEnv: []
+      extraEnv:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials-secret
+              key: AWS_SECRET_ACCESS_KEY
 
       # -- Common source of environment injections to add to all pods directly managed by this chart.
       # scope: admin-api, alertmanager, compactor, continuous-test, distributor, gateway, graphite-proxy, ingester, memcached, nginx, overrides-exporter, querier, query-frontend, query-scheduler, ruler, store-gateway, smoke-test, tokengen
@@ -37,11 +47,7 @@ spec:
       # extraEnvFrom:
       #   - secretRef:
       #       name: mysecret
-      extraEnvFrom:
-        - configMapRef:
-            name: mimir-blocks-bucket
-        - secretRef:
-            name: mimir-bucket
+      extraEnvFrom: [] # Removed old references to mimir-blocks-bucket and mimir-bucket
       # -- Common volumes to add to all pods directly managed by this chart.
       # scope: admin-api, alertmanager, compactor, continuous-test, distributor, gateway, graphite-proxy, ingester, memcached, nginx, overrides-exporter, querier, query-frontend, query-scheduler, ruler, store-gateway, smoke-test, tokengen
       extraVolumes: []
@@ -81,21 +87,22 @@ spec:
           storage:
             backend: s3
             s3:
-              endpoint: "$${BUCKET_HOST}:$${BUCKET_PORT}"
-              access_key_id: "$${AWS_ACCESS_KEY_ID}"
-              secret_access_key: "$${AWS_SECRET_ACCESS_KEY}"
-              insecure: false
+              endpoint: "http://192.168.8.161:9000" # Direct endpoint
+              access_key_id: "" # Will be picked from env
+              secret_access_key: "" # Will be picked from env
+              insecure: true # For HTTP endpoint
+              s3forcepathstyle: true # For MinIO compatibility
               http:
-                insecure_skip_verify: false
+                insecure_skip_verify: true # For HTTP endpoint
         blocks_storage:
           s3:
-            bucket_name: mimir-blocks
+            bucket_name: mimir-blocks-9k4l2m
         alertmanager_storage:
           s3:
-            bucket_name: mimir-alertmanager
+            bucket_name: mimir-alertmanager-9k4l2m
         ruler_storage:
           s3:
-            bucket_name: mimir-ruler
+            bucket_name: mimir-ruler-9k4l2m
         limits:
           # Delete from storage metrics data older than 90 days.
           compactor_blocks_retention_period: 90d
