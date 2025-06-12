@@ -102,6 +102,16 @@ spec:
                 hide: false
               nodeGraph:
                 enabled: true
+          - name: Mimir
+            type: prometheus
+            uid: mimir # Unique UID for this datasource
+            access: proxy
+            url: http://mimir-nginx.observability.svc.cluster.local:80/prometheus # Mimir query endpoint via gateway
+            isDefault: false
+            jsonData:
+              httpHeaderName1: "X-Scope-OrgID"
+              httpHeaderValue1: "anonymous" # Default tenant ID
+            # editable: true
     dashboardProviders:
       dashboardproviders.yaml:
         apiVersion: 1
