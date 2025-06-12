@@ -24,7 +24,7 @@ resources:
   - ./smartctl-exporter/ks.yaml
   - ./nut-exporter/ks.yaml
   # - ./kyverno/ks.yaml
-  - ./kured/ks.yaml
+  # - ./kured/ks.yaml
 
 
 
