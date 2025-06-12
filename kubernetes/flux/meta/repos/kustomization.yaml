@@ -8,16 +8,8 @@ resources:
   - ./externalsecrets.yaml
   - ./bjw-s.yaml
   - ./cloudnative-pg.yaml
-  # - ./grafana.yaml
-  # - ./loki.yaml
-  # - ./keda.yaml
   - ./strimzi.yaml
   - ./backube.yaml
   - ./piraeus.yaml
-  # - ./tailscale.yaml
-  # - ./opentelemetry.yaml
-  # - ./descheduler.yaml
-  # - ./vpa.yaml
-  # - ./kured.yaml
-  # - ./kube-prometheus-stack.yaml
+
 
