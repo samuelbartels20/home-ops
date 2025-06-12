@@ -86,6 +86,7 @@ spec:
             port: *port
     serviceMonitor:
       app:
+        serviceName: gatus-app  # Added required serviceName field
         endpoints:
           - port: http
     route:
