@@ -14,10 +14,10 @@ resources:
   - ./strimzi.yaml
   - ./backube.yaml
   - ./piraeus.yaml
-  - ./tailscale.yaml
-  - ./opentelemetry.yaml
-  - ./descheduler.yaml
-  - ./vpa.yaml
-  - ./kured.yaml
-  - ./kube-prometheus-stack.yaml
+  # - ./tailscale.yaml
+  # - ./opentelemetry.yaml
+  # - ./descheduler.yaml
+  # - ./vpa.yaml
+  # - ./kured.yaml
+  # - ./kube-prometheus-stack.yaml
 
