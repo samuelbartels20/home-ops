@@ -64,7 +64,7 @@ spec:
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: ScrapeConfig
 metadata:
-  name: &name onepassword-connect
+  name: &name onepassword
 spec:
   staticConfigs:
     - targets:

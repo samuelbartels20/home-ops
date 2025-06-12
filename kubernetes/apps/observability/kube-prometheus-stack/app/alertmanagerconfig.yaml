@@ -84,3 +84,9 @@ spec:
             name: *secret
             key: PUSHOVER_USER_KEY
           urlTitle: View in Alertmanager
+          url: |-
+            {{- if .CommonLabels.namespace }}
+              https://alertmanager.samcloud.online/alertmanager/#/alerts?filter=namespace%3D%22{{ .CommonLabels.namespace }}%22
+            {{- else }}
+              https://alertmanager.samcloud.online/alertmanager/#/alerts
+            {{- end }}
