@@ -3,26 +3,26 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
-  name: keda
+  name: promtail
 spec:
   interval: 5m
   layerSelector:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy
   ref:
-    tag: 2.17.1
-  url: oci://ghcr.io/home-operations/charts-mirror/keda
+    tag: 6.17.0
+  url: oci://ghcr.io/grafana/helm-charts/promtail
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: keda
+  name: promtail
 spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
-    name: keda
+    name: promtail
   install:
     remediation:
       retries: -1
@@ -31,4 +31,9 @@ spec:
     remediation:
       retries: 3
   values:
-    enableServiceLinks: false
+    fullnameOverride: promtail
+    config:
+      clients:
+        - url: http://loki-headless.observability.svc.cluster.local:3100/loki/api/v1/push
+    serviceMonitor:
+      enabled: true

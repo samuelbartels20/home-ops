@@ -11,11 +11,18 @@ spec:
   targets:
     staticConfig:
       static:
-        - status.external
-        - echo.external
-        - prometheus.external
-        - alertmanager.external
-        - grafana.external
+        - expanse.internal
+        - garage-door.internal
+        - hdhomerun.internal
+        - idrac.internal
+        - kiosk.internal
+        - kvm.internal
+        - pikvm.internal
+        - receiver.internal
+        - ups.internal
+        - vacuum.internal
+        - zigbee-controller.internal
+        - zwave-controller.internal
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/probe_v1.json
 apiVersion: monitoring.coreos.com/v1

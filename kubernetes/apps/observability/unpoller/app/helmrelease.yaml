@@ -1,5 +1,5 @@
 ---
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -27,26 +27,25 @@ spec:
             env:
               TZ: America/New_York
               UP_UNIFI_DEFAULT_ROLE: home-ops
-              UP_UNIFI_DEFAULT_URL: https://10.1.237.1
+              UP_UNIFI_DEFAULT_URL: https://192.168.1.1
               UP_PROMETHEUS_HTTP_LISTEN: 0.0.0.0:80
-              UP_LOKI_DISABLE: false
-              UP_LOKI_URL: https://logs-prod-006.grafana.net
-              UP_UNIFI_DEFAULT_SAVE_ALARMS: true
-              UP_UNIFI_DEFAULT_SAVE_ANOMALIES: true
-              UP_UNIFI_DEFAULT_SAVE_DPI: true
-              UP_UNIFI_DEFAULT_SAVE_EVENTS: true
-              UP_UNIFI_DEFAULT_SAVE_IDS: true
-              UP_UNIFI_DEFAULT_SAVE_SITES: true
               UP_INFLUXDB_DISABLE: true
-              UP_UNIFI_DYNAMIC: true
             envFrom:
               - secretRef:
                   name: unpoller-secret
             probes:
-              liveness:
+              liveness: &probes
                 enabled: true
-              readiness:
-                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: &port 80
+                  initialDelaySeconds: 0
+                  periodSeconds: 10
+                  timeoutSeconds: 1
+                  failureThreshold: 3
+              readiness: *probes
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -59,21 +58,16 @@ spec:
     defaultPodOptions:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        seccompProfile: { type: RuntimeDefault }
+        runAsUser: 1000
+        runAsGroup: 1000
     service:
       app:
-        controller: unpoller
         ports:
           http:
-            port: 80
+            port: *port
     serviceMonitor:
       app:
-        serviceName: unpoller
         endpoints:
           - port: http
-            scheme: http
-            path: /metrics
             interval: 2m # Unifi API only polls at 2m intervals
             scrapeTimeout: 10s
