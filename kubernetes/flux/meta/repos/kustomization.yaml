@@ -19,4 +19,5 @@ resources:
   - ./descheduler.yaml
   - ./vpa.yaml
   - ./kured.yaml
+  - ./kube-prometheus-stack.yaml
 
