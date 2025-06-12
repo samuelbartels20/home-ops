@@ -8,9 +8,9 @@ resources:
   - ./externalsecrets.yaml
   - ./bjw-s.yaml
   - ./cloudnative-pg.yaml
-  - ./grafana.yaml
-  - ./loki.yaml
-  - ./keda.yaml
+  # - ./grafana.yaml
+  # - ./loki.yaml
+  # - ./keda.yaml
   - ./strimzi.yaml
   - ./backube.yaml
   - ./piraeus.yaml
