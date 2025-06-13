@@ -18,6 +18,7 @@ resources:
   - ./promtail/ks.yaml
   - ./grafana/ks.yaml
   - ./alloy/ks.yaml
+  - ./kube-state-metrics/ks.yaml
 
 
 
