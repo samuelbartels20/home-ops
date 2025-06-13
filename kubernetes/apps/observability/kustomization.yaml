@@ -10,6 +10,7 @@ resources:
   - ./alertmanager/ks.yaml
   - ./loki/ks.yaml
   - ./blackbox-exporter/ks.yaml
+  - ./kromgo/ks.yaml
 
 
 
