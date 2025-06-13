@@ -11,6 +11,7 @@ resources:
   - ./loki/ks.yaml
   - ./blackbox-exporter/ks.yaml
   - ./kromgo/ks.yaml
+  - ./keda/ks.yaml
 
 
 
