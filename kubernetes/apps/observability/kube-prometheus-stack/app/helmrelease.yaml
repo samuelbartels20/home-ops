@@ -38,40 +38,9 @@ spec:
         enabled: true
         forceConflicts: true
     cleanPrometheusOperatorObjectNames: true
-
     alertmanager:
       enabled: false
-      # route:
-      #   main:
-      #     enabled: true
-      #     hostnames: ["alertmanager.samcloud.online"]
-      #     parentRefs:
-      #       - name: external
-      #         namespace: kube-system
-      #         sectionName: https
 
-      # alertmanagerSpec:
-      #   replicas: 3
-      #   podAntiAffinity: "soft"
-      #   alertmanagerConfiguration:
-      #     name: alertmanager
-      #     global:
-      #       resolveTimeout: 5m
-      #   externalUrl: https://alertmanager.samcloud.online
-      #   resources:
-      #     requests:
-      #       cpu: 100m
-      #       memory: 256Mi
-      #     limits:
-      #       cpu: "1"
-      #       memory: 512Mi
-      #   storage:
-      #     volumeClaimTemplate:
-      #       spec:
-      #         storageClassName: openebs-hostpath
-      #         resources:
-      #           requests:
-      #             storage: 1Gi
 
     kubeEtcd:
       service:
