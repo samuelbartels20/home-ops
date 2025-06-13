@@ -6,6 +6,9 @@ receivers:
       - html: true
         token_file: /etc/secrets/pushover_api_token
         user_key_file: /etc/secrets/pushover_api_userkey
+        heartbeat_url_file: /etc/secrets/alertmanager_heartbeat_url
+        sound: gamelan
+        ttl: 86400s
         send_resolved: true
         priority: |-
           {{ if eq .Status "firing" }}1{{ else }}0{{ end }}
