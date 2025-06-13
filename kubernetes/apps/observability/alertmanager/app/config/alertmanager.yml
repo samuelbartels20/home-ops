@@ -2,9 +2,7 @@
 receivers:
   - name: "heartbeat"
     webhook_configs:
-      - url_secret:
-          name: alertmanager-secret
-          key: alertmanager_heartbeat_url
+      - url: "${HEARTBEAT_URL}"
   - name: "null"
   - name: "pushover"
     pushover_configs:

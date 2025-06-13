@@ -52,9 +52,21 @@ spec:
             resources:
               requests:
                 cpu: 11m
-                memory: 50M
+                memory: 50Mi
               limits:
-                memory: 99M
+                memory: 99Mi
+            env:
+              - name: HEARTBEAT_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: alertmanager-secret
+                    key: alertmanager_heartbeat_url
+            args:
+              - "--config.file=/etc/alertmanager/config.yml"
+              - "--storage.path=/alertmanager"
+              - "--web.external-url=http://alertmanager.samcloud.online/"
+              - "--log.level=info"
+              - "--config.expand-env=true"
 
     service:
       app:
