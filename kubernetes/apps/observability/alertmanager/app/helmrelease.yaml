@@ -1,4 +1,5 @@
-# Alertmanager HelmRelease - Production Ready
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -12,7 +13,7 @@ spec:
       version: 4.1.1
       sourceRef:
         kind: HelmRepository
-        name: bjw-s
+        name: bjw-s-labs
         namespace: flux-system
   dependsOn:
     - name: openebs
@@ -21,44 +22,23 @@ spec:
     controllers:
       alertmanager:
         type: statefulset
-        replicas: 3
         annotations:
           reloader.stakater.com/auto: "true"
-
-        pod:
-          affinity:
-            podAntiAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchExpressions:
-                      - key: app.kubernetes.io/name
-                        operator: In
-                        values:
-                          - alertmanager
-                  topologyKey: "kubernetes.io/hostname"
 
         statefulset:
           volumeClaimTemplates:
             - name: storage
               accessMode: ReadWriteOnce
-              size: 1Gi
+              size: 50Mi
               storageClass: openebs-hostpath
               globalMounts:
-                - path: /data
+                - path: /alertmanager
 
         containers:
           alertmanager:
             image:
               repository: quay.io/prometheus/alertmanager
               tag: v0.28.1
-            args:
-              - "--config.file=/etc/alertmanager/alertmanager.yml"
-              - "--storage.path=/data"
-              - "--cluster.listen-address=0.0.0.0:9094"
-              - "--web.listen-address=:9093"
-              - "--cluster.peer=alertmanager-0.alertmanager-headless.observability.svc:9094"
-              - "--cluster.peer=alertmanager-1.alertmanager-headless.observability.svc:9094"
-              - "--cluster.peer=alertmanager-2.alertmanager-headless.observability.svc:9094"
             probes:
               liveness:
                 enabled: true
@@ -71,15 +51,10 @@ spec:
                   periodSeconds: 5
             resources:
               requests:
-                cpu: 100m
-                memory: 128Mi
+                cpu: 11m
+                memory: 50M
               limits:
-                cpu: 500m
-                memory: 256Mi
-
-        serviceAccount:
-          create: true
-          name: alertmanager-sa
+                memory: 99M
 
     service:
       app:
@@ -104,6 +79,6 @@ spec:
         hostnames:
           - alertmanager.samcloud.online
         parentRefs:
-          - name: external
+          - name: internal
             namespace: kube-system
             sectionName: https
