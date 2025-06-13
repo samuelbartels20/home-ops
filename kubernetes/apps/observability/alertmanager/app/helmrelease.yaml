@@ -16,8 +16,8 @@ spec:
         name: bjw-s
         namespace: flux-system
   dependsOn:
-    - name: rook-ceph-cluster
-      namespace: rook-ceph
+    - name: openebs
+      namespace: storage
   values:
     controllers:
       alertmanager:
@@ -68,11 +68,11 @@ spec:
         name: alertmanager
         globalMounts:
           - path: /etc/alertmanager
-      secrets:
-        type: secret
-        name: alertmanager-secret
-        globalMounts:
-          - path: /etc/secrets
+      # secrets:
+      #   type: secret
+      #   name: alertmanager-secret
+      #   globalMounts:
+      #     - path: /etc/secrets
 
     route:
       app:
