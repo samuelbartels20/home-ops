@@ -72,7 +72,7 @@ spec:
         type: secret
         name: alertmanager-secret
         globalMounts:
-          - path: /etc/secrets
+          - path: secrets
 
     route:
       app:
