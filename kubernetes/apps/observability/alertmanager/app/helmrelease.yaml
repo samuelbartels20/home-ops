@@ -61,11 +61,6 @@ spec:
                   secretKeyRef:
                     name: alertmanager-secret
                     key: alertmanager_heartbeat_url
-            args:
-              - "--storage.path=/alertmanager"
-              - "--web.external-url=http://alertmanager.samcloud.online/"
-              - "--log.level=info"
-
     service:
       app:
         ports:
