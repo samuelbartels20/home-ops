@@ -68,11 +68,11 @@ spec:
         name: alertmanager
         globalMounts:
           - path: /etc/alertmanager
-      # secrets:
-      #   type: secret
-      #   name: alertmanager-secret
-      #   globalMounts:
-      #     - path: /etc/secrets
+      secrets:
+        type: secret
+        name: alertmanager-secret
+        globalMounts:
+          - path: /etc/secrets
 
     route:
       app:
