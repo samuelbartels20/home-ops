@@ -62,7 +62,6 @@ spec:
                     name: alertmanager-secret
                     key: alertmanager_heartbeat_url
             args:
-              - "--config.file=/etc/alertmanager/config.yml"
               - "--storage.path=/alertmanager"
               - "--web.external-url=http://alertmanager.samcloud.online/"
               - "--log.level=info"
