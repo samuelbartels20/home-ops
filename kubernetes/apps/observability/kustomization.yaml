@@ -13,6 +13,7 @@ resources:
   - ./kromgo/ks.yaml
   - ./keda/ks.yaml
   - ./silence-operator/ks.yaml
+  - ./snmp-exporter/ks.yaml
 
 
 
