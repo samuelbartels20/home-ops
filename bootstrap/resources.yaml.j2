@@ -138,3 +138,17 @@ metadata:
   namespace: network
 stringData:
   CLOUDFLARE_TUNNEL_ID: op://kubernetes/cloudflare/CLOUDFLARE_TUNNEL_ID
+
+
+---
+# alertmanager secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-secret
+  namespace: observability
+stringData:
+      alertmanager_heartbeat_url: op://K8s/alertmanager/ALERTMANAGER_HEARTBEAT_URL
+      pushover_api_token: op://K8s/alertmanager/ALERTMANAGER_PUSHOVER_TOKEN
+      pushover_api_userkey: op://K8s/alertmanager/ALERTMANAGER_PUSHOVER_USER_KEY
+
