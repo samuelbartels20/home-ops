@@ -71,7 +71,7 @@ spec:
           enabled: true
           hostnames: ["prometheus.samcloud.online"]
           parentRefs:
-            - name: internal
+            - name: external
               namespace: kube-system
               sectionName: https
       prometheusSpec:
