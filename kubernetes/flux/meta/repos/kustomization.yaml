@@ -11,5 +11,6 @@ resources:
   - ./strimzi.yaml
   - ./backube.yaml
   - ./piraeus.yaml
+  - ./otel.yaml
 
 
