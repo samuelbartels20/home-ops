@@ -32,7 +32,7 @@ spec:
     remediation:
       retries: 3
   values:
-    alertmanagerAddress: http://alertmanager.observability.svc.cluster.local:9093/loki/api/v1/push
+    alertmanagerAddress: http://alertmanager.observability.svc.cluster.local:9093/api/v1/alerts
     image:
       registry: quay.io
     networkPolicy:
