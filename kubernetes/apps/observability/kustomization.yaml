@@ -16,6 +16,7 @@ resources:
   - ./snmp-exporter/ks.yaml
   - ./smartctl-exporter/ks.yaml
   - ./promtail/ks.yaml
+  - ./grafana/ks.yaml
 
 
 
