@@ -43,7 +43,7 @@ spec:
           enabled: true
           hostnames: ["alertmanager.samcloud.online"]
           parentRefs:
-            - name: internal
+            - name: external
               namespace: kube-system
               sectionName: https
       alertmanagerSpec:
