@@ -19,6 +19,7 @@ resources:
   - ./grafana/ks.yaml
   - ./alloy/ks.yaml
   - ./kube-state-metrics/ks.yaml
+  - ./node-exporter/ks.yaml
 
 
 
