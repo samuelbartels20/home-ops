@@ -35,7 +35,7 @@ spec:
           main:
             image:
               repository: ghcr.io/civilblur/mazanoke
-              tag: v1.1.4@sha256:7b2840065c2422f44bfc3a0b6baae27ee7d9b5944672cdca78ba14ee2eb4b86f
+              tag: v1.1.5@sha256:e43dc48de575b7a032bbefd96b890d69c1f141417e43d5d096469aa1398711d6
             env:
               TZ: ${TIMEZONE}
               ENVIRONMENT: "production"
