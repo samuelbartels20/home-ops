@@ -78,10 +78,8 @@ spec:
                 memory: 256Mi
 
         serviceAccount:
-          create:
-            enabled: true
-          name:
-            value: alertmanager-sa
+          create: true
+          name: alertmanager-sa
 
     service:
       app:
