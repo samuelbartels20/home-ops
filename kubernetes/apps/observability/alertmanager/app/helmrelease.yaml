@@ -63,11 +63,11 @@ spec:
             port: 9093
 
     persistence:
-      # config:
-      #   type: configMap
-      #   name: alertmanager
-      #   globalMounts:
-      #     - path: /etc/alertmanager
+      config:
+        type: configMap
+        name: alertmanager
+        globalMounts:
+          - path: /etc/alertmanager
       secrets:
         type: secret
         name: alertmanager-secret
