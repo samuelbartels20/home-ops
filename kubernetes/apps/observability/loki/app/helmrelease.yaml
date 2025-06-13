@@ -4,6 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: loki
+  namespace: flux-system
 spec:
   interval: 5m
   layerSelector:
@@ -18,6 +19,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: loki
+  namespace: observability
 spec:
   interval: 1h
   chartRef:
@@ -75,7 +77,7 @@ spec:
       replicas: 1
       persistence:
         enabled: true
-        storageClass: ceph-block
+        storageClass: openebs-hostpath
         size: 50Gi
     gateway:
       replicas: 0
