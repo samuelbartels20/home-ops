@@ -4,6 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: grafana
+  namespace: flux-system
 spec:
   interval: 5m
   layerSelector:
@@ -18,6 +19,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: grafana
+  namespace: observability
 spec:
   interval: 1h
   chartRef:
@@ -256,7 +258,7 @@ spec:
     route:
       main:
         enabled: true
-        hostnames: ["{{ .Release.Name }}.devbu.io"]
+        hostnames: ["{{ .Release.Name }}.samcloud.online"]
         parentRefs:
           - name: internal
             namespace: kube-system
