@@ -17,6 +17,7 @@ resources:
   - ./smartctl-exporter/ks.yaml
   - ./promtail/ks.yaml
   - ./grafana/ks.yaml
+  - ./alloy/ks.yaml
 
 
 
