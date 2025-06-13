@@ -40,7 +40,7 @@ spec:
           app:
             image:
               repository: ghcr.io/wallabag/docker
-              tag: 2.6.12@sha256:9989e05769885aef0b316508b728580460c7713e435cc0b02c16e7b06e17bb6a
+              tag: 2.6.13@sha256:efa1c00736e0544291dd104f8f3092ca5e88076862e9e034ae9cd3eaa9d36daa
 
             envFrom:
               - secretRef:
