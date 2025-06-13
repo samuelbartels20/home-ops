@@ -1,6 +1,12 @@
 ---
 receivers:
   - name: "null"
+  - name: "heartbeat"
+    webhookConfigs:
+      - urlSecret:
+          name: &secret alertmanager-secret
+          key: alertmanager_heartbeat_url
+  - name: "null"
   - name: "pushover"
     pushover_configs:
       - html: true
