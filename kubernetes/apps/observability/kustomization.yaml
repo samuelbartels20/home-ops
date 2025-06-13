@@ -9,6 +9,7 @@ resources:
   - ./kube-prometheus-stack/ks.yaml
   - ./alertmanager/ks.yaml
   - ./loki/ks.yaml
+  - ./blackbox-exporter/ks.yaml
 
 
 
