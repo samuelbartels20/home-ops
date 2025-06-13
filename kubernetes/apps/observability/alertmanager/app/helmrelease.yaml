@@ -77,6 +77,12 @@ spec:
                 cpu: 500m
                 memory: 256Mi
 
+        serviceAccount:
+          create:
+            enabled: true
+          name:
+            value: alertmanager-sa
+
     service:
       app:
         ports:
@@ -94,10 +100,6 @@ spec:
         name: alertmanager-secret
         globalMounts:
           - path: /etc/secrets
-
-    serviceAccount:
-      create: true
-      name: alertmanager-sa
 
     route:
       app:
