@@ -32,7 +32,7 @@ spec:
     remediation:
       retries: 3
   values:
-    alertmanagerAddress: http://kube-prometheus-stack-alertmanager:9093
+    alertmanagerAddress: http://alertmanager.observability.svc.cluster.local:9093/loki/api/v1/push
     image:
       registry: quay.io
     networkPolicy:
