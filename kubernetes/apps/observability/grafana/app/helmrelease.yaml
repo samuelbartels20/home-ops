@@ -89,8 +89,8 @@ spec:
       default:
         kepler:
           # renovate: depName="Kepler Cluster Energy Usage"
-          gnetId: 18909
-          revision: 3
+          gnetId: 18605
+          revision: 5
           datasource: Prometheus
         apc-ups:
           gnetId: 12340
