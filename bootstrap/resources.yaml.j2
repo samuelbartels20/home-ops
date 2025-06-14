@@ -9,6 +9,30 @@ metadata:
 
 
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: gotify-secret
+    namespace: observability
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     INIT_POSTGRES_HOST: op://K8s/gotify-secret/INIT_POSTGRES_HOST
+     INIT_POSTGRES_PORT: op://K8s/gotify-secret/INIT_POSTGRES_PORT
+     INIT_POSTGRES_SSLMODE: op://K8s/gotify-secret/INIT_POSTGRES_SSLMODE
+     INIT_POSTGRES_DBNAME: op://K8s/gotify-secret/INIT_POSTGRES_DBNAME
+     INIT_POSTGRES_USER: op://K8s/gotify-secret/INIT_POSTGRES_USER
+     INIT_POSTGRES_PASS: op://K8s/gotify-secret/INIT_POSTGRES_PASS
+     INIT_POSTGRES_SUPER_USER: op://K8s/gotify-secret/INIT_POSTGRES_SUPER_USER
+     INIT_POSTGRES_SUPER_PASS: op://K8s/gotify-secret/INIT_POSTGRES_SUPER_PASS
+     GOTIFY_DEFAULTUSER_NAME: op://K8s/gotify-secret/GOTIFY_DEFAULTUSER_NAME
+     GOTIFY_DEFAULTUSER_PASS: op://K8s/gotify-secret/GOTIFY_DEFAULTUSER_PASS
+     GOTIFY_DATABASE_CONNECTION: |-
+       host='{{ .INIT_POSTGRES_HOST }}' port='{{ .INIT_POSTGRES_PORT }}' user='{{ .INIT_POSTGRES_USER }}' dbname='{{ .INIT_POSTGRES_DBNAME }}' password='{{ .INIT_POSTGRES_PASS }}' sslmode='{{ .INIT_POSTGRES_SSLMODE }}'
+
+
+
+---
 # onepassword secret
 apiVersion: v1
 kind: Secret

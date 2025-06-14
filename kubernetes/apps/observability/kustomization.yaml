@@ -21,6 +21,7 @@ resources:
   - ./vector/ks.yaml
   - ./kepler/ks.yaml
   - ./karma/ks.yaml
+  - ./gotify/ks.yaml
 
 
 
