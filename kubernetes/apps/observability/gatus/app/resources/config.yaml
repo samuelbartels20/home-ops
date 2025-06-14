@@ -19,11 +19,10 @@ connectivity:
     target: 1.1.1.1:53
     interval: 1m
 
-# 🔔 ALERTMANAGER CONFIGURATION
 alerting:
-  - type: alertmanager
-    name: main
-    url: http://alertmanager.observability.svc.cluster.local:9093
+  type: alertmanager
+  name: main
+  url: http://alertmanager.observability.svc.cluster.local:9093
 
 endpoints:
   - name: flux-webhook
