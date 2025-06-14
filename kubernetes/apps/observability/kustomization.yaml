@@ -8,14 +8,14 @@ resources:
   # - ./gatus/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
   - ./loki/ks.yaml
-  # - ./blackbox-exporter/ks.yaml
+  - ./blackbox-exporter/ks.yaml
   # - ./kromgo/ks.yaml
-  # - ./keda/ks.yaml
-  # - ./silence-operator/ks.yaml
-  # - ./snmp-exporter/ks.yaml
-  # - ./smartctl-exporter/ks.yaml
-  # - ./promtail/ks.yaml
-  # - ./grafana/ks.yaml
+  - ./keda/ks.yaml
+  - ./silence-operator/ks.yaml
+  - ./snmp-exporter/ks.yaml
+  - ./smartctl-exporter/ks.yaml
+  - ./promtail/ks.yaml
+  - ./grafana/ks.yaml
   - ./alloy/ks.yaml
   # - ./otel/ks.yaml
   - ./graphite-exporter/ks.yaml
