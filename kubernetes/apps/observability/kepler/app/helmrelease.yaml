@@ -1,5 +1,3 @@
----
-# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -24,14 +22,12 @@ spec:
       strategy: rollback
       retries: 3
   values:
-    # Label to enable Alloy log discovery
-    podLabels:
-      app.kubernetes.io/name: kepler
+    podAnnotations:
+      alloy.otel.dev/logs: "true"
+      alloy.otel.dev/source: "kepler"
 
-    # -- CPU/MEM resources
     resources: {}
 
-    # -- Extra environment variables
     extraEnvVars:
       KEPLER_LOG_LEVEL: "1"
       ENABLE_GPU: "true"
@@ -44,11 +40,9 @@ spec:
       CPU_ARCH_OVERRIDE: ""
       CGROUP_METRICS: "*"
 
-    # -- Security context to access MSR
     securityContext:
       privileged: true
 
-    # -- HostPath mount for RAPL via /dev/cpu
     extraVolumeMounts:
       - name: cpu-metrics
         mountPath: /dev/cpu
