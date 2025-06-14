@@ -4,11 +4,11 @@
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: ScrapeConfig
 metadata:
-  name: &name onepassword
+  name: &name zigbee-controller
 spec:
   staticConfigs:
     - targets:
-        - expanse.internal:7070
+        - zigbee-controller.internal
   metricsPath: /metrics
   relabelings:
     - action: replace
