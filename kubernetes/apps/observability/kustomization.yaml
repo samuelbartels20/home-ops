@@ -20,6 +20,7 @@ resources:
   - ./graphite-exporter/ks.yaml
   - ./vector/ks.yaml
   - ./kepler/ks.yaml
+  - ./karma/ks.yaml
 
 
 
