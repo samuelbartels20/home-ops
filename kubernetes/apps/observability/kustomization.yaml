@@ -7,7 +7,7 @@ components:
 resources:
   - ./gatus/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
-  - ./alertmanager/ks.yaml
+  # - ./alertmanager/ks.yaml
   - ./loki/ks.yaml
   - ./blackbox-exporter/ks.yaml
   - ./kromgo/ks.yaml
