@@ -5,7 +5,7 @@ namespace: observability
 components:
   - ../../components/common
 resources:
-  # - ./gatus/ks.yaml
+  - ./gatus/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
   - ./loki/ks.yaml
   - ./blackbox-exporter/ks.yaml
