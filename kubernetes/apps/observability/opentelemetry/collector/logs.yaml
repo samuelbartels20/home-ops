@@ -3,6 +3,7 @@ apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: otel-filelog
+  namespace: observability
 spec:
   managementState: managed
   upgradeStrategy: automatic
