@@ -59,9 +59,9 @@ loki.source.kubernetes "kepler_logs" {
 loki.process "kepler" {
   stage.static_labels {
     values = {
-      cluster = "kubernetes"
-      job     = "kepler"
-      app     = "kepler"
+      cluster = "kubernetes",
+      job     = "kepler",
+      app     = "kepler",
     }
   }
 
