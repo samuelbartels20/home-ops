@@ -22,6 +22,7 @@ resources:
   - ./node-exporter/ks.yaml
   - ./otel/ks.yaml
   - ./graphite-exporter/ks.yaml
+  - ./node-exporter/ks.yaml
 
 
 
