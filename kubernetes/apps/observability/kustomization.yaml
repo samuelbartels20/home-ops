@@ -17,7 +17,7 @@ resources:
   - ./promtail/ks.yaml
   - ./grafana/ks.yaml
   - ./alloy/ks.yaml
-  - ./opentelemetry/ks.yaml
+  # - ./opentelemetry/ks.yaml
   - ./graphite-exporter/ks.yaml
 
 
