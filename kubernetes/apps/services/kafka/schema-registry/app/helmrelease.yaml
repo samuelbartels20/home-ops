@@ -27,7 +27,7 @@ spec:
           app:
             image:
               repository: confluentinc/cp-schema-registry
-              tag: 7.9.1
+              tag: 8.0.0
 
             env:
               SCHEMA_REGISTRY_HOST_NAME: "{{ .Release.Name }}"
