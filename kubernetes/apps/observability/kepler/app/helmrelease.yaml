@@ -24,6 +24,10 @@ spec:
       strategy: rollback
       retries: 3
   values:
+    # Label to enable Alloy log discovery
+    podLabels:
+      app.kubernetes.io/name: kepler
+
     # -- CPU/MEM resources
     resources: {}
 
