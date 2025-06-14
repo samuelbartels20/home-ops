@@ -26,11 +26,10 @@ spec:
   values:
     # -- CPU/MEM resources
     resources: {}
+
     # -- Extra environment variables
     extraEnvVars:
       KEPLER_LOG_LEVEL: "1"
-      # METRIC_PATH: "/metrics"
-      # BIND_ADDRESS: "0.0.0.0:9102"
       ENABLE_GPU: "true"
       ENABLE_QAT: "true"
       ENABLE_EBPF_CGROUPID: "true"
@@ -40,13 +39,29 @@ spec:
       ENABLE_PROCESS_METRICS: "true"
       CPU_ARCH_OVERRIDE: ""
       CGROUP_METRICS: "*"
-      # REDFISH_PROBE_INTERVAL_IN_SECONDS: "60"
-      # REDFISH_SKIP_SSL_VERIFY: "true"
+
+    # -- Security context to access MSR
+    securityContext:
+      privileged: true
+
+    # -- HostPath mount for RAPL via /dev/cpu
+    extraVolumeMounts:
+      - name: cpu-metrics
+        mountPath: /dev/cpu
+        readOnly: true
+    extraVolumes:
+      - name: cpu-metrics
+        hostPath:
+          path: /dev/cpu
+          type: Directory
+
     canMount:
       usrSrc: false
+
     serviceMonitor:
       enabled: true
       attachMetadata:
         node: true
+
     redfish:
       enabled: false
