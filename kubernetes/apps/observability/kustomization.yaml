@@ -7,7 +7,6 @@ components:
 resources:
   - ./gatus/ks.yaml
   - ./kube-prometheus-stack/ks.yaml
-  # - ./alertmanager/ks.yaml
   - ./loki/ks.yaml
   - ./blackbox-exporter/ks.yaml
   - ./kromgo/ks.yaml
@@ -18,7 +17,6 @@ resources:
   - ./promtail/ks.yaml
   - ./grafana/ks.yaml
   - ./alloy/ks.yaml
-  - ./node-exporter/ks.yaml
   - ./otel/ks.yaml
   - ./graphite-exporter/ks.yaml
 
