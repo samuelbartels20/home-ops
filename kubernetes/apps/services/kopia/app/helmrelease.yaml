@@ -32,7 +32,7 @@ spec:
           app:
             image:
               repository: docker.io/kopia/kopia
-              tag: 0.17.0@sha256:51784ce0961940846f4f47cab2d4f58e2e0cb467de357f9a80279b149a00c06e
+              tag: 20250611.0.172841@sha256:47ee444970911d65ecfafb396f002abaadb1b262840656fda74d43c54860a96e
             env:
               TZ: "${TIMEZONE}"
               KOPIA_PASSWORD:
