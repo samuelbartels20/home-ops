@@ -20,6 +20,7 @@ resources:
   - ./opentelemetry/ks.yaml
   - ./graphite-exporter/ks.yaml
   - ./vector/ks.yaml
+  - ./kepler/ks.yaml
 
 
 

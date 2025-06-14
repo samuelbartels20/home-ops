@@ -12,5 +12,6 @@ resources:
   - ./backube.yaml
   - ./piraeus.yaml
   - ./otel.yaml
+  - ./kepler.yaml
 
 

@@ -4,17 +4,18 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app kepler
-  namespace: flux-system
+  namespace:  observability
 spec:
   targetNamespace: observability
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./kubernetes/main/apps/observability/kepler/app
+  path: ./kubernetes/apps/observability/kepler/app
   prune: true
   sourceRef:
     kind: GitRepository
-    name: home-ops
+    name: flux-system
+    namespace: flux-system
   wait: false
   interval: 6h
   timeout: 5m
