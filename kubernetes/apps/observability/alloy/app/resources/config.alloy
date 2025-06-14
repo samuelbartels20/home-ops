@@ -65,9 +65,10 @@ loki.process "kepler" {
     }
   }
 
-  stage.labeldrop {
-    values = ["filename", "stream"]
+  stage.labels {
+    drop = ["filename", "stream"]
   }
+
 
   forward_to = [loki.write.default.receiver]
 }
