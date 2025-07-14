@@ -1,0 +1,332 @@
+{% for namespace in ["external-secrets", "flux-system", "network"] %}
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ namespace }}
+{% endfor %}
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: gotify-secret
+    namespace: observability
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     INIT_POSTGRES_HOST: op://K8s/gotify-secret/INIT_POSTGRES_HOST
+     INIT_POSTGRES_PORT: op://K8s/gotify-secret/INIT_POSTGRES_PORT
+     INIT_POSTGRES_SSLMODE: op://K8s/gotify-secret/INIT_POSTGRES_SSLMODE
+     INIT_POSTGRES_DBNAME: op://K8s/gotify-secret/INIT_POSTGRES_DBNAME
+     INIT_POSTGRES_USER: op://K8s/gotify-secret/INIT_POSTGRES_USER
+     INIT_POSTGRES_PASS: op://K8s/gotify-secret/INIT_POSTGRES_PASS
+     INIT_POSTGRES_SUPER_USER: op://K8s/gotify-secret/INIT_POSTGRES_SUPER_USER
+     INIT_POSTGRES_SUPER_PASS: op://K8s/gotify-secret/INIT_POSTGRES_SUPER_PASS
+     GOTIFY_DEFAULTUSER_NAME: op://K8s/gotify-secret/GOTIFY_DEFAULTUSER_NAME
+     GOTIFY_DEFAULTUSER_PASS: op://K8s/gotify-secret/GOTIFY_DEFAULTUSER_PASS
+     GOTIFY_DATABASE_CONNECTION: |-
+       host='{{ .INIT_POSTGRES_HOST }}' port='{{ .INIT_POSTGRES_PORT }}' user='{{ .INIT_POSTGRES_USER }}' dbname='{{ .INIT_POSTGRES_DBNAME }}' password='{{ .INIT_POSTGRES_PASS }}' sslmode='{{ .INIT_POSTGRES_SSLMODE }}'
+
+
+
+---
+# onepassword secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onepassword-secret
+  namespace: security
+stringData:
+  token: op://K8s/1password-token/password
+  1password-credentials.json: op://K8s/1password-json/1password-credentials.json
+
+
+---
+# onepassword secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nut-exporter-secret
+  namespace: observability
+stringData:
+  NUT_EXPORTER_PASSWORD: op://K8s/nut-exporter/NUT_EXPORTER_PASSWORD
+
+
+---
+# tailscale secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: operator-oauth
+  namespace: security
+stringData:
+  client_id: op://K8s/tailscale-operator/CLIENT_ID
+  client_secret: op://K8s/tailscale-operator/CLIENT_SECRET
+
+---
+# databases/cloudnative-pg/operator/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pgadmin-secret
+    namespace: databases
+    labels:
+        cnpg.io/reload: "true"
+data:
+    password: op://K8s/POSTGRES_SUPER_PASS/POSTGRES_SUPER_PASS
+    username: op://K8s/POSTGRES_SUPER_USER/POSTGRES_SUPER_USER
+    aws-access-key-id: op://K8s/AWS_ACCESS_KEY_ID/AWS_ACCESS_KEY_ID
+    aws-secret-access-key: op://K8s/AWS_SECRET_ACCESS_KEY/AWS_SECRET_ACCESS_KEY
+
+
+---
+# databases/cloudnative-pg/operator/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloudnative-pg-secret
+    namespace: storage
+    labels:
+        cnpg.io/reload: "true"
+data:
+    password: op://K8s/cloudnative-pg/POSTGRES_SUPER_PASS
+    username: op://K8s/cloudnative-pg/POSTGRES_SUPER_USER
+    AWS_ACCESS_KEY_ID: op://K8s/cloudnative-pg/AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: op://K8s/cloudnative-pg/AWS_SECRET_ACCESS_KEY
+
+
+---
+# grafana/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: grafana-admin-secret
+    namespace: observability
+data:
+    admin-password: op://K8s/grafana-admin/GRAFANA_ADMIN_PASSWORD
+    admin-user: op://K8s/grafana-admin/GRAFANA_ADMIN_USERNAME
+
+
+---
+# vernemq/externalsecret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: vernemq-auth
+    namespace: storage
+data:
+    DOCKER_VERNEMQ_USER_ADMIN: op://K8s/vernemq-auth/vernemq_password
+    DOCKER_VERNEMQ_USER_MQTT: op://K8s/vernemq-auth/vernemq_user_mqtt_password
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sops-age
+  namespace: flux-system
+stringData:
+  age.agekey: op://kubernetes/sops/SOPS_PRIVATE_KEY
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: samcloud.online-tls
+  namespace: kube-system
+  annotations:
+    cert-manager.io/alt-names: '*.samcloud.online,samcloud.online'
+    cert-manager.io/certificate-name: samcloud.online
+    cert-manager.io/common-name: samcloud.online
+    cert-manager.io/ip-sans: ""
+    cert-manager.io/issuer-group: ""
+    cert-manager.io/issuer-kind: ClusterIssuer
+    cert-manager.io/issuer-name: letsencrypt-production
+    cert-manager.io/uri-sans: ""
+  labels:
+    controller.cert-manager.io/fao: "true"
+type: kubernetes.io/tls
+data:
+  tls.crt: op://kubernetes/samcloud.online-tls/tls.crt
+  tls.key: op://kubernetes/samcloud.online-tls/tls.key
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudflare-tunnel-id-secret
+  namespace: network
+stringData:
+  CLOUDFLARE_TUNNEL_ID: op://kubernetes/cloudflare/CLOUDFLARE_TUNNEL_ID
+
+# truenas api key
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: truenas-api-key
+  namespace: storage
+stringData:
+  API_KEY: op://kubernetes/truenas-api-key/API_KEY
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: truenas-api-key-backup
+  namespace: storage
+stringData:
+  API_KEY: op://kubernetes/truenas-api-key-backup/API_KEY
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: truenas-api-key-secret
+  namespace: storage
+stringData:
+  API_KEY: op://K8s/truenas-api-key/API_KEY
+
+---
+# alertmanager secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-secret
+  namespace: observability
+stringData:
+      alertmanager_heartbeat_url: op://K8s/alertmanager/ALERTMANAGER_HEARTBEAT_URL
+      pushover_api_token: op://K8s/alertmanager/ALERTMANAGER_PUSHOVER_TOKEN
+      pushover_api_userkey: op://K8s/alertmanager/ALERTMANAGER_PUSHOVER_USER_KEY
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pgbouncer-admin-secret
+    namespace: storage
+    labels:
+        app.kubernetes.io/name: pgbouncer
+        app.kubernetes.io/component: connection-pooler
+        app.kubernetes.io/part-of: postgresql
+type: Opaque
+stringData:
+      PGBOUNCER_ADMIN_PASSWORD: op://K8s/pgbouncer-admin-secret/PGBOUNCER_ADMIN_PASSWORD
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pgbouncer-secrets
+    namespace: storage
+    labels:
+        app.kubernetes.io/name: pgbouncer
+        app.kubernetes.io/component: connection-pooler
+        app.kubernetes.io/part-of: postgresql
+type: Opaque
+stringData:
+      POSTGRES_USER: op://K8s/pgbouncer-secrets/POSTGRES_USER
+      POSTGRES_PASSWORD: op://K8s/pgbouncer-secrets/POSTGRES_PASSWORD
+      PGBOUNCER_AUTH_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_AUTH_PASSWORD
+      PGBOUNCER_ADMIN_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_ADMIN_PASSWORD
+      PGBOUNCER_STATS_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_STATS_PASSWORD
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pgbouncer-exporter-secret
+    namespace: storage
+    labels:
+        app.kubernetes.io/name: pgbouncer-exporter
+        app.kubernetes.io/component: observability
+        app.kubernetes.io/part-of: postgresql
+type: Opaque
+stringData:
+      PGBOUNCER_PASSWORD: op://K8s/pgbouncer-exporter-secret/PGBOUNCER_PASSWORD
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pgbouncer-auth
+    namespace: storage
+    labels:
+        app.kubernetes.io/name: pgbouncer-auth
+        app.kubernetes.io/component: authentication
+        app.kubernetes.io/part-of: postgresql
+type: Opaque
+stringData:
+      PGBOUNCER_PASSWORD: op://K8s/pgbouncer-auth/PGBOUNCER_PASSWORD
+      POSTGRES_PASSWORD: op://K8s/pgbouncer-auth/POSTGRES_PASSWORD
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-analytics-credentials
+  namespace: storage
+type: Opaque
+data:
+  ANALYTICS_USER: op://K8s/postgres-analytics-credentials/ANALYTICS_USER
+  ANALYTICS_PASSWORD: op://K8s/postgres-analytics-credentials/ANALYTICS_PASSWORD
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: postgres-backup
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+type: Opaque
+stringData:
+      AWS_ACCESS_KEY_ID: op://K8s/postgres-backup/AWS_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY: op://K8s/postgres-backup/AWS_SECRET_ACCESS_KEY
+      AWS_REGION: op://K8s/postgres-backup/AWS_REGION
+      AWS_SESSION_TOKEN: op://K8s/postgres-backup/AWS_SESSION_TOKEN
+      S3_ENDPOINT_URL: op://K8s/postgres-backup/S3_ENDPOINT_URL
+      S3_BUCKET_NAME: op://K8s/postgres-backup/S3_BUCKET_NAME
+      S3_PREFIX: op://K8s/postgres-backup/S3_PREFIX
+      BACKUP_ENCRYPTION_KEY: op://K8s/postgres-backup/BACKUP_ENCRYPTION_KEY
+      BACKUP_SIGNING_KEY: op://K8s/postgres-backup/BACKUP_SIGNING_KEY
+      BARMAN_CLOUD_RETENTION_POLICY: op://K8s/postgres-backup/BARMAN_CLOUD_RETENTION_POLICY
+      BARMAN_CLOUD_COMPRESSION: op://K8s/postgres-backup/BARMAN_CLOUD_COMPRESSION
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: kured
+    namespace: kube-system
+    labels:
+        reloader.stakater.com/auto: "true"
+type: Opaque
+stringData:
+      NOTIFY_WEBHOOK_URL: op://K8s/kured/NOTIFY_WEBHOOK_URL
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: truenas-iscsi
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+type: Opaque
+stringData:
+      host: op://K8s/truenas-iscsi/host
+      API_KEY: op://K8s/truenas-iscsi/api_key
+      portal: op://K8s/truenas-iscsi/portal
+      dataset_parent: op://K8s/truenas-iscsi/dataset_parent
+      snapshot_parent: op://K8s/truenas-iscsi/snapshot_parent
+      DECRYPTION_KEY: op://K8s/truenas-iscsi/decryption_key
+      chap_username: op://K8s/truenas-iscsi/chap_username
+      chap_password: op://K8s/truenas-iscsi/chap_password
