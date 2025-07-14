@@ -1,5 +1,14 @@
 # Changelog
 
+## Release v2025.07.14.1
+
+Date-based release for 2025-07-14
+
+### Changes
+- Merge pull request #1 from samuelbartels20/renovate/configure
+- Add renovate.json
+- chore(release): 2025.07.14 [skip ci]
+
 ## Release v2025.07.14
 
 Date-based release for 2025-07-14
