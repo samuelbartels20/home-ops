@@ -1,0 +1,114 @@
+name: Date-Based Versioning & Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: read
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate date-based version
+        id: version
+        run: |
+          VERSION=$(node scripts/generate-version.js)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Check if version already exists
+        id: check_version
+        run: |
+          if git tag -l "v${{ steps.version.outputs.version }}" | grep -q "v${{ steps.version.outputs.version }}"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Version v${{ steps.version.outputs.version }} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Version v${{ steps.version.outputs.version }} is new"
+          fi
+
+      - name: Create release
+        if: steps.check_version.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Create git tag
+          git tag "v$VERSION"
+
+          # Generate changelog entry
+          echo "## Release v$VERSION" > release_notes.md
+          echo "" >> release_notes.md
+          echo "Date-based release for $(date -u +%Y-%m-%d)" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Changes" >> release_notes.md
+
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log --pretty=format:"- %s" "$LAST_TAG..HEAD" >> release_notes.md
+          else
+            git log --pretty=format:"- %s" --max-count=10 >> release_notes.md
+          fi
+
+          # Update CHANGELOG.md
+          if [ -f CHANGELOG.md ]; then
+            # Backup current changelog
+            cp CHANGELOG.md CHANGELOG.md.bak
+
+            # Create new changelog with new entry at top
+            echo "# Changelog" > CHANGELOG.md.new
+            echo "" >> CHANGELOG.md.new
+            cat release_notes.md >> CHANGELOG.md.new
+            echo "" >> CHANGELOG.md.new
+
+            # Append existing changelog (skip first line if it's "# Changelog")
+            tail -n +2 CHANGELOG.md.bak >> CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          else
+            # Create new changelog
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            cat release_notes.md >> CHANGELOG.md
+          fi
+
+          # Commit changelog
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(release): $VERSION [skip ci]"
+
+          # Push tag and commit
+          git push origin main
+          git push origin "v$VERSION"
+
+      - name: Create GitHub Release
+        if: steps.check_version.outputs.exists == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Skip release
+        if: steps.check_version.outputs.exists == 'true'
+        run: |
+          echo "Version v${{ steps.version.outputs.version }} already exists, skipping release"

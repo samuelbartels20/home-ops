@@ -1,0 +1,17 @@
+
+version: 2
+updates:
+  - package-ecosystem: "helm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "helm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "helm"
+    directory: "/"
+    schedule:
+      interval: "weekly"

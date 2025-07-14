@@ -1,0 +1,102 @@
+{
+    "branches": [
+      "main",
+      {
+        "name": "beta",
+        "prerelease": true
+      },
+      {
+        "name": "alpha",
+        "prerelease": true
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "conventionalcommits",
+          "releaseRules": [
+            {"type": "feat", "release": "minor"},
+            {"type": "fix", "release": "patch"},
+            {"type": "docs", "release": "patch"},
+            {"type": "style", "release": "patch"},
+            {"type": "refactor", "release": "patch"},
+            {"type": "perf", "release": "patch"},
+            {"type": "test", "release": "patch"},
+            {"type": "build", "release": "patch"},
+            {"type": "ci", "release": "patch"},
+            {"type": "chore", "release": "patch"},
+            {"breaking": true, "release": "major"},
+            {"revert": true, "release": "patch"},
+            {"scope": "security", "release": "patch"}
+          ],
+          "parserOpts": {
+            "noteKeywords": ["BREAKING CHANGE", "BREAKING CHANGES", "BREAKING"]
+          }
+        }
+      ],
+      [
+        "@semantic-release/release-notes-generator",
+        {
+          "preset": "conventionalcommits",
+          "presetConfig": {
+            "types": [
+              {"type": "feat", "section": " Features"},
+              {"type": "fix", "section": " Bug Fixes"},
+              {"type": "docs", "section": " Documentation"},
+              {"type": "style", "section": " Style"},
+              {"type": "refactor", "section": " Refactor"},
+              {"type": "perf", "section": " Performance"},
+              {"type": "test", "section": " Tests"},
+              {"type": "build", "section": " Build"},
+              {"type": "ci", "section": " CI"},
+              {"type": "chore", "section": " Chore"},
+              {"type": "revert", "section": " Reverts"},
+              {"type": "security", "section": " Security"}
+            ]
+          },
+          "writerOpts": {
+            "commitsSort": ["subject", "scope"]
+          }
+        }
+      ],
+      [
+        "@semantic-release/changelog",
+        {
+          "changelogFile": "CHANGELOG.md",
+          "changelogTitle": "#  Changelog\n\nAll notable changes to this project will be documented in this file. See\n[Conventional Commits](https://conventionalcommits.org) for commit guidelines."
+        }
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "assets": [
+            "CHANGELOG.md",
+            "package.json",
+            "package-lock.json",
+            "npm-shrinkwrap.json"
+          ],
+          "message": "chore(release):  ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        }
+      ],
+      [
+        "@semantic-release/github",
+        {
+          "assets": [
+            {"path": "CHANGELOG.md", "label": "Changelog"},
+            {"path": "dist/**/*.yaml", "label": "Kubernetes Manifests"}
+          ],
+          "successComment": " This PR is included in version ${nextRelease.version}",
+          "failTitle": " The release failed",
+          "failComment": "The release failed. Please check the workflow logs.",
+          "labels": ["release"],
+          "releasedLabels": ["released"]
+        }
+      ]
+    ],
+    "preset": "conventionalcommits",
+    "tagFormat": "v${version}",
+    "ci": true,
+    "dryRun": false,
+    "debug": false
+  }

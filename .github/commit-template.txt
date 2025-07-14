@@ -1,0 +1,42 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+#
+# Type can be:
+#   feat     (new feature)
+#   fix      (bug fix)
+#   docs     (changes to documentation)
+#   style    (formatting, missing semi colons, etc; no code change)
+#   refactor (refactoring production code)
+#   test     (adding missing tests, refactoring tests)
+#   chore    (updating grunt tasks etc; no production code change)
+#   perf     (performance improvements)
+#   build    (changes to build system or dependencies)
+#   ci       (changes to CI configuration files and scripts)
+#
+# Scope can be anything specifying place of the commit change, such as:
+#   auth, network, storage, k8s, etc.
+#
+# Subject should use imperative tone and say what you did:
+#   change; not changed/changes
+#   remove; not removed/removes
+#   add; not added/adds
+#   update; not updated/updates
+#
+# Body should include the motivation for the change and contrast with previous behavior
+#
+# Footer should contain any information about Breaking Changes and reference GitHub issues that this commit closes
+#
+# Examples:
+#   feat(auth): add multi-factor authentication support
+#   fix(network): resolve DNS resolution issue in Cilium
+#   docs(storage): update Rook-Ceph configuration guide
+#   style(k8s): format yaml files according to convention
+#   refactor(monitoring): simplify Prometheus rules
+#   test(ci): add integration tests for auth workflow
+#   chore(deps): update Kubernetes dependencies
+#   perf(cache): improve Redis caching strategy
+#   build(docker): optimize container image size
+#   ci(github): update GitHub Actions workflow

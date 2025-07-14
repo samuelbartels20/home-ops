@@ -1,0 +1,39 @@
+name: "CodeQL Config"
+
+queries:
+  - uses: security-and-quality
+
+paths:
+  - kubernetes/**/*.yaml
+  - kubernetes/**/*.yml
+  - .github/**/*.yaml
+  - .github/**/*.yml
+
+paths-ignore:
+  - '**/node_modules'
+  - '**/vendor'
+  - '**/*.test.yml'
+  - '**/*.test.yaml'
+  - '**/tests'
+  - 'docs'
+
+extraction:
+  yaml:
+    prepare:
+      packages: []
+    before_index:
+      - echo "Analyzing YAML files..."
+    index:
+      build_command: []
+
+query-filters:
+  - exclude:
+      problem.severity:
+        - warning
+        - recommendation
+
+security-severity-mapping:
+  critical: 9.0
+  high: 7.0
+  medium: 4.0
+  low: 1.0

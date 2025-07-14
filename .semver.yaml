@@ -1,0 +1,39 @@
+# Semantic Versioning configuration for home-ops
+branches:
+  - main
+  - next
+  - beta
+  - alpha
+
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - "@semantic-release/changelog"
+  - "@semantic-release/github"
+  - "@semantic-release/git"
+
+tagFormat: 'v${version}'
+
+generateNotes: true
+
+prereleaseBranches:
+  - alpha
+  - beta
+
+releaseRules:
+  - type: feat
+    release: minor
+  - type: fix
+    release: patch
+  - type: chore
+    release: patch
+  - type: docs
+    release: patch
+  - type: refactor
+    release: patch
+  - type: perf
+    release: patch
+  - type: test
+    release: patch
+  - type: breaking
+    release: major
