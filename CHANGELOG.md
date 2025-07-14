@@ -1,5 +1,14 @@
 # Changelog
 
+## Release v2025.07.14.3
+
+Date-based release for 2025-07-14
+
+### Changes
+- Merge pull request #3 from samuelbartels20/renovate/node-22.x
+- chore(release): 2025.07.14.2 [skip ci]
+- chore(deps): update dependency node to v22
+
 ## Release v2025.07.14.2
 
 Date-based release for 2025-07-14
