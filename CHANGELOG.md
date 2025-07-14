@@ -1,5 +1,13 @@
 # Changelog
 
+## Release v2025.07.14.5
+
+Date-based release for 2025-07-14
+
+### Changes
+- docs(readme): added readme for the entire project
+- chore(release): 2025.07.14.4 [skip ci]
+
 ## Release v2025.07.14.4
 
 Date-based release for 2025-07-14
