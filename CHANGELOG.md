@@ -1,5 +1,13 @@
 # Changelog
 
+## Release v2025.07.14.2
+
+Date-based release for 2025-07-14
+
+### Changes
+- Rename dependabot.yml to dependabot2.yml
+- chore(release): 2025.07.14.1 [skip ci]
+
 ## Release v2025.07.14.1
 
 Date-based release for 2025-07-14
