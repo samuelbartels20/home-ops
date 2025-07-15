@@ -103,7 +103,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release v${{ steps.version.outputs.version }}
+          release_name:  v${{ steps.version.outputs.version }}
           body_path: release_notes.md
           draft: false
           prerelease: false
