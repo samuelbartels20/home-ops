@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.15.29
+
+Date-based release for 2025-07-15
+
+### Changes
+- feat(1password): add 1password
+- chore(release): 2025.07.15.28 [skip ci]
+
 ##  v2025.07.15.28
 
 Date-based release for 2025-07-15
