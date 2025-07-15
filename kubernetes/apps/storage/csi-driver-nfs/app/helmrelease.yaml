@@ -1,0 +1,462 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: csi-driver-nfs
+  namespace: storage
+  annotations:
+    meta.helm.sh/release-name: csi-driver-nfs
+    meta.helm.sh/release-namespace: storage
+    fluxcd.io/automated: "true"
+    fluxcd.io/tag.chart-image: glob:4.11.*
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    app.kubernetes.io/version: "4.11.0"
+    production-grade: "true"
+    security-hardened: "true"
+
+spec:
+  interval: 1h
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: csi-driver-nfs
+  install:
+    remediation:
+      retries: 3
+    crds: CreateReplace
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    # Secrets configuration
+    secrets:
+      truenas:
+        create: false
+        apiKeySecret: "truenas-api-secret"
+
+    # Image configuration with specific versions for security
+    image:
+      baseRepo: registry.k8s.io
+      nfs:
+        repository: registry.k8s.io/sig-storage/nfsplugin
+        tag: v4.11.0
+        pullPolicy: IfNotPresent
+      csiProvisioner:
+        repository: registry.k8s.io/sig-storage/csi-provisioner
+        tag: v5.2.0
+        pullPolicy: IfNotPresent
+      csiResizer:
+        repository: registry.k8s.io/sig-storage/csi-resizer
+        tag: v1.13.1
+        pullPolicy: IfNotPresent
+      csiSnapshotter:
+        repository: registry.k8s.io/sig-storage/csi-snapshotter
+        tag: v8.2.0
+        pullPolicy: IfNotPresent
+      livenessProbe:
+        repository: registry.k8s.io/sig-storage/livenessprobe
+        tag: v2.15.0
+        pullPolicy: IfNotPresent
+      nodeDriverRegistrar:
+        repository: registry.k8s.io/sig-storage/csi-node-driver-registrar
+        tag: v2.13.0
+        pullPolicy: IfNotPresent
+      externalSnapshotter:
+        repository: registry.k8s.io/sig-storage/snapshot-controller
+        tag: v8.2.0
+        pullPolicy: IfNotPresent
+
+    # Service Account configuration
+    serviceAccount:
+      create: true
+      controller: csi-nfs-controller-sa
+      node: csi-nfs-node-sa
+      annotations:
+        app.kubernetes.io/managed-by: "Helm"
+        app.kubernetes.io/component: storage
+
+    # RBAC configuration
+    rbac:
+      create: true
+      name: nfs
+
+    # Driver configuration
+    driver:
+      name: nfs.csi.k8s.io
+      mountPermissions: 0750
+
+    # Feature flags
+    feature:
+      enableFSGroupPolicy: true
+      enableInlineVolume: false
+      propagateHostMountOptions: false
+
+    kubeletDir: /var/lib/kubelet
+
+    # Controller configuration for production
+    controller:
+      enabled: true
+      name: csi-nfs-controller
+      replicas: 2  # High availability
+
+      # Environment variables from secrets
+      env:
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: truenas-api-secret
+              key: API_KEY
+        - name: DECRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: truenas-api-secret
+              key: DECRYPTION_KEY
+
+      # Deployment strategy
+      strategyType: RollingUpdate
+      runOnMaster: false
+      runOnControlPlane: false
+      enableSnapshotter: true
+      useTarCommandInSnapshot: false
+
+      # Health checks
+      livenessProbe:
+        healthPort: 29652
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+
+      # Logging configuration
+      logLevel: 4
+      workingMountDir: /tmp
+      dnsPolicy: ClusterFirstWithHostNet
+      defaultOnDeletePolicy: delete
+
+      # Security context for production
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Container security context
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Node affinity for better distribution
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                    - amd64
+                    - arm64
+                    - ppc64le
+                    - s390x
+                    - riscv64
+                    - mips64le
+                    - mips64
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - csi-driver-nfs
+                topologyKey: kubernetes.io/hostname
+
+      # Priority and tolerations
+      priorityClassName: system-cluster-critical
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/controlplane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - operator: "Exists"
+          effect: "NoExecute"
+        - operator: "Exists"
+          effect: "NoSchedule"
+
+      # Resource configuration for production
+      resources:
+        csiProvisioner:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+            ephemeral-storage: 100Mi
+        csiResizer:
+          limits:
+            cpu: 300m
+            memory: 400Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 30m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+        csiSnapshotter:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 20m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+        livenessProbe:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+        nfs:
+          limits:
+            cpu: 300m
+            memory: 256Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 30m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+
+    # Node configuration for production
+    node:
+      name: csi-nfs-node
+      dnsPolicy: ClusterFirstWithHostNet
+      maxUnavailable: 1
+
+      # Logging configuration
+      logLevel: 4
+
+      # Health checks
+      livenessProbe:
+        healthPort: 29653
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+
+      # Security context for production
+      podSecurityContext:
+        runAsNonRoot: false
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Container security context
+      securityContext:
+        allowPrivilegeEscalation: true
+        capabilities:
+          add:
+            - SYS_ADMIN
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        privileged: false
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Node affinity
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                    - amd64
+                    - arm64
+                    - ppc64le
+                    - s390x
+                    - riscv64
+                    - mips64le
+                    - mips64
+
+
+      # Priority and tolerations
+      priorityClassName: system-node-critical
+      tolerations:
+        - operator: "Exists"
+
+      # Resource configuration for production
+      resources:
+        livenessProbe:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+        nodeDriverRegistrar:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+        nfs:
+          limits:
+            cpu: 400m
+            memory: 384Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 40m
+            memory: 48Mi
+            ephemeral-storage: 100Mi
+
+    # External snapshotter configuration
+    externalSnapshotter:
+      enabled: true
+      name: snapshot-controller
+      priorityClassName: system-cluster-critical
+      deletionPolicy: Retain
+
+      # Controller configuration
+      controller:
+        replicas: 2  # High availability
+
+      # Resource configuration
+      resources:
+        limits:
+          cpu: 300m
+          memory: 384Mi
+          ephemeral-storage: 1Gi
+        requests:
+          cpu: 30m
+          memory: 48Mi
+          ephemeral-storage: 100Mi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      customResourceDefinitions:
+        enabled: true
+
+    # Volume snapshot class configuration
+    volumeSnapshotClass:
+      create: true
+      name: truenas-nfs-snapclass
+      deletionPolicy: Retain
+      annotations:
+        snapshot.storage.kubernetes.io/is-default-class: "true"
+
+    # Storage class configuration for production
+    storageClass:
+      create: true
+      name: truenas-nfs-prod
+      annotations:
+        storageclass.kubernetes.io/is-default-class: "true"
+        storageclass.kubernetes.io/description: "Production NFS storage class"
+        storageclass.kubernetes.io/allow-volume-expansion: "true"
+      parameters:
+        server: "192.168.8.161"
+        share: "/mnt/homelab/applications/volumes"
+      reclaimPolicy: Retain
+      volumeBindingMode: WaitForFirstConsumer
+      allowVolumeExpansion: true
+      mountOptions:
+        - nfsvers=4.2
+        - hard
+        - nolock
+
+    # Pod annotations for monitoring and security
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "29652"
+      prometheus.io/path: "/metrics"
+      reloader.stakater.com/auto: "true"
+      checksum/config: "{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}"
+
+    # Service configuration for monitoring
+    service:
+      enabled: true
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "29652"
+        prometheus.io/path: "/metrics"
+
+    # ServiceMonitor for Prometheus monitoring
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      jobLabel: "csi-driver-nfs"
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: csi-driver-nfs
+      endpoints:
+        - port: metrics
+          path: /metrics
+          interval: 30s
+          scrapeTimeout: 10s
+          honorLabels: true
+          metricRelabelings:
+            - sourceLabels: [__name__]
+              regex: 'csi_(sidecar_operations_latency_seconds|operations_total)'
+              action: keep
+
+

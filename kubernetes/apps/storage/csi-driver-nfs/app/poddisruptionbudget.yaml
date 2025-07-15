@@ -1,0 +1,35 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: csi-driver-nfs-controller-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: csi-driver-nfs
+      app.kubernetes.io/component: controller
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: csi-driver-nfs-snapshot-controller-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller

@@ -1,0 +1,119 @@
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: csi-driver-nfs-controller-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+    security-hardened: "true"
+  annotations:
+    vpa.kubernetes.io/controlled-resources: "cpu,memory,ephemeral-storage"
+    vpa.kubernetes.io/controlled-values: "RequestsAndLimits"
+    vpa.kubernetes.io/min-replicas: "2"
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: csi-nfs-controller
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeral-storage: 2Gi
+        controlledValues: RequestsAndLimits
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: csi-driver-nfs-node-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+    security-hardened: "true"
+  annotations:
+    vpa.kubernetes.io/controlled-resources: "cpu,memory,ephemeral-storage"
+    vpa.kubernetes.io/controlled-values: "RequestsAndLimits"
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: DaemonSet
+    name: csi-nfs-node
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeral-storage: 2Gi
+        controlledValues: RequestsAndLimits
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: csi-driver-nfs-snapshot-controller-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+    security-hardened: "true"
+  annotations:
+    vpa.kubernetes.io/controlled-resources: "cpu,memory,ephemeral-storage"
+    vpa.kubernetes.io/controlled-values: "RequestsAndLimits"
+    vpa.kubernetes.io/min-replicas: "2"
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: snapshot-controller
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeral-storage: 2Gi
+        controlledValues: RequestsAndLimits
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage

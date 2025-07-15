@@ -1,0 +1,69 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: csi-driver-nfs-allow-internal
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-nfs
+    app.kubernetes.io/instance: csi-driver-nfs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+    security-hardened: "true"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: csi-driver-nfs
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow metrics scraping from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 29652
+        - protocol: TCP
+          port: 29653
+    # Allow internal cluster communication
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 29652
+        - protocol: TCP
+          port: 29653
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow API server communication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow NFS server communication
+    - to:
+        - ipBlock:
+            cidr: 192.168.8.0/24
+      ports:
+        - protocol: TCP
+          port: 2049
+        - protocol: TCP
+          port: 111
+        - protocol: UDP
+          port: 111

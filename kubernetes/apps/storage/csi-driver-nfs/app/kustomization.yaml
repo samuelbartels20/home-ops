@@ -1,0 +1,28 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - ./externalsecret.yaml
+  - ./helmrelease.yaml
+  - ./oci-repository.yaml
+  - ./vpa.yaml
+  - ./poddisruptionbudget.yaml
+  - ./networkpolicy.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: csi-driver-nfs
+      app.kubernetes.io/instance: csi-driver-nfs
+      app.kubernetes.io/component: storage
+      app.kubernetes.io/part-of: storage
+      production-grade: "true"
+      security-hardened: "true"
+    includeSelectors: true
+
+commonLabels:
+  app.kubernetes.io/name: csi-driver-nfs
+  app.kubernetes.io/part-of: storage
+  production-grade: "true"
