@@ -1,3 +1,5 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrepository-source-v1beta2.json
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
@@ -5,7 +7,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 10m
-  url: https://charts.external-secrets.io
+  url: https://charts.external-secrets.io/
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
