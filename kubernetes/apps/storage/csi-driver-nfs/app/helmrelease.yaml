@@ -40,7 +40,7 @@ spec:
     secrets:
       truenas:
         create: false
-        apiKeySecret: "truenas-api-secret"
+        apiKeySecret: "truenas-nfs"
 
     # Image configuration with specific versions for security
     image:
@@ -112,12 +112,12 @@ spec:
         - name: API_KEY
           valueFrom:
             secretKeyRef:
-              name: truenas-api-secret
+              name: truenas-nfs
               key: API_KEY
         - name: DECRYPTION_KEY
           valueFrom:
             secretKeyRef:
-              name: truenas-api-secret
+              name: truenas-nfs
               key: DECRYPTION_KEY
 
       # Deployment strategy
