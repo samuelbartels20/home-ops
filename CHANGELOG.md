@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.15.30
+
+Date-based release for 2025-07-15
+
+### Changes
+- feat(csi driver nfs): add csi driver nfs
+- chore(release): 2025.07.15.29 [skip ci]
+
 ##  v2025.07.15.29
 
 Date-based release for 2025-07-15
