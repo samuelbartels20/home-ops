@@ -1,0 +1,78 @@
+[allowlist]
+description = "Global allowlist"
+
+# Ignore certain file types
+regexes = [
+    '''.*\.lock$''',
+    '''package-lock\.json$''',
+    '''yarn\.lock$''',
+    '''poetry\.lock$''',
+]
+
+paths = [
+    '''node_modules''',
+    '''venv''',
+    '''.git''',
+    '''dist''',
+]
+
+# Commits to ignore (add specific commit hashes here if needed)
+commits = [
+    # "commit-hash-to-ignore"
+]
+
+# Main secret detection rules
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey|auth[_-]?token|token)[_-]?([0-9a-zA-Z]{32,})'''
+secretGroup = 2
+entropy = 3.5
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+entropy = 3.5
+
+[[rules]]
+id = "aws-secret-key"
+description = "AWS Secret Key"
+regex = '''(?i)aws[_-]?secret[_-]?access[_-]?key[_-]?[=:]\s*['\"][0-9a-zA-Z/+]{40}['\"]'''
+entropy = 3.5
+
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+entropy = 4.5
+
+[[rules]]
+id = "private-key"
+description = "Private Key"
+regex = '''-----BEGIN ((RSA|DSA|EC|PGP|OPENSSH) )?PRIVATE KEY( BLOCK)?-----'''
+entropy = 3.5
+
+[[rules]]
+id = "slack-webhook"
+description = "Slack Webhook"
+regex = '''https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8}/B[a-zA-Z0-9_]{8}/[a-zA-Z0-9_]{24}'''
+entropy = 3.5
+
+[[rules]]
+id = "kubernetes-config"
+description = "Kubernetes Config"
+regex = '''(?i)(kubeconfig|kubernetes\.config|k8s\.config|k8s\.yaml)'''
+entropy = 3.0
+
+[[rules]]
+id = "password-in-code"
+description = "Password in Code"
+regex = '''(?i)(password|passwd|pwd)[_-]?[=:]\s*['\"][^'\"\s]{8,}['\"]'''
+entropy = 3.0
+
+[[rules]]
+id = "docker-registry-auth"
+description = "Docker Registry Authentication"
+regex = '''(?i)(docker[_-]?registry|registry[_-]?password|registry[_-]?auth)[_-]?[=:]\s*['\"][^'\"\s]{8,}['\"]'''
+entropy = 3.0
