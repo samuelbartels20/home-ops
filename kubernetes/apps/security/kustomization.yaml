@@ -5,7 +5,7 @@ kind: Kustomization
 namespace: security
 components:
   - ../../components/common
-# resources:
-#   - ./external-secrets/ks.yaml
+resources:
+  - ./external-secrets/ks.yaml
   # - ./onepassword/ks.yaml
 
