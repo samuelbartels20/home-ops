@@ -51,7 +51,7 @@ jobs:
           git tag "v$VERSION"
 
           # Generate changelog entry
-          echo "## Release v$VERSION" > release_notes.md
+          echo "##  v$VERSION" > release_notes.md
           echo "" >> release_notes.md
           echo "Date-based release for $(date -u +%Y-%m-%d)" >> release_notes.md
           echo "" >> release_notes.md
