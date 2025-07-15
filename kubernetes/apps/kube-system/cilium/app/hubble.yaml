@@ -6,7 +6,7 @@ metadata:
   namespace: kube-system
 spec:
   parentRefs:
-    - name: internal
+    - name: external
       namespace: kube-system
       sectionName: https
   hostnames:
