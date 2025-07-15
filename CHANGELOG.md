@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.15.26
+
+Date-based release for 2025-07-15
+
+### Changes
+- feat(external secrets): add external secrets
+- chore(release): 2025.07.15.25 [skip ci]
+
 ##  v2025.07.15.25
 
 Date-based release for 2025-07-15
