@@ -352,7 +352,7 @@ spec:
 
     # External snapshotter configuration
     externalSnapshotter:
-      enabled: true
+      enabled: false
       name: snapshot-controller
       priorityClassName: system-cluster-critical
       deletionPolicy: Retain
@@ -398,7 +398,7 @@ spec:
 
     # Volume snapshot class configuration
     volumeSnapshotClass:
-      create: true
+      create: false
       name: truenas-nfs-snapclass
       deletionPolicy: Retain
       annotations:
