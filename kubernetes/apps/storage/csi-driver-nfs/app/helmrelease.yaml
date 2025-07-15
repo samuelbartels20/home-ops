@@ -29,10 +29,10 @@ spec:
     remediation:
       retries: 3
     crds: CreateReplace
-  # upgrade:
-  #   cleanupOnFail: true
-  #   remediation:
-  #     retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
   uninstall:
     keepHistory: false
   values:
@@ -401,8 +401,8 @@ spec:
       create: true
       name: truenas-nfs-snapclass
       deletionPolicy: Retain
-      # annotations:
-      #   snapshot.storage.kubernetes.io/is-default-class: "true"
+      annotations:
+        snapshot.storage.kubernetes.io/is-default-class: "true"
 
     # Storage class configuration for production
     storageClass:

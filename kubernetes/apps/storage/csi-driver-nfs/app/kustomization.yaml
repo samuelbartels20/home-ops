@@ -8,7 +8,7 @@ resources:
   - ./externalsecret.yaml
   - ./helmrelease.yaml
   - ./oci-repository.yaml
-  # - ./vpa.yaml
+  - ./vpa.yaml
   - ./poddisruptionbudget.yaml
   - ./networkpolicy.yaml
 
