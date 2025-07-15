@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.15.8
+
+Date-based release for 2025-07-15
+
+### Changes
+- feat(cilium): add hubble route
+- chore(release): 2025.07.15.7 [skip ci]
+
 ##  v2025.07.15.7
 
 Date-based release for 2025-07-15
