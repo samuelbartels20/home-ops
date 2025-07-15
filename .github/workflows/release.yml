@@ -7,8 +7,8 @@ on:
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
+  issues: read
+  pull-requests: read
 
 jobs:
   release:
@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
 
       - name: Generate date-based version
         id: version
@@ -95,12 +95,6 @@ jobs:
           # Push tag and commit
           git push origin main
           git push origin "v$VERSION"
-
-      - name: Pull latest changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
 
       - name: Create GitHub Release
         if: steps.check_version.outputs.exists == 'false'
