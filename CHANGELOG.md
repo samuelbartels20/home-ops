@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.16.21
+
+Date-based release for 2025-07-16
+
+### Changes
+- Merge pull request #9 from samuelbartels20/renovate/registry.k8s.io-sig-storage-csi-resizer-1.x
+- chore(release): 2025.07.16.20 [skip ci]
+- chore(deps): update registry.k8s.io/sig-storage/csi-resizer docker tag to v1.14.0
+
 ##  v2025.07.16.20
 
 Date-based release for 2025-07-16
