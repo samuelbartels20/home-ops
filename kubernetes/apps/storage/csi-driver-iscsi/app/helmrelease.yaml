@@ -92,7 +92,7 @@ spec:
             zpoolResilver: /usr/sbin/zpool
             zpoolReplace: /usr/sbin/zpool
           datasetParentName: homelab/applications
-          detachedSnapshotsDatasetParentName: homelab/applications/db-iscsi-extent-snapshot
+          detachedSnapshotsDatasetParentName: homelab/snapshots
           zvolCompression: ""
           zvolDedup: ""
           zvolEnableReservation: false
