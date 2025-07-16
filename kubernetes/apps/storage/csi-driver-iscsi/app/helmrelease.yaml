@@ -86,8 +86,6 @@ spec:
         zfs:
           cli:
             sudoEnabled: true
-            # sudoUser: root
-            # sudoPassword: 123456789
             chroot: /usr/sbin/chroot
             sudo: /usr/bin/sudo
             sudoPath: /sbin/sudo
