@@ -13,7 +13,7 @@ metadata:
 resources:
   - ./helmrelease.yaml
   - ./externalsecret.yaml
-  - ./vpa.yaml
+  # - ./vpa.yaml
   - ./poddisruptionbudget.yaml
   - ./networkpolicy.yaml
 
