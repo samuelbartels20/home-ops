@@ -109,7 +109,10 @@ spec:
           zvolEnableReservation: false
           zvolBlocksize: 16K
         iscsi:
-          targetPortal: "192.168.8.161:3260"
+          targetPortal:
+            secretRef:
+              name: truenas-iscsi
+              key: portal
           interface:
             namePrefix: csi-
             nameSuffix: "-cluster"
