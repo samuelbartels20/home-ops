@@ -75,7 +75,10 @@ spec:
               name: truenas-iscsi
               key: DECRYPTION_KEY
           port: 443
-          username: root
+          username:
+            secretRef:
+              name: truenas-iscsi
+              key: username
           password:
             secretRef:
               name: truenas-iscsi
