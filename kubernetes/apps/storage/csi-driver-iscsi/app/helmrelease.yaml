@@ -164,22 +164,22 @@ spec:
 
         # --- SSH ENV VARS FROM SECRET ---
         env:
-          - name: SSH_HOST
+          - name: host
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.driver.config.sshConnection.secretName }}
                 key: {{ .Values.driver.config.sshConnection.hostSecretKey }}
-          - name: SSH_PORT
+          - name: port
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.driver.config.sshConnection.secretName }}
                 key: {{ .Values.driver.config.sshConnection.portSecretKey }}
-          - name: SSH_USERNAME
+          - name: username
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.driver.config.sshConnection.secretName }}
                 key: {{ .Values.driver.config.sshConnection.usernameSecretKey }}
-          - name: SSH_PASSWORD
+          - name: password
             valueFrom:
               secretKeyRef:
                 name: {{ .Values.driver.config.sshConnection.secretName }}
