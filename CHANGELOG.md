@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.16.24
+
+Date-based release for 2025-07-16
+
+### Changes
+- Merge pull request #6 from samuelbartels20/renovate/democraticcsi-democratic-csi-1.x
+- chore(release): 2025.07.16.23 [skip ci]
+- chore(deps): update democraticcsi/democratic-csi docker tag to v1.9.3
+
 ##  v2025.07.16.23
 
 Date-based release for 2025-07-16
