@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.16.23
+
+Date-based release for 2025-07-16
+
+### Changes
+- Merge pull request #7 from samuelbartels20/renovate/registry.k8s.io-sig-storage-csi-node-driver-registrar-2.x
+- chore(release): 2025.07.16.22 [skip ci]
+- chore(deps): update registry.k8s.io/sig-storage/csi-node-driver-registrar docker tag to v2.14.0
+
 ##  v2025.07.16.22
 
 Date-based release for 2025-07-16
