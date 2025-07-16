@@ -119,7 +119,7 @@ spec:
           password: "123456789"
         zfs:
           cli:
-            sudoEnabled: false
+            sudoEnabled: true
             sudoUser: root
             sudoPassword: 123456789
             sudoPath: /usr/bin/sudo
