@@ -77,9 +77,9 @@ spec:
             sudoEnabled: true
             sudoUser: root
             sudoPassword: 123456789
-            sudoPath: /usr/bin/sudo
-            sudo: /sbin/sudo
-            zfs: /sbin/zfs
+            sudo: /usr/bin/sudo
+            sudoPath: /sbin/sudo
+            zfsPath: /sbin/zfs
             zpool: /sbin/zpool
             zpoolList: /usr/sbin/zpool
             zpoolImport: /usr/sbin/zpool
