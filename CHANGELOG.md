@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.16.19
+
+Date-based release for 2025-07-16
+
+### Changes
+- Merge pull request #11 from samuelbartels20/renovate/registry.k8s.io-sig-storage-livenessprobe-2.x
+- chore(release): 2025.07.16.18 [skip ci]
+- chore(deps): update registry.k8s.io/sig-storage/livenessprobe docker tag to v2.16.0
+
 ##  v2025.07.16.18
 
 Date-based release for 2025-07-16
