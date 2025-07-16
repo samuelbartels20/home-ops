@@ -88,10 +88,7 @@ spec:
           host: "192.168.8.161"
           port: 22
           username: "root"
-          password:
-            secretRef:
-              name: truenas-iscsi
-              key: password
+          password: "123456789"
         zfs:
           cli:
             sudoEnabled: true
