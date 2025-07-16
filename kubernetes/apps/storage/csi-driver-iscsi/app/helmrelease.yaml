@@ -445,14 +445,14 @@ spec:
 
 
     # Volume snapshot classes
-    volumeSnapshotClasses:
-      - name: truenas-iscsi-snapclass
-        driver: org.democratic-csi.iscsi
-        annotations:
-          snapshot.storage.kubernetes.io/is-default-class: "true"
-        deletionPolicy: Retain
-        parameters:
-          detachedSnapshots: false
+    # volumeSnapshotClasses:
+    #   - name: truenas-iscsi-snapclass
+    #     driver: org.democratic-csi.iscsi
+    #     annotations:
+    #       snapshot.storage.kubernetes.io/is-default-class: "true"
+    #     deletionPolicy: Retain
+    #     parameters:
+    #       detachedSnapshots: false
 
     # Service configuration for monitoring
     service:
