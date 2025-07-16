@@ -168,10 +168,11 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: truenas-api-key
+  name: truenas-nfs
   namespace: storage
 stringData:
-  API_KEY: op://kubernetes/truenas-api-key/API_KEY
+  API_KEY: op://K8s/truenas-nfs/API_KEY
+  DECRYPTION_KEY: op://K8s/truenas-nfs/DECRYPTION_KEY
 
 ---
 apiVersion: v1
