@@ -6,7 +6,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   selector:
     matchLabels:
@@ -28,7 +28,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   groups:
     - name: snapshot.rules
@@ -112,7 +112,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   selector:
     matchLabels:
@@ -256,11 +256,11 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: storage-monitor
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/part-of: storage-system
+      app.kubernetes.io/part-of: storage
   endpoints:
     - port: metrics
       interval: 30s
@@ -281,7 +281,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: storage-monitor
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   groups:
     - name: storage.rules
@@ -328,11 +328,11 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: storage-monitor
-    app.kubernetes.io/part-of: storage-system
+    app.kubernetes.io/part-of: storage
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/part-of: storage-system
+      app.kubernetes.io/part-of: storage
   podMetricsEndpoints:
     - port: metrics
       interval: 30s

@@ -5,7 +5,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/component: observability
 spec:
   selector:
     matchLabels:
@@ -33,7 +33,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/component: observability
 spec:
   groups:
     - name: snapshot.performance.rules
@@ -127,7 +127,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/component: observability
 spec:
   selector:
     matchLabels:
@@ -147,7 +147,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: snapshot-controller
-    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/component: observability
 spec:
   json: |
     {
