@@ -89,7 +89,6 @@ spec:
           port: 22
           usernameSecretKey: username
           passwordSecretKey: password
-          secretName: truenas-iscsi
         zfs:
           cli:
             sudoEnabled: true
