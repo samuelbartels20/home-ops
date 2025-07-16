@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.16.2
+
+Date-based release for 2025-07-16
+
+### Changes
+- feat(csi driver iscsi): add csi driver iscsi
+- chore(release): 2025.07.16.1 [skip ci]
+
 ##  v2025.07.16.1
 
 Date-based release for 2025-07-16
