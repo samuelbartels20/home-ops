@@ -87,8 +87,8 @@ spec:
         sshConnection:
           hostSecretKey: host
           port: 22
-          usernameSecretKey: "${username}"
-          passwordSecretKey: "${password}"
+          usernameSecretKey: username
+          passwordSecretKey: password
           secretName: truenas-iscsi
         zfs:
           cli:
