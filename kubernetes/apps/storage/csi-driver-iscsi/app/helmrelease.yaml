@@ -58,7 +58,7 @@ spec:
     # Democratic CSI configuration
     driver:
       config:
-        driver: freenas-iscsi
+        driver: zfs-generic-iscsi
         instance_id:
         httpConnection:
           protocol: https
