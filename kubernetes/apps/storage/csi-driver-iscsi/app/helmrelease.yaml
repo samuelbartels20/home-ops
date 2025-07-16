@@ -62,21 +62,47 @@ spec:
         instance_id:
         httpConnection:
           protocol: https
-          host: 192.168.8.161
+          host:
+            secretRef:
+              name: truenas-iscsi
+              key: host
+          apiKey:
+            secretRef:
+              name: truenas-iscsi
+              key: API_KEY
+          decryptionKey:
+            secretRef:
+              name: truenas-iscsi
+              key: DECRYPTION_KEY
           port: 443
-          username: root
-          password: 123456789
+          username:
+            secretRef:
+              name: truenas-iscsi
+              key: username
+          password:
+            secretRef:
+              name: truenas-iscsi
+              key: password
           allowInsecure: true
         sshConnection:
-          host: "192.168.8.161"
+          host:
+            secretRef:
+              name: truenas-iscsi
+              key: host
           port: 22
-          username: "root"
-          password: "123456789"
+          username:
+            secretRef:
+              name: truenas-iscsi
+              key: ssh_username
+          password:
+            secretRef:
+              name: truenas-iscsi
+              key: ssh_password
         zfs:
           cli:
             sudoEnabled: true
-            sudoUser: root
-            sudoPassword: 123456789
+            # sudoUser: root
+            # sudoPassword: 123456789
             chroot: /usr/sbin/chroot
             sudo: /usr/bin/sudo
             sudoPath: /sbin/sudo
@@ -100,7 +126,10 @@ spec:
           zvolEnableReservation: false
           zvolBlocksize: 16K
         iscsi:
-          targetPortal: "192.168.8.161:3260"
+          targetPortal:
+            secretRef:
+              name: truenas-iscsi
+              key: portal
           interface:
             namePrefix: csi-
             nameSuffix: "-cluster"
@@ -355,8 +384,14 @@ spec:
           controller-publish-secret:
           node-stage-secret:
             node-db.node.session.auth.authmethod: "CHAP"
-            node-db.node.session.auth.username: "root"
-            node-db.node.session.auth.password: "123456789123"
+            node-db.node.session.auth.username:
+              secretRef:
+                name: truenas-iscsi
+                key: chap_username
+            node-db.node.session.auth.password:
+              secretRef:
+                name: truenas-iscsi
+                key: chap_password
 
 
     # Volume snapshot classes
