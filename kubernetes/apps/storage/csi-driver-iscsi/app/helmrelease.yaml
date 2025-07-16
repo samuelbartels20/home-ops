@@ -41,51 +41,6 @@ spec:
       namespace: security
     - name: onepassword
       namespace: security
-  valuesFrom:
-    - targetPath: driver.config.httpConnection.apiKey
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: API_KEY
-    - targetPath: driver.config.httpConnection.decryptionKey
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: DECRYPTION_KEY
-    - targetPath: driver.config.httpConnection.username
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: username
-    - targetPath: driver.config.httpConnection.password
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: password
-    - targetPath: driver.config.sshConnection.username
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: ssh_username
-    - targetPath: driver.config.sshConnection.password
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: ssh_password
-    - targetPath: driver.config.httpConnection.host
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: host
-    - targetPath: driver.config.sshConnection.host
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: host
-    - targetPath: driver.config.iscsi.targetPortal
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: portal
-    - targetPath: driver.config.zfs.datasetParentName
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: dataset_parent
-    - targetPath: driver.config.zfs.detachedSnapshotsDatasetParentName
-      kind: Secret
-      name: truenas-iscsi
-      valuesKey: snapshot_parent
 
   values:
     # Secret configuration
