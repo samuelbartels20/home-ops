@@ -130,48 +130,6 @@ spec:
       strategy: deployment
       replicas: 2
       driver:
-        env:
-          - name: HOST
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: host
-          - name: API_KEY
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: API_KEY
-          - name: DECRYPTION_KEY
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: DECRYPTION_KEY
-          - name: dataset_parent
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: dataset_parent
-          - name: snapshot_parent
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: snapshot_parent
-          - name: portal
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: portal
-          - name: chap_username
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: chap_username
-          - name: chap_password
-            valueFrom:
-              secretKeyRef:
-                name: truenas-iscsi
-                key: chap_password
-
         # Resource configuration
         resources:
           limits:
