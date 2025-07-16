@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.16.22
+
+Date-based release for 2025-07-16
+
+### Changes
+- Merge pull request #8 from samuelbartels20/renovate/registry.k8s.io-sig-storage-csi-provisioner-5.x
+- chore(release): 2025.07.16.21 [skip ci]
+- chore(deps): update registry.k8s.io/sig-storage/csi-provisioner docker tag to v5.3.0
+
 ##  v2025.07.16.21
 
 Date-based release for 2025-07-16
