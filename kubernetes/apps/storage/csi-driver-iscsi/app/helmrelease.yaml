@@ -85,7 +85,6 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          secretName: truenas-iscsi
           host:
             secretRef:
               name: truenas-iscsi
