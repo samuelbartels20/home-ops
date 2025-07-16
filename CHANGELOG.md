@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.16.39
+
+Date-based release for 2025-07-16
+
+### Changes
+- feat(trilium): tested the csi driver nfs storage class with trilium app
+- chore(release): 2025.07.16.38 [skip ci]
+
 ##  v2025.07.16.38
 
 Date-based release for 2025-07-16
