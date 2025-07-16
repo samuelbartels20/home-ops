@@ -77,20 +77,20 @@ spec:
             sudoEnabled: true
             sudoUser: root
             sudoPassword: 123456789
-            sudoPath: /usr/bin/sudo
-            zfsPath: /usr/sbin/zfs
-            zpoolPath: /usr/sbin/zpool
-            zpoolListPath: /usr/sbin/zpool
-            zpoolImportPath: /usr/sbin/zpool
-            zpoolExportPath: /usr/sbin/zpool
-            zpoolCreatePath: /usr/sbin/zpool
-            zpoolDestroyPath: /usr/sbin/zpool
-            zpoolOnlinePath: /usr/sbin/zpool
-            zpoolOfflinePath: /usr/sbin/zpool
-            zpoolScrubPath: /usr/sbin/zpool
-            zpoolSyncPath: /usr/sbin/zpool
-            zpoolResilverPath: /usr/sbin/zpool
-            zpoolReplacePath: /usr/sbin/zpool
+            sudo: /usr/bin/sudo
+            zfs: /usr/sbin/zfs
+            zpool: /usr/sbin/zpool
+            zpoolList: /usr/sbin/zpool
+            zpoolImport: /usr/sbin/zpool
+            zpoolExport: /usr/sbin/zpool
+            zpoolCreate: /usr/sbin/zpool
+            zpoolDestroy: /usr/sbin/zpool
+            zpoolOnline: /usr/sbin/zpool
+            zpoolOffline: /usr/sbin/zpool
+            zpoolScrub: /usr/sbin/zpool
+            zpoolSync: /usr/sbin/zpool
+            zpoolResilver: /usr/sbin/zpool
+            zpoolReplace: /usr/sbin/zpool
           datasetParentName: homelab/applications
           detachedSnapshotsDatasetParentName: homelab/applications/db-iscsi-extent-snapshot
           zvolCompression: ""
