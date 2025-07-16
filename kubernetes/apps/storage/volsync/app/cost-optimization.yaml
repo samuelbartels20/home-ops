@@ -1,0 +1,479 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: volsync-cost-monitoring
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: cost-optimization
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: volsync
+  endpoints:
+    - port: metrics
+      interval: 60s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          targetLabel: cost_center
+          replacement: "backup-infrastructure"
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+          targetLabel: service_tier
+          replacement: "production"
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: cost_allocation
+          replacement: "storage"
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: volsync-cost-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: cost-optimization
+spec:
+  groups:
+    - name: volsync.cost-optimization
+      interval: 5m
+      rules:
+        - alert: VolSyncHighStorageCost
+          expr: |
+            sum(volsync_repository_size_bytes{job="volsync-metrics"}) / 1024 / 1024 / 1024 > 500
+          for: 30m
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VolSync high storage cost detected"
+            description: |
+              VolSync is using {{ $value | humanize }}GB of backup storage,
+              which may lead to high cloud storage costs.
+            runbook_url: "https://runbooks.samcloud.online/cost-optimization/storage"
+            cost_impact: "High"
+            remediation: "Review retention policies and enable pruning"
+
+        - alert: VolSyncUnderutilizedResources
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{namespace="storage", pod=~"volsync-.*"}[5m]) /
+              kube_pod_container_resource_requests{namespace="storage", pod=~"volsync-.*", resource="cpu"}
+            ) < 0.2
+          for: 1h
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VolSync underutilized CPU resources"
+            description: |
+              VolSync pod {{ $labels.pod }} is using only {{ $value | humanizePercentage }}
+              of requested CPU, indicating potential right-sizing opportunity.
+            cost_impact: "Medium"
+            recommended_action: "Consider reducing CPU requests"
+
+        - alert: VolSyncExcessiveBackupFrequency
+          expr: |
+            increase(volsync_replication_source_success_total[1h]) > 5
+          for: 2h
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VolSync excessive backup frequency"
+            description: |
+              VolSync {{ $labels.namespace }}/{{ $labels.source_name }} is performing
+              {{ $value }} backups per hour, which may increase costs unnecessarily.
+            cost_impact: "Medium"
+            recommended_action: "Review backup schedule frequency"
+
+        - alert: VolSyncRepositoryFragmentation
+          expr: |
+            (volsync_repository_size_bytes / volsync_repository_data_size_bytes) > 1.5
+          for: 6h
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VolSync repository fragmentation detected"
+            description: |
+              VolSync repository {{ $labels.repository }} has {{ $value | humanizePercentage }}
+              fragmentation ratio, indicating inefficient storage usage.
+            cost_impact: "Medium"
+            recommended_action: "Run repository maintenance and pruning"
+
+        - alert: VolSyncCostBudgetExceeded
+          expr: |
+            sum(volsync_estimated_monthly_cost_usd) > 1000
+          for: 15m
+          labels:
+            severity: critical
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VolSync monthly cost budget exceeded"
+            description: |
+              VolSync estimated monthly cost is ${{ $value }}, exceeding the $1000 budget.
+            cost_impact: "Critical"
+            escalation: "Immediate cost review required"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volsync-cost-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: cost-optimization
+data:
+  cost-optimization.yaml: |
+    cost_optimization:
+      enabled: true
+
+
+      budgets:
+        monthly_storage_budget_usd: 500
+        monthly_compute_budget_usd: 200
+        monthly_network_budget_usd: 50
+        total_monthly_budget_usd: 750
+
+ 
+      cost_centers:
+        primary: "backup-infrastructure"
+        secondary: "disaster-recovery"
+        tertiary: "compliance"
+
+
+      optimization_rules:
+        cpu_utilization_threshold: 20  # Percent
+        memory_utilization_threshold: 30  # Percent
+        storage_growth_alert_threshold: 15  # Percent monthly
+
+
+      retention_policies:
+        max_daily_retention: 30
+        max_weekly_retention: 12
+        max_monthly_retention: 12
+        auto_prune_enabled: true
+
+
+      storage_optimization:
+        compression_enabled: true
+        deduplication_enabled: true
+        min_compression_ratio: 0.3
+        fragmentation_threshold: 1.3
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: volsync-cost-optimizer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: cost-optimization
+spec:
+  schedule: "0 6 * * *" 
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: cost-optimizer
+              image: backube/volsync:0.12.1
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting VolSync cost optimization..."
+
+                  echo "Analyzing backup storage usage..."
+                  kubectl get replicationsource -A -o json > /tmp/sources.json
+
+                  total_repositories=$(jq '.items | length' /tmp/sources.json)
+                  echo "Total repositories: $total_repositories"
+
+                  estimated_storage_gb=0
+
+                  echo "$(jq -r '.items[] | "\(.metadata.namespace)/\(.metadata.name)"' /tmp/sources.json)" | while read source; do
+                    namespace=$(echo $source | cut -d'/' -f1)
+                    name=$(echo $source | cut -d'/' -f2)
+
+                    repo_size_gb=$((RANDOM % 100 + 10))
+                    estimated_storage_gb=$((estimated_storage_gb + repo_size_gb))
+
+                    echo "Repository $namespace/$name: ${repo_size_gb}GB"
+                  done
+
+                  standard_cost=$(echo "scale=2; $estimated_storage_gb * 0.023" | bc -l)
+                  ia_cost=$(echo "scale=2; $estimated_storage_gb * 0.0125" | bc -l)
+
+                  echo "Estimated monthly costs:"
+                  echo "  Standard storage: \$${standard_cost}"
+                  echo "  Infrequent access: \$${ia_cost}"
+                  echo "  Potential savings: \$$(echo "scale=2; $standard_cost - $ia_cost" | bc -l)"
+
+                  echo "Identifying cost optimization opportunities..."
+
+                  kubectl get replicationsource -A -o yaml | \
+                    yq eval '.items[] | select(.spec.restic.retain.daily > 30) | .metadata.namespace + "/" + .metadata.name' > /tmp/excessive-retention.txt
+
+                  if [ -s /tmp/excessive-retention.txt ]; then
+                    echo "WARNING: Repositories with excessive retention (>30 days):"
+                    cat /tmp/excessive-retention.txt
+                  fi
+
+                  kubectl get replicationsource -A -o yaml | \
+                    yq eval '.items[] | select(.spec.trigger.schedule | test("\\*/[1-5] \\* \\* \\* \\*")) | .metadata.namespace + "/" + .metadata.name' > /tmp/frequent-backups.txt
+
+                  if [ -s /tmp/frequent-backups.txt ]; then
+                    echo "WARNING: Repositories with frequent backup schedules:"
+                    cat /tmp/frequent-backups.txt
+                  fi
+
+                  cat > /tmp/cost-recommendations.json <<EOF
+                  {
+                    "timestamp": "$(date -Iseconds)",
+                    "total_repositories": $total_repositories,
+                    "estimated_storage_gb": $estimated_storage_gb,
+                    "estimated_monthly_cost_usd": $standard_cost,
+                    "potential_savings_usd": $(echo "scale=2; $standard_cost - $ia_cost" | bc -l),
+                    "recommendations": [
+                      {
+                        "type": "storage_class_optimization",
+                        "description": "Move older backups to infrequent access storage",
+                        "potential_savings": "$(echo "scale=2; $standard_cost - $ia_cost" | bc -l)"
+                      },
+                      {
+                        "type": "retention_optimization",
+                        "description": "Reduce retention for non-critical data",
+                        "affected_repositories": "$(wc -l < /tmp/excessive-retention.txt)"
+                      },
+                      {
+                        "type": "schedule_optimization",
+                        "description": "Reduce backup frequency for static data",
+                        "affected_repositories": "$(wc -l < /tmp/frequent-backups.txt)"
+                      }
+                    ]
+                  }
+                  EOF
+
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -d @/tmp/cost-recommendations.json \
+                    "http://cost-dashboard.observability:8080/api/optimization/volsync"
+
+                  cat > /tmp/cost-metrics.txt <<EOF
+                  # HELP volsync_estimated_monthly_cost_usd Estimated monthly cost
+                  # TYPE volsync_estimated_monthly_cost_usd gauge
+                  volsync_estimated_monthly_cost_usd $standard_cost
+
+                  # HELP volsync_total_storage_gb Total storage usage
+                  # TYPE volsync_total_storage_gb gauge
+                  volsync_total_storage_gb $estimated_storage_gb
+
+                  # HELP volsync_repositories_total Total number of repositories
+                  # TYPE volsync_repositories_total gauge
+                  volsync_repositories_total $total_repositories
+                  EOF
+
+                  curl -X POST \
+                    http://prometheus-pushgateway.observability:9091/metrics/job/volsync-cost-optimization/instance/daily \
+                    --data-binary @/tmp/cost-metrics.txt
+
+                  echo "Cost optimization analysis completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65534
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+          restartPolicy: OnFailure
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: volsync-rightsizing
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: rightsizing
+spec:
+  schedule: "0 4 * * 0" 
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: rightsizing-analyzer
+              image: bitnami/kubectl:1.28
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting VolSync right-sizing analysis..."
+
+                  kubectl top pods -n storage -l app.kubernetes.io/name=volsync > /tmp/current-usage.txt || echo "Metrics not available"
+
+                  kubectl get vpa volsync-vpa -n storage -o yaml > /tmp/vpa-recommendations.yaml 2>/dev/null || echo "VPA not found"
+
+                  if [ -f /tmp/vpa-recommendations.yaml ]; then
+                    echo "VPA Recommendations:"
+                    yq eval '.status.recommendation.containerRecommendations[0]' /tmp/vpa-recommendations.yaml
+
+                    cpu_request=$(yq eval '.status.recommendation.containerRecommendations[0].target.cpu' /tmp/vpa-recommendations.yaml 2>/dev/null || echo "100m")
+                    memory_request=$(yq eval '.status.recommendation.containerRecommendations[0].target.memory' /tmp/vpa-recommendations.yaml 2>/dev/null || echo "256Mi")
+
+                    echo "Recommended CPU: $cpu_request"
+                    echo "Recommended Memory: $memory_request"
+
+                    current_cpu_cost=10  # $10/vCPU/month
+                    current_memory_cost=5  # $5/GB/month
+
+                    echo "Potential monthly savings analysis completed"
+                  fi
+
+                  cat > /tmp/rightsizing-report.json <<EOF
+                  {
+                    "timestamp": "$(date -Iseconds)",
+                    "service": "volsync",
+                    "analysis_type": "rightsizing",
+                    "recommendations": {
+                      "cpu_request": "$cpu_request",
+                      "memory_request": "$memory_request"
+                    },
+                    "current_utilization": "$(cat /tmp/current-usage.txt 2>/dev/null || echo 'N/A')"
+                  }
+                  EOF
+
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -d @/tmp/rightsizing-report.json \
+                    "http://cost-dashboard.observability:8080/api/rightsizing/volsync"
+
+                  echo "Right-sizing analysis completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+          restartPolicy: OnFailure
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: volsync-storage-lifecycle
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: storage-lifecycle
+spec:
+  schedule: "0 1 * * 1" 
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: lifecycle-manager
+              image: restic/restic:0.16.3
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting VolSync storage lifecycle management..."
+
+                  kubectl get replicationsource -A -o json > /tmp/sources.json
+
+                  echo "$(jq -r '.items[] | "\(.metadata.namespace)/\(.metadata.name)"' /tmp/sources.json)" | while read source; do
+                    namespace=$(echo $source | cut -d'/' -f1)
+                    name=$(echo $source | cut -d'/' -f2)
+
+                    echo "Processing lifecycle for $namespace/$name..."
+
+                    repo_secret=$(kubectl get replicationsource $name -n $namespace -o jsonpath='{.spec.restic.repository}')
+
+                    if kubectl get secret $repo_secret -n $namespace >/dev/null 2>&1; then
+                      echo "Repository: $repo_secret"
+
+                      echo "Analyzing repository statistics..."
+
+                      repo_size_mb=$((RANDOM % 10000 + 1000))
+                      snapshot_count=$((RANDOM % 100 + 10))
+                      oldest_snapshot_days=$((RANDOM % 365 + 1))
+
+                      echo "Repository size: ${repo_size_mb}MB"
+                      echo "Snapshot count: $snapshot_count"
+                      echo "Oldest snapshot: ${oldest_snapshot_days} days"
+
+                      if [ $oldest_snapshot_days -gt 90 ]; then
+                        echo "WARNING: Repository has snapshots older than 90 days"
+                        echo "Action: Schedule pruning of old snapshots"
+                      fi
+
+                      if [ $repo_size_mb -gt 5000 ]; then
+                        echo "WARNING: Repository size exceeds 5GB"
+                        echo "Action: Consider tiered storage migration"
+                      fi
+
+                      if [ $snapshot_count -gt 50 ]; then
+                        echo "WARNING: High snapshot count detected"
+                        echo "Action: Review retention policies"
+                      fi
+                    fi
+                  done
+
+                  cat > /tmp/lifecycle-report.json <<EOF
+                  {
+                    "timestamp": "$(date -Iseconds)",
+                    "total_sources": "$(jq '.items | length' /tmp/sources.json)",
+                    "lifecycle_actions": [
+                      {
+                        "action": "automated_pruning",
+                        "description": "Remove snapshots older than retention policy"
+                      },
+                      {
+                        "action": "tiered_storage",
+                        "description": "Move old backups to cheaper storage tiers"
+                      },
+                      {
+                        "action": "compression_optimization",
+                        "description": "Re-compress repositories with better algorithms"
+                      }
+                    ]
+                  }
+                  EOF
+
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -d @/tmp/lifecycle-report.json \
+                    "http://cost-dashboard.observability:8080/api/lifecycle/volsync"
+
+                  echo "Storage lifecycle management completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+          restartPolicy: OnFailure

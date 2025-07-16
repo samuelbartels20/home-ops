@@ -1,0 +1,76 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: storage
+
+metadata:
+  name: csi-driver-iscsi
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+resources:
+  - ./helmrelease.yaml
+  - ./externalsecret.yaml
+  - ./vpa.yaml
+  - ./poddisruptionbudget.yaml
+  - ./networkpolicy.yaml
+
+commonLabels:
+  app.kubernetes.io/name: csi-driver-iscsi
+  app.kubernetes.io/component: storage
+  app.kubernetes.io/part-of: storage
+  app.kubernetes.io/managed-by: kustomize
+  production-grade: "true"
+  security-hardened: "true"
+
+labels:
+  - pairs:
+      app.kubernetes.io/version: "2.5.0"
+      helm.sh/chart: "csi-driver-iscsi-2.5.0"
+    includeSelectors: false
+
+patches:
+  # Patch for production resource limits
+  - target:
+      kind: HelmRelease
+      name: csi-driver-iscsi
+    patch: |-
+      - op: add
+        path: /metadata/annotations/fluxcd.io~1prune
+        value: "false"
+      - op: add
+        path: /metadata/annotations/fluxcd.io~1ignore
+        value: "false"
+
+  # Patch for enhanced security context
+  - target:
+      kind: NetworkPolicy
+      name: csi-driver-iscsi
+    patch: |-
+      - op: add
+        path: /metadata/annotations/policy.kubernetes.io~1audit
+        value: "true"
+      - op: add
+        path: /metadata/annotations/policy.kubernetes.io~1enforce
+        value: "true"
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/instance: csi-driver-iscsi
+
+images:
+  - name: democraticcsi/democratic-csi
+    newTag: v1.8.4
+  - name: registry.k8s.io/sig-storage/csi-provisioner
+    newTag: v5.2.0
+  - name: registry.k8s.io/sig-storage/csi-resizer
+    newTag: v1.13.1
+  - name: registry.k8s.io/sig-storage/csi-snapshotter
+    newTag: v8.2.0
+  - name: registry.k8s.io/sig-storage/livenessprobe
+    newTag: v2.15.0
+  - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    newTag: v2.13.0

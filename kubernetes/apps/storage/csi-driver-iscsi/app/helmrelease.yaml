@@ -1,0 +1,497 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: csi-driver-iscsi
+  namespace: storage
+  annotations:
+    meta.helm.sh/release-name: csi-driver-iscsi
+    meta.helm.sh/release-namespace: storage
+    fluxcd.io/automated: "true"
+    fluxcd.io/tag.chart-image: glob:0.14.*
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/instance: csi-driver-iscsi
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
+    app.kubernetes.io/version: "0.14.7"
+    production-grade: "true"
+    security-hardened: "true"
+
+spec:
+  interval: 1h
+  timeout: 10m
+  chart:
+    spec:
+      chart: democratic-csi
+      version: 0.14.7
+      sourceRef:
+        kind: HelmRepository
+        name: democratic-csi
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+    crds: CreateReplace
+  uninstall:
+    keepHistory: false
+  dependsOn:
+    - name: external-secrets
+      namespace: security
+    - name: onepassword
+      namespace: security
+  valuesFrom:
+    - targetPath: driver.config.httpConnection.apiKey
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: API_KEY
+    - targetPath: driver.config.httpConnection.decryptionKey
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: DECRYPTION_KEY
+    - targetPath: driver.config.httpConnection.username
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: username
+    - targetPath: driver.config.httpConnection.password
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: password
+    - targetPath: driver.config.sshConnection.username
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: ssh_username
+    - targetPath: driver.config.sshConnection.password
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: ssh_password
+    - targetPath: driver.config.httpConnection.host
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: host
+    - targetPath: driver.config.sshConnection.host
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: host
+    - targetPath: driver.config.iscsi.targetPortal
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: portal
+    - targetPath: driver.config.zfs.datasetParentName
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: dataset_parent
+    - targetPath: driver.config.zfs.detachedSnapshotsDatasetParentName
+      kind: Secret
+      name: truenas-iscsi
+      valuesKey: snapshot_parent
+
+  values:
+    # Secret configuration
+    secrets:
+      truenas-iscsi:
+        create: false
+        apiKey:
+          secretRef:
+            name: truenas-iscsi
+            key: API_KEY
+        decryptionKey:
+          secretRef:
+            name: truenas-iscsi
+            key: DECRYPTION_KEY
+    # Democratic CSI configuration
+    driver:
+      config:
+        driver: freenas-iscsi
+        instance_id:
+        httpConnection:
+          protocol: https
+          host: 192.168.8.161
+          port: 443
+          username: root
+          password: 123456789
+          allowInsecure: true
+        sshConnection:
+          host: "192.168.8.161"
+          port: 22
+          username: "root"
+          password: "123456789"
+        zfs:
+          cli:
+            sudoEnabled: false
+            sudoUser: root
+            sudoPassword: 123456789
+            sudoPath: /usr/bin/sudo
+            zfsPath: /usr/sbin/zfs
+            zpoolPath: /usr/sbin/zpool
+            zpoolListPath: /usr/sbin/zpool
+            zpoolImportPath: /usr/sbin/zpool
+            zpoolExportPath: /usr/sbin/zpool
+            zpoolCreatePath: /usr/sbin/zpool
+            zpoolDestroyPath: /usr/sbin/zpool
+            zpoolOnlinePath: /usr/sbin/zpool
+            zpoolOfflinePath: /usr/sbin/zpool
+            zpoolScrubPath: /usr/sbin/zpool
+            zpoolSyncPath: /usr/sbin/zpool
+            zpoolResilverPath: /usr/sbin/zpool
+            zpoolReplacePath: /usr/sbin/zpool
+          datasetParentName: /mnt/homelab/applications/db-iscsi-extent
+          detachedSnapshotsDatasetParentName: /mnt/homelab/applications/db-iscsi-extent-snapshot
+          zvolCompression: ""
+          zvolDedup: ""
+          zvolEnableReservation: false
+          zvolBlocksize: 16K
+        iscsi:
+          targetPortal: "192.168.8.161:3260"
+          interface:
+            namePrefix: csi-
+            nameSuffix: "-cluster"
+          targetGroups:
+            - targetGroupPortalGroup: 2
+              targetGroupInitiatorGroup: 2
+              targetGroupAuthType: CHAP
+              targetGroupAuthGroup: 2
+          extentInsecureTpc: true
+          extentXenCompat: false
+          extentDisablePhysicalBlocksize: true
+          extentBlocksize: 4096
+          extentRpm: "7200"
+          extentAvailThreshold: 0
+
+    # CSI Driver configuration
+    csiDriver:
+      name: "org.democratic-csi.iscsi"
+      attachRequired: true
+      storageCapacity: true
+      fsGroupPolicy: "File"
+
+    # Controller configuration
+    controller:
+      enabled: true
+      image:
+        repository: democratic-csi/democratic-csi
+        tag: v1.9.3
+      strategy: deployment
+      replicas: 2
+      driver:
+        env:
+          - name: HOST
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: host
+          - name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: API_KEY
+          - name: DECRYPTION_KEY
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: DECRYPTION_KEY
+          - name: dataset_parent
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: dataset_parent
+          - name: snapshot_parent
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: snapshot_parent
+          - name: portal
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: portal
+          - name: chap_username
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: chap_username
+          - name: chap_password
+            valueFrom:
+              secretKeyRef:
+                name: truenas-iscsi
+                key: chap_password
+
+        # Resource configuration
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+            ephemeral-storage: 100Mi
+
+      # External provisioner sidecar
+      externalProvisioner:
+        enabled: true
+        image: registry.k8s.io/sig-storage/csi-provisioner:v5.2.0
+        logLevel: 2
+        resources:
+          limits:
+            cpu: 300m
+            memory: 256Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 30m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+
+      # External resizer sidecar
+      externalResizer:
+        enabled: true
+        image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+        logLevel: 2
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 20m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+
+      # External snapshotter sidecar
+      externalSnapshotter:
+        enabled: true
+        image: registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
+        logLevel: 2
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 20m
+            memory: 32Mi
+            ephemeral-storage: 100Mi
+
+      # Liveness probe sidecar
+      livenessProbe:
+        enabled: true
+        image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+
+      # Pod configuration
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - csi-driver-iscsi
+                topologyKey: kubernetes.io/hostname
+
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+      priorityClassName: system-cluster-critical
+
+    # Node configuration
+    node:
+      mount:
+        mount_flags: ""
+        checkFilesystem:
+          xfs:
+            enabled: true
+            customOptions: []
+          ext4:
+            enabled: true
+            customOptions: []
+            customFilesystemOptions: []
+          btrfs:
+            enabled: true
+            customOptions: []
+            customFilesystemOptions: []
+      enabled: true
+      image:
+        repository: democratic-csi/democratic-csi
+        tag: v1.9.3
+      hostPID: true
+      strategy: deployment
+      driver:
+        extraEnv:
+        - name: ISCSIADM_HOST_STRATEGY
+          value: nsenter
+        - name: ISCSIADM_HOST_PATH
+          value: /usr/local/sbin/iscsiadm
+        iscsiDirHostPath: /etc/iscsi
+        iscsiDirHostPathType: DirectoryOrCreate
+
+        # Resource configuration
+        resources:
+          limits:
+            cpu: 400m
+            memory: 384Mi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 40m
+            memory: 48Mi
+            ephemeral-storage: 100Mi
+
+      # Driver registrar sidecar
+      driverRegistrar:
+        enabled: true
+        image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
+        logLevel: 2
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+
+      # Liveness probe sidecar
+      livenessProbe:
+        enabled: true
+        image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+            ephemeral-storage: 100Mi
+          requests:
+            cpu: 10m
+            memory: 16Mi
+            ephemeral-storage: 50Mi
+
+      # Pod configuration
+      podSecurityContext:
+        runAsNonRoot: false  # Required for iSCSI operations
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: true  # Required for iSCSI operations
+        capabilities:
+          add:
+            - SYS_ADMIN  # Required for iSCSI mount operations
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        privileged: false
+        seccompProfile:
+          type: RuntimeDefault
+
+      tolerations:
+        - operator: Exists
+
+      priorityClassName: system-node-critical
+
+    # Storage classes
+    storageClasses:
+      - name: freenas-iscsi-csi
+        defaultClass: false
+        reclaimPolicy: Delete
+        volumeBindingMode: Immediate
+        allowVolumeExpansion: true
+        parameters:
+          fsType: ext4
+        mountOptions: []
+        secrets:
+          provisioner-secret:
+          controller-publish-secret:
+          node-stage-secret:
+            node-db.node.session.auth.authmethod: "CHAP"
+            node-db.node.session.auth.username: "root"
+            node-db.node.session.auth.password: "123456789123"
+
+
+    # Volume snapshot classes
+    volumeSnapshotClasses:
+      - name: truenas-iscsi-snapclass
+        driver: org.democratic-csi.iscsi
+        annotations:
+          snapshot.storage.kubernetes.io/is-default-class: "true"
+        deletionPolicy: Retain
+        parameters:
+          detachedSnapshots: false
+
+    # Service configuration for monitoring
+    service:
+      enabled: true
+      type: ClusterIP
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9808"
+        prometheus.io/path: "/metrics"
+
+    # ServiceMonitor for Prometheus
+    serviceMonitor:
+      enabled: true
+      labels:
+        app.kubernetes.io/name: csi-driver-iscsi
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      port: metrics
+
+    # Pod annotations
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9808"
+      prometheus.io/path: "/metrics"
+      reloader.stakater.com/auto: "true"
+
+    # RBAC configuration
+    rbac:
+      create: true
+
+    # Service account configuration
+    serviceAccount:
+      create: true
+      annotations:
+        app.kubernetes.io/managed-by: "Helm"
+        app.kubernetes.io/component: storage
+
+    # Image override for TrueNAS SCALE compatibility
+    image:
+      repository: democratic-csi/democratic-csi
+      tag: v1.9.3

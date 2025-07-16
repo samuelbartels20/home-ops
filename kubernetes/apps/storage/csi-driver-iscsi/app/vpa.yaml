@@ -1,0 +1,147 @@
+---
+# VPA for CSI Driver iSCSI Controller
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: csi-driver-iscsi-controller
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: csi-driver-iscsi-controller
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: driver
+        minAllowed:
+          cpu: 50m
+          memory: 64Mi
+          ephemeral-storage: 100Mi
+        maxAllowed:
+          cpu: 1000m
+          memory: 1Gi
+          ephemeral-storage: 2Gi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: external-provisioner
+        minAllowed:
+          cpu: 30m
+          memory: 32Mi
+          ephemeral-storage: 100Mi
+        maxAllowed:
+          cpu: 500m
+          memory: 512Mi
+          ephemeral-storage: 1Gi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: external-resizer
+        minAllowed:
+          cpu: 20m
+          memory: 32Mi
+          ephemeral-storage: 100Mi
+        maxAllowed:
+          cpu: 400m
+          memory: 512Mi
+          ephemeral-storage: 1Gi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: external-snapshotter
+        minAllowed:
+          cpu: 20m
+          memory: 32Mi
+          ephemeral-storage: 100Mi
+        maxAllowed:
+          cpu: 400m
+          memory: 512Mi
+          ephemeral-storage: 1Gi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: liveness-probe
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 200m
+          memory: 256Mi
+          ephemeral-storage: 200Mi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+
+---
+# VPA for CSI Driver iSCSI Node
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: csi-driver-iscsi-node
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: node
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: DaemonSet
+    name: csi-driver-iscsi-node
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: driver
+        minAllowed:
+          cpu: 40m
+          memory: 48Mi
+          ephemeral-storage: 100Mi
+        maxAllowed:
+          cpu: 800m
+          memory: 768Mi
+          ephemeral-storage: 2Gi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: driver-registrar
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 200m
+          memory: 256Mi
+          ephemeral-storage: 200Mi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage
+      - containerName: liveness-probe
+        minAllowed:
+          cpu: 10m
+          memory: 16Mi
+          ephemeral-storage: 50Mi
+        maxAllowed:
+          cpu: 200m
+          memory: 256Mi
+          ephemeral-storage: 200Mi
+        controlledResources:
+          - cpu
+          - memory
+          - ephemeral-storage

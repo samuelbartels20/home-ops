@@ -1,0 +1,559 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: snapshot-controller-metrics
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/part-of: storage-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: snapshot_controller_(successful|failed)_volume_snapshot_operations_total
+          action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: snapshot-controller-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/part-of: storage-system
+spec:
+  groups:
+    - name: snapshot.rules
+      rules:
+        - alert: SnapshotControllerDown
+          expr: up{job="snapshot-controller"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: storage
+          annotations:
+            summary: "Snapshot Controller is down"
+            description: "Snapshot Controller has been down for more than 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/down"
+
+        - alert: SnapshotCreationFailureRate
+          expr: |
+            rate(snapshot_controller_failed_volume_snapshot_operations_total{operation="create"}[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High snapshot creation failure rate"
+            description: "Snapshot creation operations are failing"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/creation-failures"
+
+        - alert: SnapshotDeletionFailureRate
+          expr: |
+            rate(snapshot_controller_failed_volume_snapshot_operations_total{operation="delete"}[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High snapshot deletion failure rate"
+            description: "Snapshot deletion operations are failing"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/deletion-failures"
+
+        - alert: SnapshotControllerHighLatency
+          expr: |
+            histogram_quantile(0.95, rate(snapshot_controller_operation_duration_seconds_bucket[5m])) > 30
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High snapshot operation latency"
+            description: "95th percentile of snapshot operations taking longer than 30 seconds"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/high-latency"
+
+        - alert: SnapshotQuotaUtilization
+          expr: |
+            snapshot_controller_volume_snapshot_count / snapshot_controller_volume_snapshot_quota * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High snapshot quota utilization"
+            description: "Volume snapshot quota utilization is above 80%"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/quota-utilization"
+
+        - alert: SnapshotStorageUtilization
+          expr: |
+            snapshot_controller_volume_snapshot_bytes / snapshot_controller_volume_snapshot_bytes_quota * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High snapshot storage utilization"
+            description: "Volume snapshot storage utilization is above 80%"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-controller/storage-utilization"
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: snapshot-controller-pod-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/part-of: storage-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: snapshot-controller-compliance
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+  - name: snapshot.compliance.rules
+    rules:
+    # Data Retention Compliance
+    - alert: SnapshotRetentionViolation
+      expr: time() - snapshot_creation_time_seconds > 7776000  # 90 days
+      for: 1h
+      labels:
+        severity: warning
+        compliance: "data-retention"
+      annotations:
+        summary: "Snapshot retention violation detected"
+        description: "Snapshots older than 90 days detected, violating retention policy"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-retention"
+
+    # Encryption Compliance
+    - alert: UnencryptedSnapshotDetected
+      expr: snapshot_encryption_enabled == 0
+      for: 5m
+      labels:
+        severity: critical
+        compliance: "encryption"
+      annotations:
+        summary: "Unencrypted snapshot detected"
+        description: "Snapshot created without encryption, violating security policy"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-encryption"
+
+    # Access Control Compliance
+    - alert: UnauthorizedAccessAttempt
+      expr: rate(snapshot_unauthorized_access_total[5m]) > 0
+      for: 5m
+      labels:
+        severity: critical
+        compliance: "access-control"
+      annotations:
+        summary: "Unauthorized snapshot access detected"
+        description: "Multiple unauthorized access attempts detected"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-controller/unauthorized-access"
+
+    # Backup Validation Compliance
+    - alert: BackupValidationFailure
+      expr: snapshot_backup_validation_success == 0
+      for: 1h
+      labels:
+        severity: critical
+        compliance: "backup-validation"
+      annotations:
+        summary: "Backup validation failed"
+        description: "Snapshot backup validation has failed, data integrity at risk"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-controller/backup-validation"
+
+    # GDPR Compliance
+    - alert: GDPRDataResidencyViolation
+      expr: snapshot_non_compliant_location_total > 0
+      for: 5m
+      labels:
+        severity: critical
+        compliance: "gdpr"
+      annotations:
+        summary: "GDPR data residency violation"
+        description: "Snapshots detected in non-compliant geographic location"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-controller/gdpr-compliance"
+
+    # Audit Logging Compliance
+    - alert: AuditLoggingDisabled
+      expr: snapshot_audit_logging_enabled == 0
+      for: 5m
+      labels:
+        severity: critical
+        compliance: "audit"
+      annotations:
+        summary: "Audit logging disabled"
+        description: "Snapshot controller audit logging is disabled"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-controller/audit-logging"
+
+    # Performance SLA Compliance
+    - alert: SnapshotSLAViolation
+      expr: snapshot_operation_duration_seconds > 3600
+      for: 5m
+      labels:
+        severity: warning
+        compliance: "sla"
+      annotations:
+        summary: "Snapshot SLA violation"
+        description: "Snapshot operations exceeding defined SLA thresholds"
+        runbook_url: "https://runbooks.samcloud.online/snapshot-controller/sla-compliance"
+
+---
+# Compliance Metrics Collector
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: snapshot-controller-compliance-metrics
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: compliance-monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  endpoints:
+  - port: metrics
+    interval: 30s
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'snapshot_(encryption|retention|compliance|audit)_.*'
+      action: keep
+  - port: compliance-metrics
+    interval: 1m
+    path: /compliance/metrics
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'compliance_(gdpr|hipaa|sox)_.*'
+      action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: storage-metrics
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: storage-monitor
+    app.kubernetes.io/part-of: storage-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: storage-system
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'storage_.*'
+          action: keep
+  namespaceSelector:
+    matchNames:
+      - storage
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: storage-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: storage-monitor
+    app.kubernetes.io/part-of: storage-system
+spec:
+  groups:
+    - name: storage.rules
+      rules:
+        - alert: StorageUsageHigh
+          expr: |
+            (kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+            team: storage
+          annotations:
+            summary: Storage usage is high
+            description: Storage usage for {{ $labels.persistentvolumeclaim }} is {{ $value }}%
+
+        - alert: StorageLatencyHigh
+          expr: |
+            rate(storage_operation_duration_seconds_sum[5m]) /
+            rate(storage_operation_duration_seconds_count[5m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+            team: storage
+          annotations:
+            summary: Storage latency is high
+            description: Storage operation latency is {{ $value }}s
+
+        - alert: StorageErrorsIncreasing
+          expr: |
+            rate(storage_operation_errors_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            team: storage
+          annotations:
+            summary: Storage errors detected
+            description: Storage errors are increasing for {{ $labels.operation_type }}
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: storage-pod-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: storage-monitor
+    app.kubernetes.io/part-of: storage-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: storage-system
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-dashboard
+  namespace: storage
+  labels:
+    grafana_dashboard: "true"
+data:
+  storage-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "area"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100",
+              "legendFormat": "{{persistentvolumeclaim}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Storage Usage",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "area"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "rate(storage_operation_duration_seconds_sum[5m]) / rate(storage_operation_duration_seconds_count[5m])",
+              "legendFormat": "{{operation_type}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Storage Latency",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "1m",
+      "schemaVersion": 38,
+      "style": "dark",
+      "tags": ["storage", "monitoring"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Storage Overview",
+      "version": 1,
+      "weekStart": ""
+    }

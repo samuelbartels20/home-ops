@@ -1,0 +1,156 @@
+# RBAC Configuration for Storage Components
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storage-cleanup-sa
+  namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: storage-cleanup-role
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "persistentvolumeclaims"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: storage-cleanup-rolebinding
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: storage-cleanup-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: storage-cleanup-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storage-monitor-sa
+  namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storage-monitor-role
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "persistentvolumeclaims", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: storage-monitor-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: storage-monitor-sa
+    namespace: storage
+roleRef:
+  kind: ClusterRole
+  name: storage-monitor-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Security Scanner RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storage-security-sa
+  namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: storage-security-role
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "secrets", "configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: storage-security-rolebinding
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: storage-security-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: storage-security-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Performance Testing RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storage-performance-sa
+  namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: storage-performance-role
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: storage-performance-rolebinding
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: storage-performance-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: storage-performance-role
+  apiGroup: rbac.authorization.k8s.io

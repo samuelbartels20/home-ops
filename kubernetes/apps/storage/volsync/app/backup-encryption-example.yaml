@@ -1,0 +1,22 @@
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: example-encrypted-backup
+  namespace: storage
+spec:
+  sourcePVC: example-pvc
+  trigger:
+    schedule: "0 2 * * *"
+  restic:
+    repository: s3://my-bucket/volsync-backups
+    encryptionSecretRef:
+      name: volsync-backup-secrets
+      key: ENCRYPTION_KEY
+    accessSecretRef:
+      name: volsync-backup-secrets
+    encrypt: true
+    retain:
+      daily: 30
+      weekly: 12
+      monthly: 12

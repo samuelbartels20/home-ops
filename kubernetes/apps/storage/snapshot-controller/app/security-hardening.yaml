@@ -1,0 +1,294 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: snapshot-controller-restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: snapshot-controller-scc
+  annotations:
+    kubernetes.io/description: "SCC for snapshot controller with restricted permissions"
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: []
+defaultAddCapabilities: []
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 1
+    max: 65535
+readOnlyRootFilesystem: true
+requiredDropCapabilities:
+  - ALL
+runAsUser:
+  type: MustRunAsRange
+  uidRangeMin: 1000
+  uidRangeMax: 65535
+seLinuxContext:
+  type: MustRunAs
+  seLinuxOptions:
+    level: "s0:c123,c456"
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+  - min: 1
+    max: 65535
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - projected
+  - secret
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: snapshot-controller-authz
+  namespace: storage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/monitoring/sa/prometheus-k8s"]
+        - source:
+            namespaces: ["storage"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/metrics"]
+    - from:
+        - source:
+            namespaces: ["storage"]
+      to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/snapshot"]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: snapshot-controller-security
+  namespace: storage
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  ingressDeny:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: default
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/metrics"
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: storage
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+          rules:
+            http:
+              - method: "POST"
+                path: "/snapshot"
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: storage
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+  encryption:
+    type: ipsec
+    ipsec:
+      mode: tunnel
+
+# Storage Security Hardening Configuration
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: storage-network-policy
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: storage-system
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: storage-system
+      ports:
+        - protocol: TCP
+          port: 2049  
+        - protocol: TCP
+          port: 111  
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+      ports:
+        - protocol: TCP
+          port: 2049
+        - protocol: TCP
+          port: 111
+
+---
+# Storage Encryption Configuration
+apiVersion: encryption.k8s.io/v1
+kind: EncryptionConfiguration
+metadata:
+  name: storage-encryption
+  namespace: storage
+spec:
+  resources:
+    - resources:
+        - persistentvolumes
+        - persistentvolumeclaims
+        - secrets
+      providers:
+        - kms:
+            name: storage-kms
+            endpoint: unix:///dev/kmsg
+            cachesize: 1000
+            timeout: 3s
+        - aescbc:
+            keys:
+              - name: key1
+                secret: ${STORAGE_ENCRYPTION_KEY}
+        - identity: {}
+
+---
+# Storage Security Scanner
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-security-scan
+  namespace: storage
+spec:
+  schedule: "0 1 * * *" 
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: security-scanner
+              image: aquasec/trivy:latest
+              args:
+                - filesystem
+                - --security-checks
+                - vuln,config,secret
+                - --ignore-unfixed
+                - --exit-code
+                - "1"
+                - /scan
+              volumeMounts:
+                - name: scan-vol
+                  mountPath: /scan
+                - name: reports
+                  mountPath: /reports
+          volumes:
+            - name: scan-vol
+              persistentVolumeClaim:
+                claimName: storage-scan-pvc
+            - name: reports
+              persistentVolumeClaim:
+                claimName: security-reports-pvc
+          restartPolicy: OnFailure
+
+---
+# Audit Logging Configuration
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: storage-audit-policy
+spec:
+  rules:
+    - level: RequestResponse
+      resources:
+        - group: ""
+          resources: ["persistentvolumes", "persistentvolumeclaims"]
+    - level: Metadata
+      resources:
+        - group: "snapshot.storage.k8s.io"
+          resources: ["volumesnapshots", "volumesnapshotcontents"]
+    - level: Request
+      resources:
+        - group: "storage.k8s.io"
+          resources: ["storageclasses", "volumeattachments"]
+    - level: None  
+      resources:
+        - group: "*"
+          resources: ["*"]

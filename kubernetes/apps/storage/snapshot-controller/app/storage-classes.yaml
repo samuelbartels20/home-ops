@@ -1,0 +1,91 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: premium-rwo
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: zfs.csi.openebs.io
+parameters:
+  fstype: "zfs"
+  poolname: "zfspv-pool"
+  compression: "zstd-3"
+  dedup: "on"
+  recordsize: "128k"
+  primarycache: "metadata"
+  secondarycache: "all"
+  logbias: "throughput"
+  sync: "always"
+  redundancy: "mirror"
+  iopriorityclass: "high"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard-rwo
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: zfs.csi.openebs.io
+parameters:
+  fstype: "zfs"
+  poolname: "zfspv-pool"
+  compression: "zstd-1"
+  recordsize: "128k"
+  primarycache: "all"
+  sync: "standard"
+  redundancy: "mirror"
+  iopriorityclass: "medium"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: archive-rwo
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: zfs.csi.openebs.io
+parameters:
+  fstype: "zfs"
+  poolname: "zfspv-pool"
+  compression: "zstd-5"
+  recordsize: "1M"
+  primarycache: "metadata"
+  sync: "disabled"
+  redundancy: "single"
+  iopriorityclass: "low"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+---
+# Storage Quota Management
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-quotas
+  namespace: storage
+spec:
+  hard:
+    # Total storage capacity across all PVCs
+    requests.storage: "1Ti"
+    # Quota per storage class
+    premium-rwo.storageclass.storage.k8s.io/requests.storage: "200Gi"
+    standard-rwo.storageclass.storage.k8s.io/requests.storage: "500Gi"
+    archive-rwo.storageclass.storage.k8s.io/requests.storage: "300Gi"
+    # PVC count limits
+    persistentvolumeclaims: "50"
+    premium-rwo.storageclass.storage.k8s.io/persistentvolumeclaims: "10"
+    standard-rwo.storageclass.storage.k8s.io/persistentvolumeclaims: "30"
+    archive-rwo.storageclass.storage.k8s.io/persistentvolumeclaims: "10"

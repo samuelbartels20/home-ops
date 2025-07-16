@@ -1,0 +1,117 @@
+# Storage Resource Management Configuration
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storage-resource-quota
+  namespace: storage
+spec:
+  hard:
+    # Storage Quotas
+    requests.storage: "10Ti"
+    persistentvolumeclaims: "500"
+
+    # Storage Class Specific Quotas
+    premium-rwo.storageclass.storage.k8s.io/requests.storage: "2Ti"
+    standard-rwo.storageclass.storage.k8s.io/requests.storage: "5Ti"
+    archive-rwo.storageclass.storage.k8s.io/requests.storage: "3Ti"
+
+    # Object Count Limits
+    persistentvolumeclaims.storage: "100"
+    volumesnapshots.snapshot.storage.k8s.io: "1000"
+    volumesnapshotcontents.snapshot.storage.k8s.io: "1000"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storage-limit-range
+  namespace: storage
+spec:
+  limits:
+    - type: PersistentVolumeClaim
+      max:
+        storage: "1Ti"
+      min:
+        storage: "1Gi"
+      default:
+        storage: "10Gi"
+      defaultRequest:
+        storage: "5Gi"
+
+---
+# Storage Monitoring Configuration
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: storage-monitor
+  namespace: storage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: storage-system
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+      - storage
+
+---
+# Storage Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: storage-alerts
+  namespace: storage
+spec:
+  groups:
+    - name: storage.rules
+      rules:
+        - alert: HighStorageUsage
+          expr: |
+            kubelet_volume_stats_used_bytes /
+            kubelet_volume_stats_capacity_bytes * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            description: "Storage usage is above 85% for {{ $labels.persistentvolumeclaim }}"
+
+        - alert: StorageQuotaNearLimit
+          expr: |
+            kubelet_volume_stats_used_bytes /
+            kubelet_volume_stats_capacity_bytes * 100 > 90
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            description: "Storage quota is nearly full for {{ $labels.namespace }}"
+
+        - alert: SnapshotFailure
+          expr: |
+            rate(volumesnapshot_controller_snapshot_failure_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            description: "Volume snapshot creation failed"
+
+        - alert: StorageLatencyHigh
+          expr: |
+            rate(storage_operation_duration_seconds_count{operation_name=~"volume_.*"}[5m]) > 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            description: "Storage operation latency is high for {{ $labels.operation_name }}"
+
+        - alert: StorageReplicationLag
+          expr: |
+            max_over_time(storage_replication_lag_seconds[1h]) > 1800
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            description: "Storage replication is lagging by more than 30 minutes"

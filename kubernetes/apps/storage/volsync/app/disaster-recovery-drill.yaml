@@ -1,0 +1,100 @@
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationDestination
+metadata:
+  name: prod-dr-restore
+  namespace: storage
+spec:
+  containers:
+  - name: dummy
+    image: busybox:1.37
+    command: ["sh", "-c", "echo dummy"]
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  trigger:
+    manual: {}
+  restic:
+    repository: s3://samcloud-prod-backup-bucket/volsync-backups
+    accessSecretRef:
+      name: volsync-backup-secrets
+    encryptionSecretRef:
+      name: volsync-backup-secrets
+      key: ENCRYPTION_KEY
+    copyMethod: Snapshot
+    retain:
+      daily: 3
+  destinationPVC: prod-dr-restore-pvc
+  template:
+    spec:
+      containers:
+      - name: dummy
+        image: busybox:1.37
+        command: ["sh", "-c", "echo DR template"]
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dr-restore-validation
+  namespace: storage
+spec:
+  template:
+    metadata:
+      name: dr-restore-validation
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: validate
+        image: busybox:1.37
+        command: ["sh", "-c", "ls /data && echo 'Validation complete'"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: restore-data
+          mountPath: /data
+      volumes:
+      - name: restore-data
+        persistentVolumeClaim:
+          claimName: prod-dr-restore-pvc
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dr-restore-cleanup
+  namespace: storage
+spec:
+  template:
+    metadata:
+      name: dr-restore-cleanup
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: cleanup
+        image: busybox:1.37
+        command: ["sh", "-c", "sleep 10 && kubectl delete pvc prod-dr-restore-pvc -n storage"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi

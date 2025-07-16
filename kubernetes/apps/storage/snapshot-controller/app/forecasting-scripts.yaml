@@ -1,0 +1,97 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-forecasting-scripts
+  namespace: storage
+data:
+  forecast.py: |
+    #!/usr/bin/env python3
+    import pandas as pd
+    import requests
+    from prophet import Prophet
+    from datetime import datetime, timedelta
+    import json
+    import os
+
+    def get_storage_metrics():
+        """Fetch storage metrics from Prometheus"""
+        PROMETHEUS_URL = os.getenv('PROMETHEUS_URL')
+        query = 'sum(kubelet_volume_stats_used_bytes) by (persistentvolumeclaim)'
+
+        response = requests.get(f'{PROMETHEUS_URL}/api/v1/query_range', params={
+            'query': query,
+            'start': (datetime.now() - timedelta(days=30)).isoformat(),
+            'end': datetime.now().isoformat(),
+            'step': '1h'
+        })
+
+        return response.json()
+
+    def prepare_data(metrics):
+        """Transform metrics into Prophet format"""
+        df = pd.DataFrame(metrics['data']['result'][0]['values'],
+                         columns=['ds', 'y'])
+        df['ds'] = pd.to_datetime(df['ds'], unit='s')
+        return df
+
+    def forecast_storage(df):
+        """Generate storage forecast using Prophet"""
+        model = Prophet(
+            yearly_seasonality=True,
+            weekly_seasonality=True,
+            daily_seasonality=True,
+            changepoint_prior_scale=0.05
+        )
+
+        model.fit(df)
+        future = model.make_future_dataframe(periods=30)  # 30 days forecast
+        forecast = model.predict(future)
+
+        return forecast
+
+    def send_slack_alert(message):
+        """Send alert to Slack"""
+        SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL')
+
+        requests.post(SLACK_WEBHOOK_URL, json={
+            'text': message,
+            'username': 'Storage Forecast Bot',
+            'icon_emoji': '[CHART]'
+        })
+
+    def main():
+        # Fetch metrics
+        metrics = get_storage_metrics()
+        df = prepare_data(metrics)
+
+        # Generate forecast
+        forecast = forecast_storage(df)
+
+        # Calculate growth rate and estimated full date
+        current_usage = df['y'].iloc[-1]
+        projected_usage = forecast['yhat'].iloc[-1]
+        growth_rate = (projected_usage - current_usage) / current_usage * 100
+
+        # Save results
+        results = {
+            'current_usage_gb': current_usage / (1024**3),
+            'projected_usage_gb': projected_usage / (1024**3),
+            'growth_rate_percent': growth_rate,
+            'forecast_data': forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_dict()
+        }
+
+        with open('/data/forecast_results.json', 'w') as f:
+            json.dump(results, f)
+
+        # Send alerts if growth rate is high
+        if growth_rate > 15:  # Alert if growth rate > 15%
+            send_slack_alert(
+                f"[WARN] High storage growth detected!\n"
+                f"Current usage: {current_usage/(1024**3):.2f} GB\n"
+                f"Projected usage (30 days): {projected_usage/(1024**3):.2f} GB\n"
+                f"Growth rate: {growth_rate:.2f}%"
+            )
+
+    if __name__ == '__main__':
+        main()

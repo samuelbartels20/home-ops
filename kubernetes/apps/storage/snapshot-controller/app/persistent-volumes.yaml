@@ -1,0 +1,101 @@
+---
+# Benchmark PVCs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: benchmark-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: premium-rwo
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: benchmark-results-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Security Scan PVCs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-scan-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: security-reports-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# Forecasting PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: forecast-data-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Performance Testing PVCs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: performance-test-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: premium-rwo
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: performance-results-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 20Gi

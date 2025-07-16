@@ -1,0 +1,167 @@
+# Storage Operational Improvements Configuration
+---
+# Automated Storage Cleanup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-cleanup
+  namespace: storage
+spec:
+  schedule: "0 3 * * *" 
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: storage-cleanup-sa
+          containers:
+            - name: cleanup
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Clean up orphaned PVs
+                  kubectl get pv | grep Released | awk '{print $1}' | xargs -r kubectl delete pv
+
+                  # Clean up failed PVCs
+                  kubectl get pvc | grep Failed | awk '{print $1}' | xargs -r kubectl delete pvc
+
+                  # Clean up old snapshots (>30 days)
+                  kubectl get volumesnapshot --all-namespaces | \
+                    awk '{if ($6 > 30) print $1}' | xargs -r kubectl delete volumesnapshot
+
+                  # Clean up unused storage classes
+                  kubectl get sc | grep -v "$(kubectl get pvc -A -o jsonpath='{.items[*].spec.storageClassName}')" | \
+                    grep -v NAME | awk '{print $1}' | xargs -r kubectl delete sc
+
+---
+# Storage Capacity Forecasting
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-forecasting
+  namespace: storage
+spec:
+  schedule: "0 4 * * *" 
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: forecasting
+              image: python:3.9-slim
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pip install pandas prophet requests
+                  python3 /scripts/forecast.py
+              env:
+                - name: PROMETHEUS_URL
+                  value: "http://prometheus-operated.monitoring:9090"
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: storage-notifications
+                      key: slack-webhook
+              volumeMounts:
+                - name: forecasting-scripts
+                  mountPath: /scripts
+                - name: forecast-data
+                  mountPath: /data
+          volumes:
+            - name: forecasting-scripts
+              configMap:
+                name: storage-forecasting-scripts
+            - name: forecast-data
+              persistentVolumeClaim:
+                claimName: forecast-data-pvc
+
+---
+# Storage Migration Procedures
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-migration-procedures
+  namespace: storage
+data:
+  migration-plan.yaml: |
+    steps:
+      - name: Pre-migration-checks
+        actions:
+          - verify-source-health
+          - verify-destination-capacity
+          - backup-source-data
+      - name: Migration-execution
+        actions:
+          - stop-source-workloads
+          - sync-data
+          - verify-data-integrity
+          - update-storage-references
+      - name: Post-migration-validation
+        actions:
+          - verify-application-functionality
+          - verify-performance-metrics
+          - backup-new-configuration
+    rollback:
+      enabled: true
+      timeout: 2h
+      verification-steps:
+        - verify-backup-availability
+        - restore-from-backup
+        - verify-restore-completion
+
+---
+# Storage Performance Testing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-performance-test
+  namespace: storage
+spec:
+  schedule: "0 5 * * 0" 
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: performance-test
+              image: nixery.dev/shell/fio/sysbench
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Run sysbench filesystem tests
+                  sysbench fileio --file-total-size=10G prepare
+                  sysbench fileio --file-total-size=10G --file-test-mode=rndrw \
+                    --time=300 --max-requests=0 run > /results/sysbench_results.txt
+
+                  # Run fio tests
+                  fio --name=performance-test \
+                    --filename=/test/testfile \
+                    --size=4G \
+                    --direct=1 \
+                    --rw=randrw \
+                    --bs=4k \
+                    --iodepth=64 \
+                    --numjobs=4 \
+                    --runtime=300 \
+                    --group_reporting \
+                    --output=/results/fio_results.json \
+                    --output-format=json
+              volumeMounts:
+                - name: test-vol
+                  mountPath: /test
+                - name: results-vol
+                  mountPath: /results
+          volumes:
+            - name: test-vol
+              persistentVolumeClaim:
+                claimName: performance-test-pvc
+            - name: results-vol
+              persistentVolumeClaim:
+                claimName: performance-results-pvc
+          restartPolicy: OnFailure

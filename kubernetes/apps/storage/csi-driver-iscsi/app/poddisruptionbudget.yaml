@@ -1,0 +1,37 @@
+---
+# Pod Disruption Budget for CSI Driver iSCSI Controller
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: csi-driver-iscsi-controller
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: csi-driver-iscsi
+      app.kubernetes.io/component: controller
+
+---
+# Pod Disruption Budget for CSI Driver iSCSI Snapshot Controller
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: csi-driver-iscsi-snapshot-controller
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: snapshot-controller
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: csi-driver-iscsi
+      app.kubernetes.io/component: snapshot-controller

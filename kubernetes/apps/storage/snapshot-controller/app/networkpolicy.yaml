@@ -1,0 +1,118 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snapshot-controller-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/part-of: storage-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Prometheus metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+          protocol: TCP
+    # Allow communication between snapshot controller pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: snapshot-controller
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow access to Kubernetes API
+    - to:
+        - namespaceSelector: {}
+        - podSelector:
+            matchLabels:
+              k8s-app: kubernetes
+      ports:
+        - port: 443
+          protocol: TCP
+    # Allow access to CSI drivers
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: csi-driver
+      ports:
+        - port: 9898
+          protocol: TCP
+
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - port: 443
+          protocol: TCP
+
+---
+# Service Mesh Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snapshot-controller-mesh-policy
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            istio-injection: enabled
+      ports:
+        - port: 15090
+          protocol: TCP  
+        - port: 15021
+          protocol: TCP  
+        - port: 15020
+          protocol: TCP  
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            istio-injection: enabled
+      ports:
+        - port: 15012
+          protocol: TCP  
+        - port: 15014
+          protocol: TCP  

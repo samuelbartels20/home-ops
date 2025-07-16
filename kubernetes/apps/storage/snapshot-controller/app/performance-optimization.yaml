@@ -1,0 +1,119 @@
+# Storage Performance Optimization Configuration
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: storage-autoscaler
+  namespace: storage
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: openebs-cstor-pool
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 3
+  maxReplicaCount: 10
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-operated.monitoring:9090
+        metricName: storage_usage_percentage
+        threshold: "80"
+        query: |
+          sum(kubelet_volume_stats_used_bytes) /
+          sum(kubelet_volume_stats_capacity_bytes) * 100
+
+---
+# Storage Performance Benchmark Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-benchmark
+  namespace: storage
+spec:
+  schedule: "0 0 * * 0"  # Weekly
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fio-benchmark
+              image: nixery.dev/shell/fio
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  fio --name=benchmark \
+                    --directory=/benchmark \
+                    --size=1G \
+                    --time_based \
+                    --runtime=300 \
+                    --ioengine=libaio \
+                    --direct=1 \
+                    --verify=0 \
+                    --randrepeat=0 \
+                    --group_reporting \
+                    --output=/results/$(date +%Y%m%d)_benchmark.json \
+                    --output-format=json \
+                    --rw=randrw \
+                    --rwmixread=70 \
+                    --bs=4k,8k,16k,32k,64k,128k \
+                    --iodepth=1,4,16,64 \
+                    --numjobs=4
+              volumeMounts:
+                - name: benchmark-vol
+                  mountPath: /benchmark
+                - name: results-vol
+                  mountPath: /results
+          volumes:
+            - name: benchmark-vol
+              persistentVolumeClaim:
+                claimName: benchmark-pvc
+            - name: results-vol
+              persistentVolumeClaim:
+                claimName: benchmark-results-pvc
+          restartPolicy: OnFailure
+
+---
+# Storage Defragmentation Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: storage-defrag
+  namespace: storage
+spec:
+  schedule: "0 2 * * 0"   
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: zfs-defrag
+              image: openebs/zfs-driver:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  zpool scrub zfspv-pool
+                  sleep 3600  # Allow scrub to complete
+                  zfs defrag zfspv-pool
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: zfs-root
+                  mountPath: /dev
+                - name: zfs-run
+                  mountPath: /run
+          volumes:
+            - name: zfs-root
+              hostPath:
+                path: /dev
+            - name: zfs-run
+              hostPath:
+                path: /run
+          nodeSelector:
+            storage-type: zfs
+          restartPolicy: OnFailure

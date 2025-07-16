@@ -1,0 +1,85 @@
+---
+# VolSync ReplicationSource for iSCSI volumes backup
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: truenas-iscsi-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  sourcePVC: truenas-iscsi-source
+  trigger:
+    schedule: "0 2 * * *"
+  restic:
+    pruneIntervalDays: 7
+    repository: restic-secret
+    retain:
+      daily: 30
+      weekly: 12
+      monthly: 6
+      yearly: 3
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: freenas-iscsi-csi
+    capacity: 100Gi
+    volumeSnapshotClassName: freenas-iscsi-snapclass
+    copyMethod: Snapshot
+
+---
+# VolSync ReplicationDestination for disaster recovery
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationDestination
+metadata:
+  name: truenas-iscsi-restore
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: disaster-recovery
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+spec:
+  trigger:
+    manual: restore-trigger
+  restic:
+    repository: restic-secret
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: freenas-iscsi-csi
+    capacity: 100Gi
+    copyMethod: Snapshot
+
+---
+# Secret for Restic repository configuration
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: restic-secret
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: csi-driver-iscsi
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: storage
+    production-grade: "true"
+    security-hardened: "true"
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: restic-secret
+    creationPolicy: Owner
+    template:
+      type: Opaque
+      data:
+        RESTIC_REPOSITORY: "{{ .repository }}"
+        RESTIC_PASSWORD: "{{ .password }}"
+        AWS_ACCESS_KEY_ID: "{{ .access_key }}"
+        AWS_SECRET_ACCESS_KEY: "{{ .secret_key }}"
+  dataFrom:
+    - extract:
+        key: restic-backup
+  refreshInterval: 15m

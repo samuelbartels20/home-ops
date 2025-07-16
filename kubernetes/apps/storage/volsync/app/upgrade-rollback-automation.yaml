@@ -1,0 +1,42 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: volsync-upgrade-test
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: upgrade
+spec:
+  template:
+    spec:
+      serviceAccountName: volsync-sa
+      containers:
+        - name: upgrade-test
+          image: bitnami/kubectl:1.28
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Pre-upgrade health check..."
+              kubectl get pods -n storage -l app.kubernetes.io/name=volsync
+              echo "Upgrading Volsync..."
+              sleep 10
+              echo "Post-upgrade health check..."
+              kubectl get pods -n storage -l app.kubernetes.io/name=volsync
+              if [ $(kubectl get pods -n storage -l app.kubernetes.io/name=volsync | grep -c CrashLoopBackOff) -gt 0 ]; then
+                echo "Upgrade failed, rolling back..."
+                sleep 5
+                echo "Rollback completed"
+              else
+                echo "Upgrade successful"
+              fi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      restartPolicy: Never

@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapshot-controller-seccomp
+  namespace: storage
+data:
+  custom-seccomp.json: |
+    {
+      "defaultAction": "SCMP_ACT_ERRNO",
+      "architectures": ["SCMP_ARCH_X86_64"],
+      "syscalls": [
+        {"names": ["accept4", "access", "arch_prctl", "bind", "brk", "chdir", "chmod", "chown", "close", "connect", "dup2", "epoll_create1", "epoll_ctl", "epoll_wait", "exit", "exit_group", "faccessat", "fchdir", "fchmod", "fchmodat", "fchown", "fchownat", "fcntl", "fdatasync", "flock", "fstat", "fstatfs", "fsync", "ftruncate", "futex", "getcwd", "getdents64", "getegid", "geteuid", "getgid", "getpeername", "getpgrp", "getpid", "getppid", "getpriority", "getrandom", "getresgid", "getresuid", "getrlimit", "getsockname", "getsockopt", "gettid", "gettimeofday", "getuid", "ioctl", "kill", "lchown", "link", "linkat", "listen", "lseek", "lstat", "madvise", "mkdir", "mkdirat", "mmap", "mount", "mprotect", "munmap", "nanosleep", "newfstatat", "open", "openat", "pipe2", "prctl", "pread64", "prlimit64", "pselect6", "pwrite64", "read", "readlink", "readlinkat", "readv", "recvfrom", "recvmsg", "rename", "renameat", "rmdir", "rt_sigaction", "rt_sigprocmask", "rt_sigqueueinfo", "rt_sigreturn", "rt_sigsuspend", "sched_getaffinity", "sched_yield", "seccomp", "sendmsg", "sendto", "set_robust_list", "set_tid_address", "setgid", "setgroups", "setitimer", "setpgid", "setresgid", "setresuid", "setsid", "setsockopt", "setuid", "shmat", "shmctl", "shmdt", "shmget", "shutdown", "socket", "socketpair", "stat", "statfs", "symlink", "symlinkat", "sync", "sysinfo", "umask", "uname", "unlink", "unlinkat", "utime", "utimensat", "wait4", "write", "writev"], "action": "SCMP_ACT_ALLOW"}
+      ]
+    }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: snapshot-controller-enhanced-network
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: metrics
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+      ports:
+        - port: webhook
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+      ports:
+        - port: csi
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: pushgateway
+          protocol: TCP
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: snapshot-controller-enhanced-psp
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default,localhost/snapshot-controller-seccomp'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'localhost/snapshot-controller-seccomp'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+    ranges:
+      - min: 1000
+        max: 65535
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  readOnlyRootFilesystem: true
+  seLinux:
+    rule: 'RunAsAny'
+  forbiddenSysctls:
+    - '*'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snapshot-controller
+  namespace: storage
+spec:
+  template:
+    spec:
+      securityContext:
+        seccompProfile:
+          type: Localhost
+          localhostProfile: snapshot-controller-seccomp
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        supplementalGroups:
+          - 1000
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+      containers:
+        - name: snapshot-controller
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: Localhost
+              localhostProfile: snapshot-controller-seccomp

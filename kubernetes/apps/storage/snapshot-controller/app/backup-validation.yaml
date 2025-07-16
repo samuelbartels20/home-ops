@@ -1,0 +1,225 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: snapshot-backup-validation
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: backup-validation
+    app.kubernetes.io/part-of: storage-system
+spec:
+  schedule: "0 */4 * * *" 
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 600
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: snapshot-backup-validation
+            app.kubernetes.io/component: disaster-recovery
+        spec:
+          serviceAccountName: snapshot-backup-validator
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: validator
+              image: curlimages/curl:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  set -euo pipefail
+
+                  validation_status="PASSED"
+                  failed_checks=0
+                  total_checks=0
+
+                  record_validation() {
+                    local check_name=$1
+                    local status=$2
+                    local details=$3
+                    total_checks=$((total_checks + 1))
+
+                    if [ "$status" != "PASSED" ]; then
+                      failed_checks=$((failed_checks + 1))
+                      validation_status="FAILED"
+                    fi
+
+                    echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") - $check_name: $status - $details" >> /var/log/validation/results.log
+                  }
+
+                  echo "Checking snapshot existence and age..."
+                  for snapshot in $(kubectl get volumesnapshot -n storage -o jsonpath='{.items[*].metadata.name}'); do
+                    age=$(kubectl get volumesnapshot $snapshot -n storage -o jsonpath='{.status.creationTime}')
+                    if [ -n "$age" ]; then
+                      record_validation "SnapshotAge_$snapshot" "PASSED" "Snapshot exists and has valid age"
+                    else
+                      record_validation "SnapshotAge_$snapshot" "FAILED" "Snapshot age validation failed"
+                    fi
+                  done
+
+                  echo "Validating encryption..."
+                  for snapshot in $(kubectl get volumesnapshot -n storage -o jsonpath='{.items[*].metadata.name}'); do
+                    if kubectl get volumesnapshot $snapshot -n storage -o yaml | grep -q "encryption: aes-256-gcm"; then
+                      record_validation "Encryption_$snapshot" "PASSED" "Encryption validated"
+                    else
+                      record_validation "Encryption_$snapshot" "FAILED" "Encryption validation failed"
+                    fi
+                  done
+
+                  echo "Checking cross-region replication..."
+                  for region in "europe-west1" "us-east1" "asia-east1"; do
+                    if kubectl get volumesnapshot -n storage --context=$region 2>/dev/null; then
+                      record_validation "Replication_$region" "PASSED" "Replication validated"
+                    else
+                      record_validation "Replication_$region" "FAILED" "Replication check failed"
+                    fi
+                  done
+
+                  echo "Performing RTO validation..."
+                  start_time=$(date +%s)
+
+                  cat <<EOF | kubectl apply -f -
+                  apiVersion: v1
+                  kind: PersistentVolumeClaim
+                  metadata:
+                    name: rto-test-pvc
+                    namespace: storage
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 1Gi
+                    storageClassName: standard
+                  EOF
+
+                  cat <<EOF | kubectl apply -f -
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: rto-test-snapshot
+                    namespace: storage
+                  spec:
+                    volumeSnapshotClassName: production-snapshot-class
+                    source:
+                      persistentVolumeClaimName: rto-test-pvc
+                  EOF
+
+                  kubectl wait --for=condition=Ready volumesnapshot/rto-test-snapshot -n storage --timeout=5m
+
+                  cat <<EOF | kubectl apply -f -
+                  apiVersion: v1
+                  kind: PersistentVolumeClaim
+                  metadata:
+                    name: rto-test-restore-pvc
+                    namespace: storage
+                  spec:
+                    dataSource:
+                      name: rto-test-snapshot
+                      kind: VolumeSnapshot
+                      apiGroup: snapshot.storage.k8s.io
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 1Gi
+                    storageClassName: standard
+                  EOF
+
+                  end_time=$(date +%s)
+                  rto_seconds=$((end_time - start_time))
+
+                  if [ $rto_seconds -le 900 ]; then  
+                    record_validation "RTO_Test" "PASSED" "RTO within limits: ${rto_seconds}s"
+                  else
+                    record_validation "RTO_Test" "FAILED" "RTO exceeded: ${rto_seconds}s"
+                  fi
+
+                  kubectl delete pvc rto-test-pvc rto-test-restore-pvc -n storage
+                  kubectl delete volumesnapshot rto-test-snapshot -n storage
+
+                  cat <<EOF > /var/log/validation/report.json
+                  {
+                    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+                    "status": "${validation_status}",
+                    "total_checks": ${total_checks},
+                    "failed_checks": ${failed_checks},
+                    "rto_seconds": ${rto_seconds},
+                    "details": $(cat /var/log/validation/results.log | jq -R -s -c 'split("\n")[:-1]')
+                  }
+                  EOF
+
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -d @/var/log/validation/report.json \
+                    http://monitoring-service.observability.svc.cluster.local:8080/api/reports/backup-validation
+
+                  if [ "${validation_status}" = "PASSED" ]; then
+                    exit 0
+                  else
+                    exit 1
+                  fi
+              volumeMounts:
+                - name: validation-logs
+                  mountPath: /var/log/validation
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: validation-logs
+              emptyDir: {}
+
+---
+# Service Account for Validation
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snapshot-backup-validator
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: backup-validation
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: snapshot-backup-validator
+  namespace: storage
+rules:
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: snapshot-backup-validator
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: snapshot-backup-validator
+    namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: snapshot-backup-validator

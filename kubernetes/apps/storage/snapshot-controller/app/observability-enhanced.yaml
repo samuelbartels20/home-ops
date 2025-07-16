@@ -1,0 +1,223 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapshot-controller-logging
+  namespace: storage
+data:
+  logging.yaml: |
+    level: info
+    development: false
+    disableCaller: false
+    disableStacktrace: false
+    encoding: json
+    encoderConfig:
+      messageKey: message
+      levelKey: level
+      timeKey: timestamp
+      nameKey: logger
+      callerKey: caller
+      functionKey: function
+      stacktraceKey: stacktrace
+      levelEncoder: lowercase
+      timeEncoder: iso8601
+      durationEncoder: string
+      callerEncoder: short
+    outputPaths:
+      - stdout
+      - /var/log/snapshot-controller/app.json
+    errorOutputPaths:
+      - stderr
+      - /var/log/snapshot-controller/error.json
+    initialFields:
+      service: snapshot-controller
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: snapshot-controller-otel
+  namespace: storage
+spec:
+  mode: deployment
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 1024
+      resourcedetection:
+        detectors: [env, system]
+        timeout: 2s
+      attributes:
+        actions:
+          - key: environment
+            value: production
+            action: insert
+
+    exporters:
+      otlp:
+        endpoint: tempo.monitoring.svc.cluster.local:4317
+        tls:
+          insecure: true
+      loki:
+        endpoint: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+        tenant_id: snapshot-controller
+        labels:
+          app: snapshot-controller
+          component: storage
+      prometheus:
+        endpoint: prometheus-operated.monitoring.svc.cluster.local:9090
+        namespace: storage
+        const_labels:
+          app: snapshot-controller
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resourcedetection, attributes]
+          exporters: [otlp]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resourcedetection, attributes]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resourcedetection, attributes]
+          exporters: [loki]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: snapshot-controller-traces
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: tracing
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-controller
+  endpoints:
+    - port: otlp-http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: snapshot-controller-slos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: slo
+spec:
+  groups:
+    - name: snapshot.slo.rules
+      rules:
+        - record: snapshot_operation:availability:ratio_1h
+          expr: |
+            sum(rate(snapshot_operations_total{status="success"}[1h])) /
+            sum(rate(snapshot_operations_total[1h]))
+
+        - record: snapshot_operation:latency:p99_1h
+          expr: |
+            histogram_quantile(0.99, sum(rate(snapshot_operation_duration_seconds_bucket[1h])) by (le))
+
+        - alert: SnapshotSLOAvailabilityBreach
+          expr: snapshot_operation:availability:ratio_1h < 0.995
+          for: 5m
+          labels:
+            severity: critical
+            category: slo
+          annotations:
+            summary: "Snapshot operation availability below SLO"
+            description: "Snapshot operations availability is below 99.5% over 1h"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-slo"
+
+        - alert: SnapshotSLOLatencyBreach
+          expr: snapshot_operation:latency:p99_1h > 30
+          for: 5m
+          labels:
+            severity: critical
+            category: slo
+          annotations:
+            summary: "Snapshot operation latency above SLO"
+            description: "P99 snapshot operation latency is above 30s"
+            runbook_url: "https://runbooks.samcloud.online/snapshot-latency-slo"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: GrafanaDashboard
+metadata:
+  name: snapshot-controller-slo
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: slo
+spec:
+  json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "title": "Snapshot Operation Availability",
+          "type": "gauge",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "snapshot_operation:availability:ratio_1h * 100",
+              "legendFormat": "Availability %"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              { "value": null, "color": "red" },
+              { "value": 99, "color": "yellow" },
+              { "value": 99.5, "color": "green" }
+            ]
+          }
+        },
+        {
+          "title": "P99 Latency",
+          "type": "gauge",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "snapshot_operation:latency:p99_1h",
+              "legendFormat": "P99 Latency (s)"
+            }
+          ],
+          "thresholds": {
+            "steps": [
+              { "value": null, "color": "green" },
+              { "value": 20, "color": "yellow" },
+              { "value": 30, "color": "red" }
+            ]
+          }
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 16,
+      "style": "dark",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "title": "Snapshot Controller SLOs",
+      "version": 0
+    }

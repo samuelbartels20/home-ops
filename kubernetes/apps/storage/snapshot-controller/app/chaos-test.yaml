@@ -1,0 +1,179 @@
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: snapshot-controller-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: chaos-testing
+spec:
+  action: pod-failure
+  mode: one
+  duration: "5m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "snapshot-controller"
+  scheduler:
+    cron: "@every 24h"
+
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: snapshot-controller-network-delay
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: chaos-testing
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "snapshot-controller"
+  delay:
+    latency: "100ms"
+    correlation: "100"
+    jitter: "0ms"
+  duration: "5m"
+  scheduler:
+    cron: "@every 24h"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: snapshot-controller-chaos-validation
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: chaos-testing
+spec:
+  schedule: "0 4 * * *" 
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: snapshot-chaos-validator
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          containers:
+            - name: chaos-validator
+              image: bitnami/kubectl:1.28
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+                  echo "Starting chaos test validation..."
+
+                  # Check controller recovery
+                  echo "Checking controller recovery..."
+                  kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=snapshot-controller -n storage --timeout=300s
+                  if [ $? -eq 0 ]; then
+                    echo "[PASS] Controller recovered successfully"
+                  else
+                    echo "[FAIL] Controller failed to recover"
+                    exit 1
+                  fi
+
+                  # Test snapshot creation during recovery
+                  echo "Testing snapshot creation..."
+                  cat > /tmp/test-snapshot.yaml <<EOF
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: chaos-test-snapshot
+                    namespace: storage
+                  spec:
+                    volumeSnapshotClassName: production-snapshot-class
+                    source:
+                      persistentVolumeClaimName: test-pvc
+                  EOF
+
+                  kubectl apply -f /tmp/test-snapshot.yaml
+                  sleep 30
+
+                  # Check snapshot status
+                  ready=$(kubectl get volumesnapshot chaos-test-snapshot -n storage -o jsonpath='{.status.readyToUse}')
+                  if [ "$ready" = "true" ]; then
+                    echo "[PASS] Snapshot creation successful during recovery"
+                  else
+                    echo "[FAIL] Snapshot creation failed during recovery"
+                    exit 1
+                  fi
+
+                  # Clean up test resources
+                  kubectl delete -f /tmp/test-snapshot.yaml
+
+                  # Generate test report
+                  report=$(cat <<EOF
+                  {
+                    "timestamp": "$(date -Iseconds)",
+                    "test_type": "chaos_engineering",
+                    "controller_recovery": "passed",
+                    "snapshot_creation": "passed",
+                    "overall_status": "passed"
+                  }
+                  EOF
+                  )
+
+                  # Send report to monitoring system
+                  echo "$report" | curl -X POST \
+                    -H "Content-Type: application/json" \
+                    --data-binary @- \
+                    http://monitoring-service.observability.svc.cluster.local:8080/api/reports/chaos-test
+
+                  echo "[PASS] Chaos test validation completed successfully"
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: snapshot-chaos-validator
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: snapshot-controller
+    app.kubernetes.io/component: chaos-testing
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: snapshot-chaos-validator
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["podchaos", "networkchaos"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: snapshot-chaos-validator
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: snapshot-chaos-validator
+    namespace: storage
+roleRef:
+  kind: Role
+  name: snapshot-chaos-validator
+  apiGroup: rbac.authorization.k8s.io

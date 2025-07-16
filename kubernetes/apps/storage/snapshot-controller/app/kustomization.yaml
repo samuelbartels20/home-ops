@@ -1,0 +1,33 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - ./helmrelease.yaml
+  - ./volumesnapshotclass.yaml
+  - ./resource-management.yaml
+  - ./performance-optimization.yaml
+  - ./security-hardening.yaml
+  - ./operational-improvements.yaml
+  - ./rbac.yaml
+  - ./secrets.yaml
+  - ./persistent-volumes.yaml
+  - ./monitoring.yaml
+
+commonLabels:
+  app.kubernetes.io/name: snapshot-controller
+  app.kubernetes.io/part-of: storage-system
+  app.kubernetes.io/component: snapshot-controller
+  app.kubernetes.io/managed-by: kustomize
+
+configMapGenerator:
+  - name: storage-forecasting-scripts
+    files:
+      - forecast.py=./forecasting-scripts.yaml
+
+secretGenerator:
+  - name: storage-secrets
+    envs:
+      - ./secrets.env

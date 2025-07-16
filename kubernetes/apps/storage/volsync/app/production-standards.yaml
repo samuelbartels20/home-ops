@@ -1,0 +1,52 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: volsync-standards
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: volsync
+    app.kubernetes.io/component: standards
+    app.kubernetes.io/part-of: storage
+data:
+  standards.yaml: |
+    security:
+      tls:
+        enabled: true
+        minVersion: "TLSv1.2"
+      authentication:
+        required: true
+      authorization:
+        enabled: true
+        rbac: true
+
+    availability:
+      minReplicas: 2
+      maxUnavailable: 1
+      podAntiAffinity: true
+      topologySpread: true
+
+    performance:
+      maxConcurrentTransfers: 10
+      maxTransferSize: "10Gi"
+      maxRetries: 3
+
+    monitoring:
+      metrics: true
+      healthChecks: true
+      logging:
+        level: info
+        format: json
+
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"
+      retention: "30d"
+
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"

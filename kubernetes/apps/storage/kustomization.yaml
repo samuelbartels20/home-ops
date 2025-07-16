@@ -7,3 +7,4 @@ components:
   - ../../components/common
 resources:
   - ./csi-driver-nfs/ks.yaml
+  - ./csi-driver-iscsi/ks.yaml
