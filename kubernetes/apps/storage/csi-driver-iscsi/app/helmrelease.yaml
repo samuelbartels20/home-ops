@@ -85,10 +85,17 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          hostSecretKey: host
+          secretName: truenas-iscsi
+          host:
+            secretRef:
+              name: truenas-iscsi
+              key: host
           port: 22
-          usernameSecretKey: username
-          passwordSecretKey: password
+          username:
+            secretRef:
+              name: truenas-iscsi
+              key: username
+          password:
         zfs:
           cli:
             sudoEnabled: true
