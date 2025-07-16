@@ -91,7 +91,7 @@ spec:
             zpoolSyncPath: /usr/sbin/zpool
             zpoolResilverPath: /usr/sbin/zpool
             zpoolReplacePath: /usr/sbin/zpool
-          datasetParentName: homelab/applications/
+          datasetParentName: homelab/applications
           detachedSnapshotsDatasetParentName: homelab/applications/db-iscsi-extent-snapshot
           zvolCompression: ""
           zvolDedup: ""
