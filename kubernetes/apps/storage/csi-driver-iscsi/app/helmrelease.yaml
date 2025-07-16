@@ -76,7 +76,10 @@ spec:
               key: DECRYPTION_KEY
           port: 443
           username: root
-          password: 123456789
+          password:
+            secretRef:
+              name: truenas-iscsi
+              key: password
           allowInsecure: true
         sshConnection:
           host: "192.168.8.161"
