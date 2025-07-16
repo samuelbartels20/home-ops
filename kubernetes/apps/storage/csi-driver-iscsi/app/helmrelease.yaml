@@ -162,6 +162,29 @@ spec:
             memory: 64Mi
             ephemeral-storage: 100Mi
 
+        # --- SSH ENV VARS FROM SECRET ---
+        env:
+          - name: SSH_HOST
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.driver.config.sshConnection.secretName }}
+                key: {{ .Values.driver.config.sshConnection.hostSecretKey }}
+          - name: SSH_PORT
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.driver.config.sshConnection.secretName }}
+                key: {{ .Values.driver.config.sshConnection.portSecretKey }}
+          - name: SSH_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.driver.config.sshConnection.secretName }}
+                key: {{ .Values.driver.config.sshConnection.usernameSecretKey }}
+          - name: SSH_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.driver.config.sshConnection.secretName }}
+                key: {{ .Values.driver.config.sshConnection.passwordSecretKey }}
+
       # External provisioner sidecar
       externalProvisioner:
         enabled: true
