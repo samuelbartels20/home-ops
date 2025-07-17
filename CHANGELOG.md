@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.17.10
+
+Date-based release for 2025-07-17
+
+### Changes
+- feat(cloudnative pg) deployed cloudnative pg ioperator to use for deploymenty of kubernetes
+- feat(trilium): tested the csi driver nfs storage class with trilium app
+- chore(release): 2025.07.17.9 [skip ci]
+
 ##  v2025.07.17.9
 
 Date-based release for 2025-07-17
