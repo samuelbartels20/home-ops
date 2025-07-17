@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     environment: production
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 2 * * *"
   backupOwnerReference: self
   cluster:
     name: postgres
@@ -34,7 +34,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     environment: production
 spec:
-  schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+  schedule: "0 1 * * 0"
   backupOwnerReference: self
   cluster:
     name: postgres
@@ -55,7 +55,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     environment: production
 spec:
-  schedule: "0 0 1 * *"  # Monthly on the 1st at midnight
+  schedule: "0 0 1 * *"
   backupOwnerReference: self
   cluster:
     name: postgres
