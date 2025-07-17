@@ -87,15 +87,15 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-    name: cloudnative-pg-secret
+    name: cloudnative-pg
     namespace: storage
     labels:
         cnpg.io/reload: "true"
-data:
-    password: op://K8s/cloudnative-pg/POSTGRES_SUPER_PASS
-    username: op://K8s/cloudnative-pg/POSTGRES_SUPER_USER
-    AWS_ACCESS_KEY_ID: op://K8s/cloudnative-pg/AWS_ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY: op://K8s/cloudnative-pg/AWS_SECRET_ACCESS_KEY
+stringData:
+    pg_password: op://K8s/cloudnative-pg/pg_password
+    pg_username: op://K8s/cloudnative-pg/pg_username
+    minio_access_key_id: op://K8s/cloudnative-pg/minio_access_key_id
+    minio_secret_access_key: op://K8s/cloudnative-pg/minio_secret_access_key
 
 
 ---
@@ -105,7 +105,7 @@ kind: Secret
 metadata:
     name: grafana-admin-secret
     namespace: observability
-data:
+stringData:
     admin-password: op://K8s/grafana-admin/GRAFANA_ADMIN_PASSWORD
     admin-user: op://K8s/grafana-admin/GRAFANA_ADMIN_USERNAME
 
@@ -117,7 +117,7 @@ kind: Secret
 metadata:
     name: vernemq-auth
     namespace: storage
-data:
+stringData:
     DOCKER_VERNEMQ_USER_ADMIN: op://K8s/vernemq-auth/vernemq_password
     DOCKER_VERNEMQ_USER_MQTT: op://K8s/vernemq-auth/vernemq_user_mqtt_password
 
@@ -250,7 +250,7 @@ metadata:
 type: Opaque
 stringData:
       PGBOUNCER_PASSWORD: op://K8s/pgbouncer-exporter-secret/PGBOUNCER_PASSWORD
-      
+
 
 ---
 apiVersion: v1
@@ -274,7 +274,7 @@ metadata:
   name: postgres-analytics-credentials
   namespace: storage
 type: Opaque
-data:
+stringData:
   ANALYTICS_USER: op://K8s/postgres-analytics-credentials/ANALYTICS_USER
   ANALYTICS_PASSWORD: op://K8s/postgres-analytics-credentials/ANALYTICS_PASSWORD
 
