@@ -90,7 +90,7 @@ spec:
           allowInsecure: true
         sshConnection:
           host: "${TRUENAS_HOST}"
-          port: ${TRUENAS_PORT}
+          port: 22
           username: "${TRUENAS_USERNAME}"
           password: "${TRUENAS_PASSWORD}"
         zfs:
