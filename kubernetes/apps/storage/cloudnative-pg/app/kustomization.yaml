@@ -9,7 +9,7 @@ resources:
   - ./service.yaml
   - ./prometheus-rules.yaml
   - ./externalsecret.yaml
-  - ./operator.yaml
+  # - ./operator.yaml
 commonLabels:
   app.kubernetes.io/name: cloudnative-pg
   app.kubernetes.io/instance: cloudnative-pg
