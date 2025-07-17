@@ -1,5 +1,4 @@
 ---
-# Deployment automation using app-template chart
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
@@ -57,10 +56,8 @@ spec:
             command: ["/bin/bash", "-c"]
             args:
               - |
-                # Install additional tools
                 apt-get update && apt-get install -y postgresql-client jq
 
-                # Copy deployment script
                 cp /scripts/blue-green-deploy.sh /usr/local/bin/
                 chmod +x /usr/local/bin/blue-green-deploy.sh
 
