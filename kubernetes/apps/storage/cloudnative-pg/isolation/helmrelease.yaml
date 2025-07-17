@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/component: isolation
     app.kubernetes.io/part-of: postgresql
     environment: production
-    tier: monitoring
+    tier: observability
 spec:
   interval: 15m
   timeout: 10m
