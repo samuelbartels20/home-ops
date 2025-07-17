@@ -1,6 +1,4 @@
 ---
-# Tenant Resource Monitor HelmRelease
-# Multi-tenant isolation monitoring using app-template chart
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
