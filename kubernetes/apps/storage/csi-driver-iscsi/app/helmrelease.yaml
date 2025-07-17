@@ -41,6 +41,10 @@ spec:
       namespace: security
     - name: onepassword
       namespace: security
+  valuesFrom:
+    - kind: Secret
+      name: truenas-iscsi-secret
+      valuesKey: values.yaml
 
   values:
     # Secret configuration
@@ -85,10 +89,10 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          host: "192.168.8.161"
-          port: 22
-          username: "root"
-          password: "123456789"
+          host: "${TRUENAS_HOST}"
+          port: ${TRUENAS_PORT}
+          username: "${TRUENAS_USERNAME}"
+          password: "${TRUENAS_PASSWORD}"
         zfs:
           cli:
             sudoEnabled: true
@@ -160,7 +164,15 @@ spec:
             cpu: 50m
             memory: 64Mi
             ephemeral-storage: 100Mi
-
+        extraEnv:
+          - name: SSH_HOST
+            value: "${TRUENAS_HOST}"
+          - name: SSH_PORT
+            value: "${TRUENAS_PORT}"
+          - name: SSH_USERNAME
+            value: "${TRUENAS_USERNAME}"
+          - name: SSH_PASSWORD
+            value: "${TRUENAS_PASSWORD}"
       # External provisioner sidecar
       externalProvisioner:
         enabled: true
@@ -292,6 +304,14 @@ spec:
           value: nsenter
         - name: ISCSIADM_HOST_PATH
           value: /usr/local/sbin/iscsiadm
+        - name: SSH_HOST
+          value: "${TRUENAS_HOST}"
+        - name: SSH_PORT
+          value: "${TRUENAS_PORT}"
+        - name: SSH_USERNAME
+          value: "${TRUENAS_USERNAME}"
+        - name: SSH_PASSWORD
+          value: "${TRUENAS_PASSWORD}"
         iscsiDirHostPath: /etc/iscsi
         iscsiDirHostPathType: DirectoryOrCreate
 
