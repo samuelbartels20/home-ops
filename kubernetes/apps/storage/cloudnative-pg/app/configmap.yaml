@@ -29,7 +29,7 @@ data:
 
     shared_buffers = 4GB
     work_mem = 256MB
-    maintenance_work_mem = 1GB
+    maintenance_work_mem = 512MB
     effective_cache_size = 12GB
     temp_buffers = 64MB
     max_connections = 1000
