@@ -1,31 +1,16 @@
 ---
-# PostgreSQL Analytics Engine Components
-# Modular organization for analytics and columnar storage
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: storage
 
 resources:
-  # Analytics cluster and database
   - ./cluster.yaml
-
-  # Analytics configuration and schemas
   - ./configmap.yaml
-
-  # Credentials management
   - ./externalsecrets.yaml
-
-  # RBAC resources
   - ./rbac.yaml
-
-  # Service definitions
   - ./service.yaml
-
-  # Automated maintenance jobs
   - ./cronjobs.yaml
-
-  # Query accelerator HelmRelease
   - ./helmrelease.yaml
 
 labels:
