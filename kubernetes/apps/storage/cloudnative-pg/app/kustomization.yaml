@@ -1,28 +1,17 @@
-# Complete deployment with advanced features
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: storage
 resources:
-  - helmrelease.yaml
-  - configmap.yaml
-  - rbac.yaml
-  - service.yaml
-  - prometheus-rules.yaml
+  - ./helmrelease.yaml
+  - ./configmap.yaml
+  - ./rbac.yaml
+  - ./service.yaml
+  - ./prometheus-rules.yaml
+  - ./externalsecret.yaml
+  - ./operator.yaml
 commonLabels:
   app.kubernetes.io/name: cloudnative-pg
   app.kubernetes.io/instance: cloudnative-pg
   app.kubernetes.io/component: database
   app.kubernetes.io/part-of: storage
-
----
-# CloudNativePG Operator Configuration
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-namespace: storage
-resources:
-  - helmrelease.yaml
-commonLabels:
-  app.kubernetes.io/name: cloudnative-pg
-  app.kubernetes.io/instance: cloudnative-pg
-  app.kubernetes.io/component: operator
-  app.kubernetes.io/part-of: postgresql
