@@ -59,6 +59,34 @@ spec:
           secretRef:
             name: truenas-iscsi
             key: DECRYPTION_KEY
+        host:
+          secretRef:
+            name: truenas-iscsi
+            key: host
+        port:
+          secretRef:
+            name: truenas-iscsi
+            key: port
+        dataset_parent:
+          secretRef:
+            name: truenas-iscsi
+            key: dataset_parent
+        snapshot_parent:
+          secretRef:
+            name: truenas-iscsi
+            key: snapshot_parent
+        chap_username:
+          secretRef:
+            name: truenas-iscsi
+            key: chap_username
+        chap_password:
+          secretRef:
+            name: truenas-iscsi
+            key: chap_password
+        username:
+          secretRef:
+            name: truenas-iscsi
+            key: username
     # Democratic CSI configuration
     driver:
       config:
@@ -89,10 +117,10 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          host: "{{ .host }}"
+          host: "${TRUENAS_HOST}"
           port: 22
           username: "${TRUENAS_USERNAME}"
-          password: "${TRUENAS_PASSWORD}"
+          password: "${TRUENAS_PASSWORD}" 
         zfs:
           cli:
             sudoEnabled: true
