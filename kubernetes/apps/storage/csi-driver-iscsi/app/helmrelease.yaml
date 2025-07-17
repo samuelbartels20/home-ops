@@ -119,7 +119,7 @@ spec:
         sshConnection:
           host: "192.168.8.161"
           port: 22
-          username: "${TRUENAS_USERNAME}"
+          username: "root"
           password:
             secretRef:
               name: truenas-iscsi
@@ -195,24 +195,6 @@ spec:
             cpu: 50m
             memory: 64Mi
             ephemeral-storage: 100Mi
-        extraEnv:
-          - name: SSH_HOST
-            value:
-              secretRef:
-                name: truenas-iscsi
-                key: host
-          - name: SSH_PORT
-            value: 22
-          - name: SSH_USERNAME
-            value:
-              secretRef:
-                name: truenas-iscsi
-                key: username
-          - name: SSH_PASSWORD
-            value:
-              secretRef:
-                name: truenas-iscsi
-                key: password
       # External provisioner sidecar
       externalProvisioner:
         enabled: true
@@ -344,23 +326,6 @@ spec:
           value: nsenter
         - name: ISCSIADM_HOST_PATH
           value: /usr/local/sbin/iscsiadm
-        - name: SSH_HOST
-          value:
-            secretRef:
-              name: truenas-iscsi
-              key: host
-        - name: SSH_PORT
-          value: 22
-        - name: SSH_USERNAME
-          value:
-            secretRef:
-              name: truenas-iscsi
-              key: username
-        - name: SSH_PASSWORD
-          value:
-            secretRef:
-              name: truenas-iscsi
-              key: password
         iscsiDirHostPath: /etc/iscsi
         iscsiDirHostPathType: DirectoryOrCreate
 
