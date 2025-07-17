@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/component: maintenance
     app.kubernetes.io/part-of: postgresql
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 2 * * *"  
   jobTemplate:
     spec:
       template:
