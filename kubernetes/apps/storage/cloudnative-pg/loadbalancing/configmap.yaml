@@ -1,0 +1,33 @@
+# HAProxy configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-haproxy-config
+  namespace: storage
+data:
+  haproxy.cfg: |
+    global
+      maxconn 1000
+      log stdout format raw local0 info
+
+    defaults
+      log global
+      mode tcp
+      retries 2
+      timeout client 30m
+      timeout connect 4s
+      timeout server 30m
+      timeout check 5s
+
+    frontend pg_frontend
+      bind *:5432
+      default_backend pg_backend
+
+    backend pg_backend
+      balance roundrobin
+      option httpchk
+      http-check expect status 200
+      default-server inter 3s fall 3 rise 2 on-marked-down shutdown-sessions
+      server pg1 pg-cluster-1:5432 check port 8008
+      server pg2 pg-cluster-2:5432 check port 8008
+      server pg3 pg-cluster-3:5432 check port 8008

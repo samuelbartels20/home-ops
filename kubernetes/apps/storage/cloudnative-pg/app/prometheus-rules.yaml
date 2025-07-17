@@ -1,0 +1,55 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+# PostgreSQL monitoring rules with SLI/SLO monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudnative-pg-rules
+  namespace: storage
+spec:
+  groups:
+  - name: postgres.rules
+    rules:
+    # Cluster Health
+    - alert: PostgreSQLReplicaDown
+      expr: cnpg_pg_stat_replication_replica_count < 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL replica count is below minimum"
+        description: |
+          Cluster {{ $labels.cluster }} has {{ $value }} replica(s), but requires at least 2 for redundancy.
+
+    # Performance
+    - alert: PostgreSQLHighCPU
+      expr: rate(process_cpu_seconds_total{application="postgres"}[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL high CPU usage"
+        description: |
+          PostgreSQL instance {{ $labels.instance }} has high CPU usage.
+
+    # Storage
+    - alert: PostgreSQLStorageNearFull
+      expr: cnpg_pg_stat_database_disk_usage / cnpg_pg_stat_database_disk_total > 0.85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "PostgreSQL storage nearly full"
+        description: |
+          Storage usage for cluster {{ $labels.cluster }} is at {{ $value | humanizePercentage }}.
+
+    # Connection Pool
+    - alert: PostgreSQLTooManyConnections
+      expr: sum(pg_stat_activity_count) by (instance) > 150
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Too many PostgreSQL connections"
+        description: |
+          PostgreSQL instance {{ $labels.instance }} has too many connections.

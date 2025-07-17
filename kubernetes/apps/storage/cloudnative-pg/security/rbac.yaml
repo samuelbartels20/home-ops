@@ -1,0 +1,309 @@
+---
+# RBAC Configuration for CloudNative PostgreSQL
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-instance
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "poolers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: postgres-operator
+subjects:
+  - kind: ServiceAccount
+    name: postgres-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-instance
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-instance
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: postgres-instance
+subjects:
+  - kind: ServiceAccount
+    name: postgres-instance
+
+---
+# ClusterRole for CloudNative PostgreSQL Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+rules:
+  # Core Kubernetes API permissions
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "services", "persistentvolumeclaims", "pods", "events"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/log"]
+    verbs: ["create", "get", "list", "watch"]
+
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Apps API permissions
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Policy API permissions
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # RBAC permissions for service accounts
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # CloudNative PostgreSQL CRD permissions
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "poolers", "backups", "scheduledbackups"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters/status", "poolers/status", "backups/status", "scheduledbackups/status"]
+    verbs: ["get", "patch", "update"]
+
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters/finalizers", "poolers/finalizers", "backups/finalizers", "scheduledbackups/finalizers"]
+    verbs: ["update"]
+
+  # Monitoring permissions
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["podmonitors", "servicemonitors"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Storage permissions
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+
+  # Volume snapshot permissions
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Metrics and coordination
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Admission controller permissions
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+---
+# ClusterRoleBinding for CloudNative PostgreSQL Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: postgres-operator
+subjects:
+  - kind: ServiceAccount
+    name: postgres-operator
+    namespace: storage
+
+---
+# Role for PostgreSQL Instance Management
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-instance
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+rules:
+  # ConfigMap permissions for PostgreSQL configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Secret permissions for credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # Pod permissions for instance management
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Service permissions for networking
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+
+  # Event permissions for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # Lease permissions for leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+---
+# RoleBinding for PostgreSQL Instance
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-instance
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: postgres-instance
+subjects:
+  - kind: ServiceAccount
+    name: postgres-instance
+    namespace: storage
+
+---
+# RBAC configuration for PostgreSQL
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pg-backup
+  namespace: storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pg-backup
+  namespace: storage
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/exec"]
+  verbs: ["get", "list", "create"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pg-backup
+  namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pg-backup
+subjects:
+- kind: ServiceAccount
+  name: pg-backup
+  namespace: storage
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pg-monitoring
+  namespace: storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pg-monitoring
+  namespace: storage
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "podmonitors"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pg-monitoring
+  namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pg-monitoring
+subjects:
+- kind: ServiceAccount
+  name: pg-monitoring
+  namespace: storage

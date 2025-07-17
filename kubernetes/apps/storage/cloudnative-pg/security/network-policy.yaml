@@ -1,0 +1,369 @@
+---
+# PostgreSQL Network Security Policies
+# Zero-trust networking with comprehensive ingress/egress controls
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: network-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    security-level: strict
+  annotations:
+    network-policy.kubernetes.io/type: "zero-trust"
+    security.cnpg.io/policy-version: "v1.2"
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress Rules - Strict Control
+  ingress:
+    # Allow PostgreSQL connections from applications
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            app.kubernetes.io/allowed-postgres-access: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow monitoring from Prometheus
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9187  # PostgreSQL exporter
+        - protocol: TCP
+          port: 8000  # CloudNativePG metrics
+
+    # Allow replication between PostgreSQL instances
+    - from:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow health checks from Kubernetes
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8000  # Health check endpoint
+
+    # Allow backup operations
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: backup
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/component: backup
+      ports:
+        - protocol: TCP
+          port: 5432
+
+  # Egress Rules - Controlled External Access
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow NTP for time synchronization
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 123
+
+    # Allow S3 backup storage access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+        - protocol: TCP
+          port: 80   # HTTP (for redirects)
+
+    # Allow replication to other PostgreSQL instances
+    - to:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow connection to Kubernetes API for operator communication
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443  # Kubernetes API
+        - protocol: TCP
+          port: 443   # HTTPS API
+
+---
+# Network Policy for PostgreSQL Operator
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudnative-pg-operator-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: operator-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    security-level: strict
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow webhook calls from Kubernetes API server
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 9443  # Webhook port
+
+    # Allow metrics collection
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080  # Metrics port
+
+    # Allow health checks
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8081  # Health check port
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow Kubernetes API access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+
+    # Allow PostgreSQL cluster management
+    - to:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8000
+
+    # Allow container registry access for image pulls
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Network Policy for Backup Operations
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-backup-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/backup: "true"
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow monitoring
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow PostgreSQL access for backup
+    - to:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow S3 access for backup storage
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+---
+# Default Deny All Policy (Security Baseline)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: security-baseline
+    app.kubernetes.io/component: network-security
+    security-policy: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Network Policy for Client Applications
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-client-access-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-client-access
+    app.kubernetes.io/component: client-security
+    app.kubernetes.io/part-of: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/database-client: "true"
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow PostgreSQL connections
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: storage
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow HTTPS for external APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Network Policy for Connection Pooling
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-pooler-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-pooler
+    app.kubernetes.io/component: pooler-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/pooler: "true"
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow client connections
+    - from:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/database-client: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow monitoring
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow PostgreSQL connections
+    - to:
+      - podSelector:
+          matchLabels:
+            cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432

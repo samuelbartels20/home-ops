@@ -1,0 +1,28 @@
+---
+# ServiceMonitor for CloudNative PostgreSQL Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: postgres-operator
+  labels:
+    app.kubernetes.io/name: postgres-monitoring
+    app.kubernetes.io/component: operator-monitor
+    app.kubernetes.io/part-of: postgresql
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - storage
+  metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: cnpg_.*
+      action: keep
+    - targetLabel: cluster
+      replacement: postgres

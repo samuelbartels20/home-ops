@@ -1,0 +1,114 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-deployment
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: automation
+    app.kubernetes.io/part-of: postgresql
+data:
+  deploy.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Starting deployment process..."
+
+    # Validate configuration
+    echo "Validating configuration..."
+    if ! kubectl apply --dry-run=client -f config.yaml; then
+      echo "Configuration validation failed"
+      exit 1
+    fi
+
+    # Apply changes
+    echo "Applying changes..."
+    kubectl apply -f config.yaml
+
+    # Verify deployment
+    echo "Verifying deployment..."
+    kubectl wait --for=condition=Ready pod -l app=postgres -n storage --timeout=300s
+
+    echo "Deployment completed successfully"
+
+  # Schema migration examples
+  migration-examples.sql: |
+    -- Example 1: Add new column with default value
+    -- This is safe for zero-downtime deployment
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_ip INET DEFAULT NULL;
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_last_login_ip ON users(last_login_ip);
+
+    -- Example 2: Add new table
+    CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        preference_key VARCHAR(100) NOT NULL,
+        preference_value TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, preference_key)
+    );
+
+    -- Example 3: Safe column type change (expand)
+    -- Change VARCHAR(50) to VARCHAR(100) - safe expansion
+    ALTER TABLE products ALTER COLUMN product_code TYPE VARCHAR(100);
+
+    -- Example 4: Add new constraint (non-blocking)
+    -- Add check constraint with NOT VALID first, then validate
+    ALTER TABLE orders ADD CONSTRAINT check_order_amount_positive
+        CHECK (total_amount > 0) NOT VALID;
+    -- Validate constraint in separate transaction (can be done later)
+    -- ALTER TABLE orders VALIDATE CONSTRAINT check_order_amount_positive;
+
+    -- Example 5: Create new index concurrently
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_created_at_status
+        ON orders(created_at, status) WHERE status IN ('pending', 'processing');
+
+    -- Example 6: Add new function
+    CREATE OR REPLACE FUNCTION get_user_full_name(user_id INTEGER)
+    RETURNS TEXT LANGUAGE sql STABLE AS $$
+        SELECT CONCAT(first_name, ' ', last_name)
+        FROM users
+        WHERE id = user_id;
+    $$;
+
+    -- Example 7: Create new view
+    CREATE OR REPLACE VIEW user_order_summary AS
+    SELECT
+        u.id,
+        u.email,
+        COUNT(o.id) as total_orders,
+        SUM(o.total_amount) as total_spent,
+        MAX(o.created_at) as last_order_date
+    FROM users u
+    LEFT JOIN orders o ON u.id = o.user_id
+    GROUP BY u.id, u.email;
+
+  pre-deployment.sql: |
+    -- Pre-deployment database checks
+    SELECT pg_is_in_recovery();
+    SELECT pg_current_wal_lsn();
+
+  post-deployment.sql: |
+    -- Post-deployment validation
+    SELECT pg_stat_replication.state
+    FROM pg_stat_replication;
+
+    -- Verify replication status
+    SELECT client_addr, state, sync_state
+    FROM pg_stat_replication;
+
+  deployment-check.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Running deployment checks..."
+
+    # Check database connectivity
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c "SELECT 1;"
+
+    # Verify replication lag
+    PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c \
+      "SELECT client_addr, replay_lag FROM pg_stat_replication;"
+
+    echo "Deployment checks completed"

@@ -1,0 +1,302 @@
+---
+# PgBouncer Connection Pooler HelmRelease
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: pgbouncer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    tier: middleware
+spec:
+  interval: 15m
+  timeout: 10m
+  chart:
+    spec:
+      chart: pgbouncer
+      version: 1.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      interval: 15m
+  install:
+    createNamespace: false
+    timeout: 10m
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    timeout: 10m
+    remediation:
+      strategy: rollback
+      retries: 3
+
+  values:
+    controllers:
+      main:
+        replicas: 3
+        strategy: RollingUpdate
+
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        containers:
+          main:
+            image:
+              repository: pgbouncer/pgbouncer
+              tag: 1.21.0
+              pullPolicy: IfNotPresent
+
+            env:
+              DATABASES_HOST: "192.168.8.161"
+              DATABASES_PORT: "5432"
+              DATABASES_DBNAME: "postgres"
+              POOL_MODE: "transaction"
+              SERVER_RESET_QUERY: "DISCARD ALL"
+              MAX_CLIENT_CONN: "10000"
+              DEFAULT_POOL_SIZE: "25"
+              MIN_POOL_SIZE: "10"
+              RESERVE_POOL_SIZE: "5"
+              RESERVE_POOL_TIMEOUT: "5"
+              MAX_DB_CONNECTIONS: "50"
+              MAX_USER_CONNECTIONS: "50"
+              SERVER_ROUND_ROBIN: "1"
+              IGNORE_STARTUP_PARAMETERS: "extra_float_digits"
+              SERVER_IDLE_TIMEOUT: "600"
+              SERVER_CONNECT_TIMEOUT: "15"
+              SERVER_LOGIN_RETRY: "15"
+              CLIENT_LOGIN_TIMEOUT: "60"
+              AUTODB_IDLE_TIMEOUT: "3600"
+              DNS_MAX_TTL: "15"
+              DNS_NXDOMAIN_TTL: "15"
+              TCP_KEEPALIVE: "1"
+              TCP_KEEPCNT: "3"
+              TCP_KEEPIDLE: "600"
+              TCP_KEEPINTVL: "30"
+              SO_REUSEPORT: "1"
+              TCP_USER_TIMEOUT: "30000"
+
+            envFrom:
+              - secretRef:
+                  name: cloudnative-pg-secret
+
+            probes:
+              liveness:
+                enabled: true
+                type: TCP
+                spec:
+                  port: 5432
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+
+              readiness:
+                enabled: true
+                type: TCP
+                spec:
+                  port: 5432
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+
+            resources:
+              requests:
+                cpu: 500m
+                memory: 256Mi
+                ephemeral-storage: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 1Gi
+                ephemeral-storage: 2Gi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+              capabilities:
+                drop:
+                  - ALL
+              seccompProfile:
+                type: RuntimeDefault
+
+          # PgBouncer Exporter sidecar
+          exporter:
+            image:
+              repository: prometheuscommunity/pgbouncer-exporter
+              tag: v0.7.0
+              pullPolicy: IfNotPresent
+
+            env:
+              PGBOUNCER_EXPORTER_HOST: "127.0.0.1"
+              PGBOUNCER_EXPORTER_PORT: "6432"
+              PGBOUNCER_USER: "pgbouncer"
+
+            envFrom:
+              - secretRef:
+                  name: pgbouncer-admin-secret
+
+            probes:
+              liveness:
+                enabled: true
+                type: HTTP
+                spec:
+                  path: /metrics
+                  port: 9127
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+
+              readiness:
+                enabled: true
+                type: HTTP
+                spec:
+                  path: /metrics
+                  port: 9127
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 999
+              capabilities:
+                drop:
+                  - ALL
+
+        pod:
+          labels:
+            app.kubernetes.io/name: pgbouncer
+            app.kubernetes.io/component: connection-pooler
+            monitoring: "true"
+            security-scan: "required"
+
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9127"
+            prometheus.io/path: "/metrics"
+            cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: pgbouncer
+                  topologyKey: kubernetes.io/hostname
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: pgbouncer
+                    topologyKey: topology.kubernetes.io/zone
+
+    service:
+      main:
+        controller: main
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+          service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9127"
+          prometheus.io/path: "/metrics"
+        ports:
+          postgresql:
+            port: 5432
+            targetPort: 5432
+            protocol: TCP
+          admin:
+            port: 6432
+            targetPort: 6432
+            protocol: TCP
+          metrics:
+            port: 9127
+            targetPort: 9127
+            protocol: TCP
+
+    configMaps:
+      - name: pgbouncer-config
+        enabled: true
+        type: configMap
+        globalMounts:
+          - path: /etc/pgbouncer
+        data:
+          pgbouncer.ini: |
+            [pgbouncer]
+            listen_port = 5432
+            listen_addr = *
+            auth_type = md5
+            auth_file = /etc/pgbouncer/userlist.txt
+            stats_users = stats
+            admin_users = admin
+            pool_mode = transaction
+            max_client_conn = 1000
+            default_pool_size = 20
+            min_pool_size = 0
+            reserve_pool_size = 0
+            max_db_connections = 0
+            max_user_connections = 0
+            server_reset_query = DISCARD ALL
+            server_check_delay = 30
+            server_check_query = select 1
+            server_lifetime = 3600
+            server_idle_timeout = 600
+            application_name_add_host = 1
+
+    persistence:
+      config:
+        enabled: true
+        type: configMap
+        name: pgbouncer-config
+        globalMounts:
+          - path: /etc/pgbouncer
+
+    secrets:
+      - name: pgbouncer-secrets
+        enabled: true
+        type: secret
+        globalMounts:
+          - path: /etc/pgbouncer/secrets
+            mode: 0400
+      - name: tmp
+        enabled: true
+        type: emptyDir
+        sizeLimit: 100Mi
+        globalMounts:
+          - path: /tmp
+      - name: var-run
+        enabled: true
+        type: emptyDir
+        sizeLimit: 100Mi
+        globalMounts:
+          - path: /var/run
+
+    serviceAccount:
+      create: true
+      name: pgbouncer

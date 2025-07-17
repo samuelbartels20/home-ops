@@ -1,0 +1,23 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ./rbac.yaml
+  - ./configmap.yaml
+  - ./externalsecrets.yaml
+  - ./service.yaml
+  - ./hpa.yaml
+  - ./helmrelease.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/component: pooling
+      app.kubernetes.io/part-of: postgresql
+
+commonLabels:
+  app.kubernetes.io/name: postgresql
+  app.kubernetes.io/part-of: postgresql

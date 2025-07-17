@@ -1,0 +1,63 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: blue-green-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: postgresql
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: postgres-blue-green-controller
+          containers:
+            - name: monitor
+              image: bitnami/kubectl:latest
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  NAMESPACE=storage
+
+                  echo "=== Blue-Green Deployment Status ==="
+                  echo "Timestamp: $(date)"
+
+                  ACTIVE_CLUSTER=$(kubectl get service postgres-active -n $NAMESPACE \
+                    -o jsonpath='{.spec.selector.cnpg\.io/cluster}' 2>/dev/null || echo "UNKNOWN")
+
+                  echo "Active cluster: $ACTIVE_CLUSTER"
+
+                  for cluster in postgres-blue postgres-green postgres; do
+                    if kubectl get cluster $cluster -n $NAMESPACE >/dev/null 2>&1; then
+                      STATUS=$(kubectl get cluster $cluster -n $NAMESPACE \
+                        -o jsonpath='{.status.phase}' 2>/dev/null || echo "UNKNOWN")
+                      INSTANCES=$(kubectl get cluster $cluster -n $NAMESPACE \
+                        -o jsonpath='{.status.instances}' 2>/dev/null || echo "0")
+                      READY=$(kubectl get cluster $cluster -n $NAMESPACE \
+                        -o jsonpath='{.status.readyInstances}' 2>/dev/null || echo "0")
+
+                      echo "Cluster $cluster: $STATUS ($READY/$INSTANCES ready)"
+                    else
+                      echo "Cluster $cluster: NOT FOUND"
+                    fi
+                  done
+
+                  JOBS=$(kubectl get jobs -n $NAMESPACE \
+                    -l deployment=blue-green --no-headers 2>/dev/null | wc -l || echo "0")
+                  echo "Active deployment jobs: $JOBS"
+
+                  echo "=== End Status ==="
+
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+                limits:
+                  cpu: "100m"
+                  memory: "128Mi"
+
+          restartPolicy: OnFailure

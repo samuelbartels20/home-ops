@@ -1,0 +1,12 @@
+---
+# Service Account for Query Accelerator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-query-accelerator
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+automountServiceAccountToken: true

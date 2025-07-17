@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: postgres-isolation
+  labels:
+    app.kubernetes.io/name: postgres-isolation
+    app.kubernetes.io/component: resource-isolation
+    app.kubernetes.io/part-of: postgresql
+
+resources:
+  - ./configmap.yaml
+  - ./helmrelease.yaml
+  - ./monitor-script.yaml
+  - ./rbac.yaml
+  - ./priorityclass.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/component: isolation
+      app.kubernetes.io/part-of: postgresql

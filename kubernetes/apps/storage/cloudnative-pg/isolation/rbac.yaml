@@ -1,0 +1,12 @@
+---
+# Service Account for Tenant Monitor
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-tenant-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+automountServiceAccountToken: true

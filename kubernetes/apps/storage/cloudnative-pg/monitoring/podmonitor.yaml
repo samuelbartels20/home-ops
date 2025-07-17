@@ -1,0 +1,62 @@
+---
+# PodMonitor for PostgreSQL Pods (alternative to ServiceMonitor)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: postgres-pods
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgres-monitoring
+    app.kubernetes.io/component: pod-monitor
+    app.kubernetes.io/part-of: postgresql
+    monitoring: prometheus
+    environment: production
+  annotations:
+    prometheus.io/scrape: "true"
+    monitoring.cnpg.io/cluster: "postgres"
+spec:
+  selector:
+    matchLabels:
+      monitoring.cnpg.io/cluster: "postgres"
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+          targetLabel: cluster
+        - sourceLabels: [__meta_kubernetes_pod_label_cnpg_io_instanceRole]
+          targetLabel: role
+        - sourceLabels: [__meta_kubernetes_pod_label_cnpg_io_podRole]
+          targetLabel: pod_role
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_pod_ip]
+          targetLabel: pod_ip
+        - sourceLabels: [__meta_kubernetes_pod_host_ip]
+          targetLabel: host_ip
+      metricRelabelings:
+        # Keep PostgreSQL and CloudNativePG metrics
+        - sourceLabels: [__name__]
+          regex: 'pg_database_.*|pg_table_.*|pg_index_.*|pg_stat_.*|pg_replication_.*|pg_wal_.*|cnpg_.*'
+          action: keep
+        # Drop high cardinality metrics
+        - sourceLabels: [__name__]
+          regex: 'pg_stat_statements_.*'
+          action: drop
+        # Add custom labels
+        - targetLabel: environment
+          replacement: production
+        - targetLabel: tier
+          replacement: database
+        - targetLabel: backup_enabled
+          replacement: "true"
+  namespaceSelector:
+    matchNames:
+      - storage

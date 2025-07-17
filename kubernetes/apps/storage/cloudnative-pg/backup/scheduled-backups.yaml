@@ -1,0 +1,65 @@
+# PostgreSQL Backup Configuration
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-daily-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  backupOwnerReference: self
+  cluster:
+    name: postgres
+  # Backup configuration
+  target:
+    serverName: postgres
+  storage:
+    storageClass: longhorn
+    size: 50Gi
+  retentionPolicy: "30d"
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-weekly-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+  backupOwnerReference: self
+  cluster:
+    name: postgres
+  storage:
+    storageClass: longhorn
+    size: 100Gi
+  retentionPolicy: "90d"
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-monthly-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 0 1 * *"  # Monthly on the 1st at midnight
+  backupOwnerReference: self
+  cluster:
+    name: postgres
+  storage:
+    storageClass: longhorn
+    size: 200Gi
+  retentionPolicy: "365d"

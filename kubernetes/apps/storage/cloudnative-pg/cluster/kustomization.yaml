@@ -1,0 +1,14 @@
+# PostgreSQL cluster configuration
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+resources:
+  - cluster.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - service.yaml
+commonLabels:
+  app.kubernetes.io/name: pg-cluster
+  app.kubernetes.io/instance: pg-cluster
+  app.kubernetes.io/component: database
+  app.kubernetes.io/part-of: storage
