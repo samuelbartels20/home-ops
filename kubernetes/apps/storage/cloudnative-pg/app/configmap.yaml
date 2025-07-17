@@ -27,10 +27,10 @@ data:
     log_rotation_age = 1d
     log_rotation_size = 100MB
 
-    shared_buffers = 8GB
+    shared_buffers = 4GB
     work_mem = 256MB
-    maintenance_work_mem = 2GB
-    effective_cache_size = 24GB
+    maintenance_work_mem = 1GB
+    effective_cache_size = 12GB
     temp_buffers = 64MB
     max_connections = 1000
     max_worker_processes = 16
