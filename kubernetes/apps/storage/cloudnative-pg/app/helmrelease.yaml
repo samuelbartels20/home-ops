@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: cloudnative-pg
-      version: 1.25.2
+      version: 0.24.0
       sourceRef:
         kind: HelmRepository
         name: cloudnative-pg
@@ -72,7 +72,7 @@ spec:
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_IMMEDIATE: "false"
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_PAUSE: "false"
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_SHUTDOWN: "false"
-        BACKUP_RESTORE_RECOVERY_TARGET_ACTION_PROMOTE: "true"
+        BACKUP_RESTORE_RECOVERY_TARGET_ACTION_PROMOTE: "true"        
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_FOLLOW: "false"
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_STANDBY: "false"
         BACKUP_RESTORE_RECOVERY_TARGET_ACTION_TIMELINE: "false"
