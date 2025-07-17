@@ -1,6 +1,4 @@
 ---
-# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
-# PostgreSQL monitoring rules with SLI/SLO monitoring
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
