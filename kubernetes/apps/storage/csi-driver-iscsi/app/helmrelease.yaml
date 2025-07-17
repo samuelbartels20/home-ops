@@ -117,10 +117,7 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          host:
-            secretRef:
-              name: truenas-iscsi
-              key: host
+          host: "192.168.8.161"
           port: 22
           username: "${TRUENAS_USERNAME}"
           password:
