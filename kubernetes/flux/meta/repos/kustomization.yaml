@@ -7,3 +7,4 @@ resources:
   - ./external-secrets.yaml
   - ./bjw-s.yaml
   - ./csi-driver-iscsi.yaml
+  - ./cloudnative-pg.yaml
