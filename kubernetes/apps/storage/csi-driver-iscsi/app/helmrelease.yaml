@@ -89,7 +89,7 @@ spec:
               key: password
           allowInsecure: true
         sshConnection:
-          host: "${TRUENAS_HOST}"
+          host: "{{ .host }}"
           port: 22
           username: "${TRUENAS_USERNAME}"
           password: "${TRUENAS_PASSWORD}"
