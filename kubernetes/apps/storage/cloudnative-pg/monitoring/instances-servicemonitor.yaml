@@ -1,5 +1,4 @@
 ---
-# ServiceMonitor for PostgreSQL Instances
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -40,14 +39,11 @@ spec:
         - sourceLabels: [__meta_kubernetes_pod_ip]
           targetLabel: pod_ip
       metricRelabelings:
-        # PostgreSQL metrics
         - sourceLabels: [__name__]
           regex: 'pg_.*|postgres_.*|cnpg_.*'
           action: keep
-        # Add environment label
         - targetLabel: environment
           replacement: production
-        # Add tier label
         - targetLabel: tier
           replacement: database
   namespaceSelector:
