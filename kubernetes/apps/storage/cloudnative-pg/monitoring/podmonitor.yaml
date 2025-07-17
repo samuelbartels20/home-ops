@@ -1,5 +1,4 @@
 ---
-# PodMonitor for PostgreSQL Pods (alternative to ServiceMonitor)
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -42,15 +41,12 @@ spec:
         - sourceLabels: [__meta_kubernetes_pod_host_ip]
           targetLabel: host_ip
       metricRelabelings:
-        # Keep PostgreSQL and CloudNativePG metrics
         - sourceLabels: [__name__]
           regex: 'pg_database_.*|pg_table_.*|pg_index_.*|pg_stat_.*|pg_replication_.*|pg_wal_.*|cnpg_.*'
           action: keep
-        # Drop high cardinality metrics
         - sourceLabels: [__name__]
           regex: 'pg_stat_statements_.*'
           action: drop
-        # Add custom labels
         - targetLabel: environment
           replacement: production
         - targetLabel: tier
