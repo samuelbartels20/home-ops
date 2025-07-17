@@ -1,7 +1,4 @@
 ---
-# HAProxy Load Balancer HelmRelease
-# L4 load balancing with intelligent query routing and read/write split
-# Based on Netflix and Cloudflare production implementations
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
