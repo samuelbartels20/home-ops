@@ -250,6 +250,7 @@ metadata:
 type: Opaque
 stringData:
       PGBOUNCER_PASSWORD: op://K8s/pgbouncer-exporter-secret/PGBOUNCER_PASSWORD
+      
 
 ---
 apiVersion: v1
@@ -265,6 +266,7 @@ type: Opaque
 stringData:
       PGBOUNCER_PASSWORD: op://K8s/pgbouncer-auth/PGBOUNCER_PASSWORD
       POSTGRES_PASSWORD: op://K8s/pgbouncer-auth/POSTGRES_PASSWORD
+
 ---
 apiVersion: v1
 kind: Secret
