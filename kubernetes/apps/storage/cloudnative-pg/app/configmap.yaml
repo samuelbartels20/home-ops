@@ -27,7 +27,7 @@ data:
     log_rotation_age = 1d
     log_rotation_size = 100MB
 
-    shared_buffers = 4GB
+    shared_buffers = 256MB
     work_mem = 256MB
     maintenance_work_mem = 512MB
     effective_cache_size = 12GB
