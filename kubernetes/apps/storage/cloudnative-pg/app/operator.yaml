@@ -1,4 +1,4 @@
-# Production-grade configuration
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,7 +6,6 @@ metadata:
   namespace: storage
 data:
   operator.yaml: |
-    # Operator configuration
     apiVersion: v1
     kind: Config
     clusters:
