@@ -1,5 +1,4 @@
 ---
-# Service Account for Query Accelerator
 apiVersion: v1
 kind: ServiceAccount
 metadata:
