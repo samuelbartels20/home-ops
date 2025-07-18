@@ -1,9 +1,0 @@
----
-# Priority Class for Tenant Monitor
-apiVersion: scheduling.k8s.io/v1
-kind: PriorityClass
-metadata:
-  name: postgres-tenant-monitor-priority
-value: 1000
-globalDefault: false
-description: "Priority class for PostgreSQL tenant monitor"

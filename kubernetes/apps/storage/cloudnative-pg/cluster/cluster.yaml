@@ -68,23 +68,54 @@ spec:
   # Storage Configuration
   storage:
     size: 20Gi
-    storageClass: longhorn
+    storageClass: freenas-iscsi-csi
     resizeInUseVolumes: true
 
   # Dedicated WAL Storage for Performance
   walStorage:
-    size: 100Gi
-    storageClass: ultra-fast-ssd-retain
+    size: 50Gi
+    storageClass: freenas-iscsi-csi
     resizeInUseVolumes: true
+
+  # Backup configuration for MinIO via Barman
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      destinationPath: s3://postgres-backup
+      endpointURL: http://minio.storage.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: cloudnative-pg
+          key: minio_access_key_id
+        secretAccessKey:
+          name: cloudnative-pg
+          key: minio_secret_access_key
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        jobs: 2
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.161:9000
+        serverName: postgres-v2
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
 
   # PostgreSQL Configuration Tuning
   postgresql:
     parameters:
-      # Connection Settings
       max_connections: "100"
       superuser_reserved_connections: "10"
 
-      # Memory Settings
       shared_buffers: "256MB"
       effective_cache_size: "1GB"
       work_mem: "4MB"
@@ -93,7 +124,6 @@ spec:
       effective_io_concurrency: "200"
       random_page_cost: "1.1"
 
-      # WAL Settings
       wal_level: "replica"
       max_wal_senders: "20"
       max_replication_slots: "20"
@@ -103,7 +133,6 @@ spec:
       max_wal_size: "4GB"
       min_wal_size: "1GB"
 
-      # Query Planner Settings
       seq_page_cost: "1.0"
       cpu_tuple_cost: "0.01"
       cpu_index_tuple_cost: "0.005"
@@ -116,7 +145,6 @@ spec:
       parallel_tuple_cost: "0.1"
       parallel_setup_cost: "1000.0"
 
-      # Logging Settings
       log_destination: "csvlog"
       logging_collector: "on"
       log_directory: "/controller/log"
@@ -134,7 +162,6 @@ spec:
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
       log_statement: "ddl"
 
-      # Auto-vacuum Settings
       autovacuum: "on"
       autovacuum_max_workers: "10"
       autovacuum_naptime: "10"
@@ -145,40 +172,37 @@ spec:
       autovacuum_vacuum_cost_delay: "10ms"
       autovacuum_vacuum_cost_limit: "2000"
 
-      # Statistics Settings
       track_activities: "on"
       track_counts: "on"
       track_functions: "all"
       track_io_timing: "on"
 
-      # Security Settings
       ssl: "on"
       ssl_prefer_server_ciphers: "on"
       ssl_min_protocol_version: "TLSv1.2"
       password_encryption: "scram-sha-256"
 
-      # Lock Settings
       deadlock_timeout: "1s"
       lock_timeout: "30s"
       statement_timeout: "0"
       idle_in_transaction_session_timeout: "30min"
 
-      # Background Writer Settings
+
       bgwriter_delay: "200ms"
       bgwriter_lru_maxpages: "1000"
       bgwriter_lru_multiplier: "2.0"
       bgwriter_flush_after: "512kB"
 
-      # Archive Settings
+
       archive_mode: "on"
       archive_command: "barman-cloud-wal-archive --config /etc/barman.conf s3://postgres-backup %p"
       archive_timeout: "300s"
 
-      # Synchronous Replication
+
       synchronous_standby_names: "FIRST 2 (*)"
       synchronous_commit: "on"
 
-      # Additional Performance Settings
+
       huge_pages: "try"
       shared_preload_libraries: "pg_stat_statements,pg_buffercache"
       pg_stat_statements.max: "10000"
@@ -186,12 +210,12 @@ spec:
       pg_stat_statements.track_utility: "on"
       pg_stat_statements.save: "on"
 
-      # JSON and Full-Text Search
+
       default_text_search_config: "pg_catalog.english"
 
-      # Timezone
+
       timezone: "UTC"
       log_timezone: "UTC"
 
-      # New properties
+
       max_worker_processes: "8"

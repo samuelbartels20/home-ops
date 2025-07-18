@@ -7,6 +7,12 @@ resources:
   - ./configmap.yaml
   - ./rbac.yaml
   - ./service.yaml
+  - ./scheduledbackup.yaml
+  - ./pod-disruption-budget.yaml
+  - ./resource-quotas.yaml
+  - ./horizontal-pod-autoscaler.yaml
+  - ./tls-certificates.yaml
+  - ./audit-compliance.yaml
 commonLabels:
   app.kubernetes.io/name: pg-cluster
   app.kubernetes.io/instance: pg-cluster

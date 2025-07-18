@@ -1,0 +1,48 @@
+---
+# Audit Policy for PostgreSQL cluster
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-audit-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pg-cluster
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: storage
+data:
+  audit.conf: |
+    # PostgreSQL Audit Configuration
+    audit_enabled = on
+    audit_event = 'DDL,ROLE,GRANT,CONNECTION,LOGIN,LOGOUT'
+    audit_log_format = 'json'
+    audit_log_destination = 'syslog'
+    audit_log_facility = 'LOCAL0'
+    audit_log_level = 'INFO'
+    audit_log_rotation_age = '1d'
+    audit_log_rotation_size = '100MB'
+    audit_log_retention_days = '90'
+    audit_log_masking = on
+    audit_log_masking_patterns = 'password,credit_card,ssn'
+    audit_log_compliance = 'SOX,PCI-DSS,GDPR'
+    audit_log_alert_on_failure = on
+    audit_log_alert_threshold = '5'
+  
+  compliance.conf: |
+    # Compliance Configuration
+    data_classification = 'PII,PHI,PCI'
+    encryption_at_rest = 'required'
+    encryption_in_transit = 'required'
+    encryption_algorithm = 'AES-256'
+    access_control_model = 'RBAC'
+    least_privilege_principle = 'enforced'
+    data_retention_policy = '7_years'
+    data_deletion_policy = 'secure_wipe'
+    backup_encryption = 'required'
+    backup_retention = '90_days'
+    continuous_monitoring = 'enabled'
+    anomaly_detection = 'enabled'
+    real_time_alerting = 'enabled'
+    incident_response_time = '15_minutes'
+    breach_notification_time = '72_hours'
+    audit_trail_retention = '7_years'
+    audit_trail_integrity = 'cryptographic' 

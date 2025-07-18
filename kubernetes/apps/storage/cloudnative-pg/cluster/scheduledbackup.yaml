@@ -10,15 +10,3 @@ spec:
   schedule: "0 0 * * *"
   backupOwnerReference: self
   immediate: true
----
-apiVersion: postgresql.cnpg.io/v1
-kind: ScheduledBackup
-metadata:
-  name: immich-backup
-  namespace: storage
-spec:
-  schedule: "@daily"
-  immediate: true
-  backupOwnerReference: self
-  cluster:
-    name: immich

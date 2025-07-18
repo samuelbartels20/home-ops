@@ -1,0 +1,149 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-cluster-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pg-cluster
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: storage
+data:
+  # PostgreSQL cluster configuration
+  postgresql.conf: |
+    # Connection and Authentication
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    superuser_reserved_connections = 10
+    
+    # Memory Configuration
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    work_mem = 4MB
+    maintenance_work_mem = 64MB
+    wal_buffers = 64MB
+    
+    # WAL Configuration
+    wal_level = replica
+    max_wal_senders = 20
+    max_replication_slots = 20
+    wal_keep_size = 2GB
+    checkpoint_timeout = 15min
+    checkpoint_completion_target = 0.9
+    max_wal_size = 4GB
+    min_wal_size = 1GB
+    
+    # Logging Configuration
+    log_destination = 'csvlog'
+    logging_collector = on
+    log_directory = '/controller/log'
+    log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+    log_rotation_age = 1d
+    log_rotation_size = 100MB
+    log_min_duration_statement = 1000
+    log_checkpoints = on
+    log_connections = on
+    log_disconnections = on
+    log_lock_waits = on
+    log_statement = 'ddl'
+    
+    # Autovacuum Configuration
+    autovacuum = on
+    autovacuum_max_workers = 10
+    autovacuum_naptime = 10
+    autovacuum_vacuum_threshold = 50
+    autovacuum_vacuum_scale_factor = 0.1
+    autovacuum_analyze_threshold = 50
+    autovacuum_analyze_scale_factor = 0.05
+    
+    # Security Configuration
+    ssl = on
+    ssl_prefer_server_ciphers = on
+    ssl_min_protocol_version = 'TLSv1.2'
+    password_encryption = 'scram-sha-256'
+    
+    # Performance Tuning
+    effective_io_concurrency = 200
+    random_page_cost = 1.1
+    seq_page_cost = 1.0
+    cpu_tuple_cost = 0.01
+    cpu_index_tuple_cost = 0.005
+    cpu_operator_cost = 0.0025
+    
+    # Parallel Query Settings
+    max_parallel_workers = 4
+    max_parallel_workers_per_gather = 2
+    max_parallel_maintenance_workers = 2
+    
+    # Extensions and Libraries
+    shared_preload_libraries = 'pg_stat_statements,pg_buffercache'
+    pg_stat_statements.max = 10000
+    pg_stat_statements.track = all
+    pg_stat_statements.track_utility = on
+    pg_stat_statements.save = on
+    
+    # Replication Settings
+    synchronous_standby_names = 'FIRST 2 (*)'
+    synchronous_commit = on
+    
+    # Timeout Settings
+    deadlock_timeout = 1s
+    lock_timeout = 30s
+    statement_timeout = 0
+    idle_in_transaction_session_timeout = 30min
+    
+    # Background Writer
+    bgwriter_delay = 200ms
+    bgwriter_lru_maxpages = 1000
+    bgwriter_lru_multiplier = 2.0
+    bgwriter_flush_after = 512kB
+    
+    # Archive Settings
+    archive_mode = on
+    archive_command = 'barman-cloud-wal-archive --config /etc/barman.conf s3://postgres-backup %p'
+    archive_timeout = 300s
+    
+    # Monitoring
+    track_activities = on
+    track_counts = on
+    track_functions = all
+    track_io_timing = on
+    
+    # System Settings
+    timezone = 'UTC'
+    log_timezone = 'UTC'
+    max_worker_processes = 8
+    huge_pages = try
+    default_text_search_config = 'pg_catalog.english'
+  
+  # pg_hba.conf for client authentication
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            scram-sha-256
+    host    all             all             ::1/128                 scram-sha-256
+    host    all             all             0.0.0.0/0               scram-sha-256
+    host    replication     all             127.0.0.1/32            scram-sha-256
+    host    replication     all             ::1/128                 scram-sha-256
+    host    replication     all             0.0.0.0/0               scram-sha-256
+  
+  # Backup configuration
+  backup.conf: |
+    [barman]
+    barman_user = barman
+    configuration_files_directory = /etc/barman
+    log_file = /var/log/barman/barman.log
+    log_level = INFO
+    
+    [postgres]
+    description = "PostgreSQL Cluster"
+    ssh_command = ssh postgres@postgres-rw.storage.svc.cluster.local
+    conninfo = host=postgres-rw.storage.svc.cluster.local user=postgres dbname=postgres
+    backup_method = postgres
+    backup_options = exclusive_backup
+    archiver = on
+    archiver_batch_size = 50
+    retention_policy = RECOVERY WINDOW OF 30 DAYS
+    retry_times = 3
+    retry_sleep = 30 
