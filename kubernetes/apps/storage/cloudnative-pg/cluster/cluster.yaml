@@ -81,8 +81,8 @@ spec:
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
-      destinationPath: s3://postgres-backup
-      endpointURL: http://minio.storage.svc.cluster.local:9000
+      destinationPath: s3://pgbackup
+      endpointURL: http://192.168.8.161:9000
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg
