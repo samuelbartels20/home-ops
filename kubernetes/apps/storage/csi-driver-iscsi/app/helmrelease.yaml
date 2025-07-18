@@ -397,8 +397,6 @@ spec:
         allowVolumeExpansion: true
         parameters:
           fsType: ext4
-          iqn: iqn.2005-10.org.freenas.ctl:postgres
-          lun: 0
         mountOptions: []
         secrets:
           provisioner-secret:
