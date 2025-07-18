@@ -401,14 +401,8 @@ spec:
           controller-publish-secret:
           node-stage-secret:
             node-db.node.session.auth.authmethod: "CHAP"
-            node-db.node.session.auth.username:
-              secretRef:
-                name: truenas-iscsi
-                key: chap_username
-            node-db.node.session.auth.password:
-              secretRef:
-                name: truenas-iscsi
-                key: chap_password
+            node-db.node.session.auth.username: "root"
+            node-db.node.session.auth.password: "123456789123"
 
 
     # Volume snapshot classes
