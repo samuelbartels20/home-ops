@@ -17,15 +17,15 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  wait: true
+  wait: false
   interval: 30m
   retryInterval: 1m
   timeout: 5m
-  # dependsOn:
-  #   - name: external-secrets
-  #     namespace: security
-  #   - name: onepassword
-  #     namespace: security
+  dependsOn:
+    - name: external-secrets
+      namespace: security
+    - name: onepassword
+      namespace: security
 
 # ---
 # # PostgreSQL Analytics Engine
