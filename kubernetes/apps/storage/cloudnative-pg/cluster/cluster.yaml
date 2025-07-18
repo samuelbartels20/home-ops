@@ -36,11 +36,7 @@ spec:
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
-  resources:
-    requests:
-      cpu: 300m
-    limits:
-      memory: 1Gi
+
   bootstrap:
     initdb:
       database: app_db
