@@ -1,5 +1,4 @@
 ---
-# PostgreSQL cluster setup with optimized performance and security
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -23,17 +22,14 @@ metadata:
 spec:
   instances: 3
   minSyncReplicas: 2
-  maxSyncReplicas: 3
+  maxSyncReplicas: 2
 
-  # PostgreSQL Image with extensions
   imageName: ghcr.io/cloudnative-pg/postgresql:16.2
   imagePullPolicy: IfNotPresent
 
-  # Update Strategy
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
-  # Bootstrap Configuration
   bootstrap:
     initdb:
       database: app_db
@@ -51,7 +47,6 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gin;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-        - "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements,pg_buffercache';"
         - "SELECT pg_reload_conf();"
       postInitApplicationSQL:
         - "GRANT CONNECT ON DATABASE app_db TO app_user;"
@@ -60,24 +55,20 @@ spec:
         - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;"
         - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_user;"
 
-  # Superuser Configuration
   superuserSecret:
-    name: cloudnative-pg-secret
+    name: cloudnative-pg
   enableSuperuserAccess: true
 
-  # Storage Configuration
   storage:
     size: 20Gi
     storageClass: freenas-iscsi-csi
     resizeInUseVolumes: true
 
-  # Dedicated WAL Storage for Performance
   walStorage:
     size: 50Gi
     storageClass: freenas-iscsi-csi
     resizeInUseVolumes: true
 
-  # Backup configuration for MinIO via Barman
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
@@ -110,12 +101,10 @@ spec:
             name: cloudnative-pg
             key: minio_secret_access_key
 
-  # PostgreSQL Configuration Tuning
   postgresql:
     parameters:
       max_connections: "100"
       superuser_reserved_connections: "10"
-
       shared_buffers: "256MB"
       effective_cache_size: "1GB"
       work_mem: "4MB"
@@ -123,7 +112,6 @@ spec:
       wal_buffers: "64MB"
       effective_io_concurrency: "200"
       random_page_cost: "1.1"
-
       wal_level: "replica"
       max_wal_senders: "20"
       max_replication_slots: "20"
@@ -132,25 +120,18 @@ spec:
       checkpoint_completion_target: "0.9"
       max_wal_size: "4GB"
       min_wal_size: "1GB"
-
       seq_page_cost: "1.0"
       cpu_tuple_cost: "0.01"
       cpu_index_tuple_cost: "0.005"
       cpu_operator_cost: "0.0025"
-
-      # Parallel Query Settings
       max_parallel_workers: "4"
       max_parallel_workers_per_gather: "2"
       max_parallel_maintenance_workers: "2"
       parallel_tuple_cost: "0.1"
       parallel_setup_cost: "1000.0"
-
       log_destination: "csvlog"
       logging_collector: "on"
       log_directory: "/controller/log"
-      log_filename: "postgresql-%Y-%m-%d_%H%M%S.log"
-      log_rotation_age: "1d"
-      log_rotation_size: "100MB"
       log_min_duration_statement: "1000"
       log_checkpoints: "on"
       log_connections: "on"
@@ -161,7 +142,6 @@ spec:
       log_error_verbosity: "default"
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
       log_statement: "ddl"
-
       autovacuum: "on"
       autovacuum_max_workers: "10"
       autovacuum_naptime: "10"
@@ -171,51 +151,29 @@ spec:
       autovacuum_analyze_scale_factor: "0.05"
       autovacuum_vacuum_cost_delay: "10ms"
       autovacuum_vacuum_cost_limit: "2000"
-
       track_activities: "on"
       track_counts: "on"
       track_functions: "all"
       track_io_timing: "on"
-
-      ssl: "on"
-      ssl_prefer_server_ciphers: "on"
       ssl_min_protocol_version: "TLSv1.2"
       password_encryption: "scram-sha-256"
-
       deadlock_timeout: "1s"
       lock_timeout: "30s"
       statement_timeout: "0"
       idle_in_transaction_session_timeout: "30min"
-
-
       bgwriter_delay: "200ms"
       bgwriter_lru_maxpages: "1000"
       bgwriter_lru_multiplier: "2.0"
       bgwriter_flush_after: "512kB"
-
-
       archive_mode: "on"
-      archive_command: "barman-cloud-wal-archive --config /etc/barman.conf s3://postgres-backup %p"
       archive_timeout: "300s"
-
-
-      synchronous_standby_names: "FIRST 2 (*)"
       synchronous_commit: "on"
-
-
       huge_pages: "try"
-      shared_preload_libraries: "pg_stat_statements,pg_buffercache"
       pg_stat_statements.max: "10000"
       pg_stat_statements.track: "all"
       pg_stat_statements.track_utility: "on"
       pg_stat_statements.save: "on"
-
-
       default_text_search_config: "pg_catalog.english"
-
-
       timezone: "UTC"
       log_timezone: "UTC"
-
-
       max_worker_processes: "8"
