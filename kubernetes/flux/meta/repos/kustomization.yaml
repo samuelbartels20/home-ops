@@ -6,5 +6,5 @@ resources:
   - ./external-dns.yaml
   - ./external-secrets.yaml
   - ./bjw-s.yaml
-  - ./csi-driver-iscsi.yaml
-  - ./cloudnative-pg.yaml
+  # - ./csi-driver-iscsi.yaml
+  # - ./cloudnative-pg.yaml
