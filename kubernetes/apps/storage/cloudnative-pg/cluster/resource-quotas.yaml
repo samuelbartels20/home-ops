@@ -1,29 +1,29 @@
----
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: postgres-cluster-quota
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: storage
-spec:
-  hard:
-    requests.cpu: "8"
-    requests.memory: 8Gi
-    limits.cpu: "16"
-    limits.memory: 16Gi
-    requests.storage: 100Gi
-    persistentvolumeclaims: "10"
-    services: "5"
-    services.loadbalancers: "2"
-    pods: "10"
-    replicationcontrollers: "5"
-    resourcequotas: "1"
-    services.nodeports: "3"
-    count/persistentvolumeclaims: "10"
-    count/services.loadbalancers: "2"
+# ---
+# apiVersion: v1
+# kind: ResourceQuota
+# metadata:
+#   name: postgres-cluster-quota
+#   namespace: storage
+#   labels:
+#     app.kubernetes.io/name: pg-cluster
+#     app.kubernetes.io/component: database
+#     app.kubernetes.io/part-of: storage
+# spec:
+#   hard:
+#     requests.cpu: "8"
+#     requests.memory: 8Gi
+#     limits.cpu: "16"
+#     limits.memory: 16Gi
+#     requests.storage: 100Gi
+#     persistentvolumeclaims: "10"
+#     services: "5"
+#     services.loadbalancers: "2"
+#     pods: "10"
+#     replicationcontrollers: "5"
+#     resourcequotas: "1"
+#     services.nodeports: "3"
+#     count/persistentvolumeclaims: "10"
+#     count/services.loadbalancers: "2"
 ---
 apiVersion: v1
 kind: LimitRange
