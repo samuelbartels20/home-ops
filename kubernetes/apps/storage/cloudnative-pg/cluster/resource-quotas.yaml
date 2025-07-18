@@ -17,13 +17,13 @@ spec:
     requests.storage: 100Gi
     persistentvolumeclaims: "10"
     services: "5"
-    services.loadbalancers: "2"
+    services.loadbalancers: "3"
     pods: "10"
     replicationcontrollers: "5"
     resourcequotas: "1"
     services.nodeports: "3"
     count/persistentvolumeclaims: "10"
-    count/services.loadbalancers: "2"
+    count/services.loadbalancers: "3"
 ---
 apiVersion: v1
 kind: LimitRange
