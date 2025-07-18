@@ -152,12 +152,12 @@ spec:
             namePrefix: csi-
             nameSuffix: "-cluster"
           targetGroups:
-            - targetGroupPortalGroup: "3"
-              targetGroupInitiatorGroup: "5"
-              targetGroupAuthType: "CHAP"
-              targetGroupAuthGroup: "2"
-              iqn: "iqn.2005-10.org.freenas.ctl:postgres"
-              lun: "0"
+            - targetGroupPortalGroup: 3
+              targetGroupInitiatorGroup: 5
+              targetGroupAuthType: CHAP
+              targetGroupAuthGroup: 2
+              iqn: iqn.2005-10.org.freenas.ctl:postgres
+              lun: 0
           extentInsecureTpc: true
           extentXenCompat: false
           extentDisablePhysicalBlocksize: true
