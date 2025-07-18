@@ -406,7 +406,7 @@ spec:
           node-stage-secret:
             node-db.node.session.auth.authmethod: CHAP
             node-db.node.session.auth.username: root
-            node-db.node.session.auth.password: 123456789123
+            node-db.node.session.auth.password: 123456789S123
 
 
     # Volume snapshot classes
