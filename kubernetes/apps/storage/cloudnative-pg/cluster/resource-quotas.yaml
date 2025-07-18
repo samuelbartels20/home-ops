@@ -43,12 +43,6 @@ spec:
     max:
       cpu: 4Gi
       memory: 8Gi
-    default:
-      cpu: 500m
-      memory: 1Gi
-    defaultRequest:
-      cpu: 250m
-      memory: 512Mi
   - type: Container
     min:
       cpu: 100m
@@ -66,4 +60,4 @@ spec:
     min:
       storage: 1Gi
     max:
-      storage: 100Gi 
+      storage: 100Gi
