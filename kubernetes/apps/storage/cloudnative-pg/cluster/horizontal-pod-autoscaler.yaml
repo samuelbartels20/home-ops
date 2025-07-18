@@ -1,4 +1,3 @@
----
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -38,7 +37,7 @@ spec:
         name: postgres
       target:
         type: AverageValue
-        averageValue: 100
+        averageValue: "100"
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 60
@@ -59,4 +58,4 @@ spec:
       - type: Pods
         value: 1
         periodSeconds: 60
-      selectPolicy: Min 
+      selectPolicy: Min
