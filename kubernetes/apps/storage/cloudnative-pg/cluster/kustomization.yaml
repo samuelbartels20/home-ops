@@ -9,7 +9,7 @@ resources:
   - ./service.yaml
   - ./scheduledbackup.yaml
   - ./pod-disruption-budget.yaml
-  - ./resource-quotas.yaml
+  # - ./resource-quotas.yaml
   - ./horizontal-pod-autoscaler.yaml
   - ./tls-certificates.yaml
   - ./audit-compliance.yaml
