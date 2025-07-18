@@ -27,31 +27,31 @@ spec:
     - name: onepassword
       namespace: security
 
-# ---
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-cluster
-#   namespace: storage
-# spec:
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-#   interval: 30m
-#   path: ./kubernetes/apps/storage/cloudnative-pg/cluster
-#   prune: true
-#   retryInterval: 1m
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   targetNamespace: storage
-#   timeout: 3m
-#   wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-cluster
+  namespace: storage
+spec:
+  dependsOn:
+    - name: cloudnative-pg-operator
+      namespace: storage
+    - name: external-secrets
+      namespace: security
+    - name: onepassword
+      namespace: security
+  interval: 30m
+  path: ./kubernetes/apps/storage/cloudnative-pg/cluster
+  prune: true
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: storage
+  timeout: 3m
+  wait: false
 # ---
 # # PostgreSQL Analytics Engine
 # apiVersion: kustomize.toolkit.fluxcd.io/v1
