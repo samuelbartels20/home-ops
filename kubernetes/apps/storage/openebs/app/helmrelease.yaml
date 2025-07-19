@@ -23,19 +23,19 @@ spec:
     remediation:
       retries: 3
   values:
+    # Disable observability and backup components
+    alloy:
+      enabled: false
+
+    minio:
+      enabled: false
+
+    # Disable engines using alloy or minio
     engines:
       alloy:
         enabled: false
-        lvm:
-          enabled: false
-        zfs:
-          enabled: false
       minio:
         enabled: false
-        lvm:
-          enabled: false
-        zfs:
-          enabled: false
       local:
         lvm:
           enabled: false
@@ -44,17 +44,21 @@ spec:
       replicated:
         mayastor:
           enabled: false
+
+    # Disable CSI snapshots
     openebs-crds:
       csi:
         volumeSnapshots:
           enabled: false
+
+    # Configure hostpath provisioner
     localpv-provisioner:
       localpv:
         image:
-          registry: quay.io/
+          registry: quay.io
       helperPod:
         image:
-          registry: quay.io/
+          registry: quay.io
       hostpathClass:
         enabled: true
         name: openebs-hostpath
