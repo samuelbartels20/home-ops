@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -61,7 +62,7 @@ spec:
       data:
         compression: bzip2
         jobs: 2
-      serverName: postgres17-v2
+      serverName: &currentCluster postgres17-v1
   walStorage:
     size: 10Gi
     storageClass: openebs-hostpath
@@ -86,7 +87,7 @@ spec:
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.161:9000
-        serverName: postgres-v2
+        serverName: postgres17-v1
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg
