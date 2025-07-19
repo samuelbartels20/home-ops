@@ -23,9 +23,9 @@ spec:
     remediation:
       retries: 3
   values:
-    loki:
+    openebs-loki:
       enabled: false
-    prometheus:
+    openebs-prometheus:
       enabled: false
     grafana:
       enabled: false
@@ -34,7 +34,7 @@ spec:
     alloy:
       enabled: false
 
-    minio:
+    openebs-minio:
       enabled: false
 
     # Disable engines using alloy or minio
