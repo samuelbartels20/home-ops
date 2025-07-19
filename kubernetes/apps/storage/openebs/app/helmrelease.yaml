@@ -88,8 +88,6 @@ spec:
         image:
           registry: quay.io
           repository: openebs/provisioner-localpv
-          tag: "4.3.0"
-          pullPolicy: IfNotPresent
         
 
         resources:
@@ -110,8 +108,6 @@ spec:
         image:
           registry: quay.io
           repository: openebs/linux-utils
-          tag: "latest"
-          pullPolicy: IfNotPresent
       
       # Hostpath storage class configuration
       hostpathClass:
@@ -159,7 +155,6 @@ spec:
       image:
         registry: quay.io
         repository: openebs/linux-utils
-        tag: "latest"
 
 ---
 # Network policy to secure storage namespace
