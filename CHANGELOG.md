@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.19.19
+
+Date-based release for 2025-07-19
+
+### Changes
+- feat(cloudnative-pg) deployed the cluster
+- chore(release): 2025.07.19.18 [skip ci]
+
 ##  v2025.07.19.18
 
 Date-based release for 2025-07-19
