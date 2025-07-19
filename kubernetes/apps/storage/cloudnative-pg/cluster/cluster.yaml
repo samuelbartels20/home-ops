@@ -118,14 +118,6 @@ spec:
         - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
         - 'SELECT pg_reload_conf();'
 
-  monitoring:
-    enabled: true
-    customQueriesConfigMap:
-      - name: postgresql-monitoring-queries
-        key: custom-queries.yaml
-    customQueriesSecret:
-      - name: postgresql-monitoring-secret
-        key: secret-queries.yaml
 
 
   externalClusters:
