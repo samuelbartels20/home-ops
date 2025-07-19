@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.19.42
+
+Date-based release for 2025-07-19
+
+### Changes
+- Remove Longhorn configuration and restore Longhorn files
+- chore(release): 2025.07.19.41 [skip ci]
+
 ##  v2025.07.19.41
 
 Date-based release for 2025-07-19
