@@ -28,7 +28,8 @@ spec:
     remediation:
       retries: 3
     timeout: 10m
-
+  preUpgrade:
+    skipValidation: true
   values:
     # Disable all observability components
     openebs-loki:
