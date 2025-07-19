@@ -65,12 +65,12 @@ spec:
 
   storage:
     size: 20Gi
-    storageClass: freenas-iscsi-csi
+    storageClass: longhorn
     resizeInUseVolumes: true
 
   walStorage:
     size: 50Gi
-    storageClass: freenas-iscsi-csi
+    storageClass: longhorn
     resizeInUseVolumes: true
 
   backup:
