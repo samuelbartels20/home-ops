@@ -36,11 +36,11 @@ spec:
 
   resources:
     requests:
-      memory: "1Gi"
-      cpu: "500m"
+      memory: 1Gi
+      cpu: 500m
     limits:
-      memory: "2Gi"
-      cpu: "2000m"
+      memory: 1Gi
+      cpu: 2000m
       
       # Node Selectors and Tolerations
       nodeSelector:
