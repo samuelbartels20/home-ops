@@ -36,15 +36,15 @@ spec:
 
   bootstrap:
     initdb:
-      database: postgres
-      owner: postgres
+      database: app_db
+      owner: app_user
       secret:
-        name: cloudnative-pg
+        name: postgres-app-secret
       postInitSQL:
         - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
         - "CREATE EXTENSION IF NOT EXISTS pg_buffercache;"
         - "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
-        - "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+        - "CREATE EXTENSION IF NOT EXISTS uuid-ossp;"
         - "CREATE EXTENSION IF NOT EXISTS ltree;"
         - "CREATE EXTENSION IF NOT EXISTS hstore;"
         - "CREATE EXTENSION IF NOT EXISTS citext;"
@@ -53,23 +53,23 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS btree_gist;"
         - "SELECT pg_reload_conf();"
       postInitApplicationSQL:
-        - "GRANT CONNECT ON DATABASE postgres TO postgres;"
-        - "GRANT USAGE ON SCHEMA public TO postgres;"
-        - "GRANT CREATE ON SCHEMA public TO postgres;"
-        - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO postgres;"
-        - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO postgres;"
+        - "GRANT CONNECT ON DATABASE app_db TO app_user;"
+        - "GRANT USAGE ON SCHEMA public TO app_user;"
+        - "GRANT CREATE ON SCHEMA public TO app_user;"
+        - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;"
+        - "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_user;"
 
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
 
   storage:
-    size: 20Gi
+    size: 10Gi
     storageClass: longhorn
     resizeInUseVolumes: true
 
   walStorage:
-    size: 50Gi
+    size: 10Gi
     storageClass: longhorn
     resizeInUseVolumes: true
 
