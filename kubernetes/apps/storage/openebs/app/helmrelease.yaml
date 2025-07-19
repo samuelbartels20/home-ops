@@ -4,8 +4,17 @@ kind: HelmRelease
 metadata:
   name: openebs
   namespace: storage
+  labels:
+    app.kubernetes.io/name: openebs
+    app.kubernetes.io/component: storage
+  annotations:
+    flux.weave.works/automated: "false"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      Applied by: samuelbartels20
+      Date: 2025-07-19 11:35:34
 spec:
   interval: 5m
+  timeout: 10m
   chart:
     spec:
       chart: openebs
@@ -18,26 +27,35 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
+    timeout: 10m
   upgrade:
+    crds: CreateReplace
     cleanupOnFail: true
     remediation:
       retries: 3
+    timeout: 10m
   values:
+    # Disable all observability components
     openebs-loki:
       enabled: false
+    
     openebs-prometheus:
       enabled: false
+    
     grafana:
       enabled: false
+    
     alertmanager:
-    # Disable observability and backup components
+      enabled: false
+    
     alloy:
       enabled: false
 
+    # Disable MinIO and backup components
     openebs-minio:
       enabled: false
 
-    # Disable engines using alloy or minio
+    # Disable advanced storage engines
     engines:
       alloy:
         enabled: false
@@ -51,23 +69,131 @@ spec:
       replicated:
         mayastor:
           enabled: false
+        jiva:
+          enabled: false
+      cStor:
+        enabled: false
 
-    # Disable CSI snapshots
+    # Disable volume snapshots
     openebs-crds:
       csi:
         volumeSnapshots:
           enabled: false
 
-    # Configure hostpath provisioner
+    # Enable only Local PV Provisioner (hostpath)
     localpv-provisioner:
+      enabled: true
       localpv:
+        enabled: true
         image:
           registry: quay.io
+          repository: openebs/provisioner-localpv
+          tag: "4.3.1"
+          pullPolicy: IfNotPresent
+        
+
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+        
+
+        nodeSelector: {}
+        
+
+        tolerations: []
+        
       helperPod:
         image:
           registry: quay.io
+          repository: openebs/linux-utils
+          tag: "4.3.1"
+          pullPolicy: IfNotPresent
+      
+      # Hostpath storage class configuration
       hostpathClass:
         enabled: true
         name: openebs-hostpath
         isDefaultClass: false
+        reclaimPolicy: Delete
+        volumeBindingMode: WaitForFirstConsumer
         basePath: /var/openebs/local
+        
+
+        additionalStorageClasses:
+          - name: openebs-hostpath-ssd
+            isDefaultClass: false
+            reclaimPolicy: Delete
+            volumeBindingMode: WaitForFirstConsumer
+            basePath: /var/openebs/ssd
+            nodeAffinityLabels:
+              - key: node-type
+                operator: In
+                values: ["ssd", "nvme"]
+          
+          - name: openebs-hostpath-hdd
+            isDefaultClass: false
+            reclaimPolicy: Delete
+            volumeBindingMode: WaitForFirstConsumer
+            basePath: /var/openebs/hdd
+            nodeAffinityLabels:
+              - key: node-type
+                operator: In
+                values: ["hdd", "storage"]
+
+
+    ndm:
+      enabled: false
+    
+    ndmOperator:
+      enabled: false
+    
+    webhook:
+      enabled: false
+    
+    # Cleanup configurations
+    cleanup:
+      image:
+        registry: quay.io
+        repository: openebs/linux-utils
+        tag: "4.3.1"
+
+---
+# Network policy to secure storage namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: storage-network-policy
+  namespace: storage
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: storage
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: applications
+  egress:
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53  
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 123  
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: storage
