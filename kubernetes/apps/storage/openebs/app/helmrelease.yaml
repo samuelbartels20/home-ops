@@ -24,6 +24,18 @@ spec:
       retries: 3
   values:
     engines:
+      alloy:
+        enabled: false
+        lvm:
+          enabled: false
+        zfs:
+          enabled: false
+      minio:
+        enabled: false
+        lvm:
+          enabled: false
+        zfs:
+          enabled: false
       local:
         lvm:
           enabled: false

@@ -8,4 +8,4 @@ resources:
   - ./bjw-s.yaml
   - ./openebs.yaml
   # - ./cloudnative-pg.yaml
-  # - ./longhorn.yaml
+  - ./longhorn.yaml

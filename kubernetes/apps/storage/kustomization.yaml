@@ -9,4 +9,3 @@ resources:
   - ./csi-driver-nfs/ks.yaml
   - ./openebs/ks.yaml
   # - ./cloudnative-pg/ks.yaml
-  # - ./longhorn/ks.yaml
