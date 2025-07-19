@@ -41,6 +41,50 @@ spec:
     limits:
       memory: "2Gi"
       cpu: "2000m"
+  podTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/component: database
+    spec:
+      # Security Context at pod level
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 26
+        runAsGroup: 26
+        fsGroup: 26
+        fsGroupChangePolicy: "OnRootMismatch"
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Anti-Affinity Rules
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                cnpg.io/cluster: postgres17
+            topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                - database
+      
+      # Node Selectors and Tolerations
+      nodeSelector:
+        node-type: database
+      
+      tolerations:
+        - key: "database"
+          operator: "Equal"
+          value: "true"
+          effect: "NoSchedule"
+
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
@@ -48,36 +92,6 @@ spec:
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
-
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: postgres
-            app.kubernetes.io/component: database
-        topologyKey: kubernetes.io/hostname
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-          - key: node-type
-            operator: In
-            values:
-            - database
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 26
-    runAsGroup: 26
-    fsGroup: 26
-    fsGroupChangePolicy: "OnRootMismatch"
-    seccompProfile:
-      type: RuntimeDefault
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-      - ALL
 
   storage:
     size: 10Gi
