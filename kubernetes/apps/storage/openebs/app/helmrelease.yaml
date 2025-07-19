@@ -23,6 +23,13 @@ spec:
     remediation:
       retries: 3
   values:
+    loki:
+      enabled: false
+    prometheus:
+      enabled: false
+    grafana:
+      enabled: false
+    alertmanager:
     # Disable observability and backup components
     alloy:
       enabled: false
