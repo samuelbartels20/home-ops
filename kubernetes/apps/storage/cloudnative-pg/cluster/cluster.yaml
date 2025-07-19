@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres
+  name: postgres17
   namespace: storage
   labels:
     app.kubernetes.io/name: postgres
@@ -61,6 +61,25 @@ spec:
       data:
         compression: bzip2
         jobs: 2
+      serverName: postgres17-v2
+  walStorage:
+    size: 10Gi
+    storageClass: openebs-hostpath
+    resizeInUseVolumes: true
+
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: cloudnative-pg
+      postInitSQL:
+        - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
+        - 'CREATE EXTENSION IF NOT EXISTS pg_buffercache;'
+        - 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+        - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+        - 'CREATE EXTENSION IF NOT EXISTS ltree;'
+        - 'CREATE EXTENSION IF NOT EXISTS hstore;'
 
   externalClusters:
     - name: clusterBackup
