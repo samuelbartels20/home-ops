@@ -41,7 +41,7 @@ spec:
     engines:
       alloy:
         enabled: false
-      minio:
+      openebs-minio:
         enabled: false
       local:
         lvm:
