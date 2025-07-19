@@ -8,5 +8,5 @@ components:
 resources:
   - ./csi-driver-nfs/ks.yaml
   # - ./csi-driver-iscsi/ks.yaml
-  - ./cloudnative-pg/ks.yaml
+  # - ./cloudnative-pg/ks.yaml
   - ./longhorn/ks.yaml
