@@ -28,29 +28,16 @@ spec:
   minSyncReplicas: 2
   maxSyncReplicas: 2
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:17.2
-  imagePullPolicy: IfNotPresent
+  images:
+    - major: 17
+      image: ghcr.io/cloudnative-pg/postgresql:17.2
+      plugins:
+        - name: barman-cloud
+          image: ghcr.io/cloudnative-pg/postgres-barman-cloud:latest
 
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
-  # resources:
-  #   requests:
-  #     memory: 1Gi
-  #     cpu: 500m
-  #   limits:
-  #     memory: 1Gi
-  #     cpu: 2000m
-      
-  #     # Node Selectors and Tolerations
-  #     nodeSelector:
-  #       node-type: database
-      
-  #     tolerations:
-  #       - key: "database"
-  #         operator: "Equal"
-  #         value: "true"
-  #         effect: "NoSchedule"
 
   nodeMaintenanceWindow:
     inProgress: false
