@@ -20,6 +20,9 @@ metadata:
     backup.cnpg.io/retention-policy: "30d"
     security.cnpg.io/fips-enabled: "true"
     monitoring.cnpg.io/enabled: "true"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      Applied by: samuelbartels20
+      Date: 2025-07-19T10:00:00Z
 spec:
   instances: 3
   minSyncReplicas: 2
@@ -31,6 +34,13 @@ spec:
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
@@ -39,10 +49,50 @@ spec:
     name: cloudnative-pg
   enableSuperuserAccess: true
 
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: postgres
+            app.kubernetes.io/component: database
+        topologyKey: kubernetes.io/hostname
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: node-type
+            operator: In
+            values:
+            - database
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 26
+    runAsGroup: 26
+    fsGroup: 26
+    fsGroupChangePolicy: "OnRootMismatch"
+    seccompProfile:
+      type: RuntimeDefault
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+
   storage:
     size: 10Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
+    accessModes:
+      - ReadWriteOnce
+    volumeMode: Filesystem
+
+  walStorage:
+    size: 10Gi
+    storageClass: openebs-hostpath
+    resizeInUseVolumes: true
+    accessModes:
+      - ReadWriteOnce
 
   backup:
     retentionPolicy: "30d"
@@ -63,10 +113,10 @@ spec:
         compression: bzip2
         jobs: 2
       serverName: &currentCluster postgres17-v1
-  walStorage:
-    size: 10Gi
-    storageClass: openebs-hostpath
-    resizeInUseVolumes: true
+      tags:
+        environment: production
+        cluster: postgres17
+        backup-type: comprehensive
 
   bootstrap:
     initdb:
@@ -74,6 +124,10 @@ spec:
       owner: postgres
       secret:
         name: cloudnative-pg
+      options:
+        - "--encoding=UTF8"
+        - "--locale=en_US.UTF-8"
+        - "--data-checksums"
       postInitSQL:
         - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
         - 'CREATE EXTENSION IF NOT EXISTS pg_buffercache;'
@@ -81,13 +135,29 @@ spec:
         - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
         - 'CREATE EXTENSION IF NOT EXISTS ltree;'
         - 'CREATE EXTENSION IF NOT EXISTS hstore;'
+        - 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
+        - 'CREATE EXTENSION IF NOT EXISTS btree_gin;'
+        - 'CREATE EXTENSION IF NOT EXISTS btree_gist;'
+        - 'ALTER SYSTEM SET log_statement = ''all'';'
+        - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
+        - 'SELECT pg_reload_conf();'
+
+  monitoring:
+    enabled: true
+    customQueriesConfigMap:
+      - name: postgresql-monitoring-queries
+        key: custom-queries.yaml
+    customQueriesSecret:
+      - name: postgresql-monitoring-secret
+        key: secret-queries.yaml
+
 
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.161:9000
-        serverName: postgres17-v1
+        serverName: postgres17-production
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg
@@ -95,38 +165,81 @@ spec:
           secretAccessKey:
             name: cloudnative-pg
             key: minio_secret_access_key
-
   postgresql:
     parameters:
-      max_connections: "100"
-      superuser_reserved_connections: "10"
-      shared_buffers: "256MB"
-      effective_cache_size: "1GB"
-      work_mem: "4MB"
-      maintenance_work_mem: "64MB"
+      max_connections: "200"
+      superuser_reserved_connections: "5"
+      
+      shared_buffers: "1GB"
+      effective_cache_size: "3GB"
+      work_mem: "8MB"
+      maintenance_work_mem: "256MB"
       wal_buffers: "64MB"
+      
       effective_io_concurrency: "200"
       random_page_cost: "1.1"
-      wal_level: "replica"
-      max_wal_senders: "20"
-      max_replication_slots: "20"
-      wal_keep_size: "2GB"
-      checkpoint_timeout: "15min"
-      checkpoint_completion_target: "0.9"
-      max_wal_size: "4GB"
-      min_wal_size: "1GB"
       seq_page_cost: "1.0"
       cpu_tuple_cost: "0.01"
       cpu_index_tuple_cost: "0.005"
       cpu_operator_cost: "0.0025"
+      
       max_parallel_workers: "4"
       max_parallel_workers_per_gather: "2"
       max_parallel_maintenance_workers: "2"
       parallel_tuple_cost: "0.1"
       parallel_setup_cost: "1000.0"
-      log_destination: "csvlog"
+      max_worker_processes: "8"
+      
+      wal_level: "replica"
+      max_wal_senders: "10"
+      max_replication_slots: "10"
+      wal_keep_size: "4GB"
+      checkpoint_timeout: "10min"
+      checkpoint_completion_target: "0.9"
+      max_wal_size: "8GB"
+      min_wal_size: "2GB"
+      archive_mode: "on"
+      archive_timeout: "300s"
+      synchronous_commit: "on"
+      hot_standby: "on"
+      hot_standby_feedback: "on"
+      ssl: "on"
+      ssl_cert_file: "/controller/certificates/tls.crt"
+      ssl_key_file: "/controller/certificates/tls.key"
+      ssl_ca_file: "/controller/certificates/ca.crt"
+      ssl_prefer_server_ciphers: "on"
+      ssl_ciphers: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384"
+      ssl_min_protocol_version: "TLSv1.2"
+      ssl_max_protocol_version: "TLSv1.3"
+      password_encryption: "scram-sha-256"
+      row_security: "on"
+      deadlock_timeout: "1s"
+      lock_timeout: "60s"
+      statement_timeout: "300s"
+      idle_in_transaction_session_timeout: "30min"
+      bgwriter_delay: "200ms"
+      bgwriter_lru_maxpages: "1000"
+      bgwriter_lru_multiplier: "2.0"
+      bgwriter_flush_after: "512kB"
+      autovacuum: "on"
+      autovacuum_max_workers: "6"
+      autovacuum_naptime: "30s"
+      autovacuum_vacuum_threshold: "50"
+      autovacuum_vacuum_scale_factor: "0.05"
+      autovacuum_analyze_threshold: "50"
+      autovacuum_analyze_scale_factor: "0.02"
+      autovacuum_vacuum_cost_delay: "2ms"
+      autovacuum_vacuum_cost_limit: "2000"
+      autovacuum_vacuum_insert_threshold: "1000"
+      autovacuum_vacuum_insert_scale_factor: "0.2"
+      log_destination: "csvlog,stderr"
       logging_collector: "on"
       log_directory: "/controller/log"
+      log_filename: "postgresql-%Y-%m-%d_%H%M%S.log"
+      log_file_mode: "0600"
+      log_rotation_age: "1d"
+      log_rotation_size: "100MB"
+      log_truncate_on_rotation: "on"
       log_min_duration_statement: "1000"
       log_checkpoints: "on"
       log_connections: "on"
@@ -136,39 +249,27 @@ spec:
       log_autovacuum_min_duration: "0"
       log_error_verbosity: "default"
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
-      log_statement: "ddl"
-      autovacuum: "on"
-      autovacuum_max_workers: "10"
-      autovacuum_naptime: "10"
-      autovacuum_vacuum_threshold: "50"
-      autovacuum_vacuum_scale_factor: "0.1"
-      autovacuum_analyze_threshold: "50"
-      autovacuum_analyze_scale_factor: "0.05"
-      autovacuum_vacuum_cost_delay: "10ms"
-      autovacuum_vacuum_cost_limit: "2000"
+      log_statement: "all"  
+      log_replication_commands: "on"
+      log_recovery_conflict_waits: "on"
       track_activities: "on"
       track_counts: "on"
       track_functions: "all"
       track_io_timing: "on"
-      ssl_min_protocol_version: "TLSv1.2"
-      password_encryption: "scram-sha-256"
-      deadlock_timeout: "1s"
-      lock_timeout: "30s"
-      statement_timeout: "0"
-      idle_in_transaction_session_timeout: "30min"
-      bgwriter_delay: "200ms"
-      bgwriter_lru_maxpages: "1000"
-      bgwriter_lru_multiplier: "2.0"
-      bgwriter_flush_after: "512kB"
-      archive_mode: "on"
-      archive_timeout: "300s"
-      synchronous_commit: "on"
-      huge_pages: "try"
+      track_wal_io_timing: "on"
+      compute_query_id: "on"
       pg_stat_statements.max: "10000"
       pg_stat_statements.track: "all"
       pg_stat_statements.track_utility: "on"
+      pg_stat_statements.track_planning: "on"
       pg_stat_statements.save: "on"
       default_text_search_config: "pg_catalog.english"
       timezone: "UTC"
       log_timezone: "UTC"
-      max_worker_processes: "8"
+      huge_pages: "try"
+      shared_preload_libraries: "pg_stat_statements,pg_buffercache"
+      synchronous_standby_names: "*"
+      vacuum_cost_delay: "2ms"
+      vacuum_cost_limit: "2000"
+      gin_pending_list_limit: "4MB"
+      

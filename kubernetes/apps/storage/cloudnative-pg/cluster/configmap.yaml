@@ -138,8 +138,8 @@ data:
     
     [postgres]
     description = "PostgreSQL Cluster"
-    ssh_command = ssh postgres@postgres-rw.storage.svc.cluster.local
-    conninfo = host=postgres-rw.storage.svc.cluster.local user=postgres dbname=postgres
+    ssh_command = ssh postgres@192.168.8.101
+    conninfo = host=192.168.8.101 user=postgres dbname=postgres
     backup_method = postgres
     backup_options = exclusive_backup
     archiver = on
@@ -147,3 +147,32 @@ data:
     retention_policy = RECOVERY WINDOW OF 30 DAYS
     retry_times = 3
     retry_sleep = 30 
+
+  custom-queries.yaml: |
+    pg_database:
+      query: "SELECT pg_database.datname, pg_database_size(pg_database.datname) as size FROM pg_database"
+      master: true
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - size:
+            usage: "GAUGE"
+            description: "Disk space used by the database"
+
+    pg_stat_user_tables:
+      query: "SELECT schemaname, tablename, n_live_tup, n_dead_tup FROM pg_stat_user_tables"
+      master: true
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Name of the schema"
+        - tablename:
+            usage: "LABEL"
+            description: "Name of the table"
+        - n_live_tup:
+            usage: "GAUGE"
+            description: "Number of live rows"
+        - n_dead_tup:
+            usage: "GAUGE"
+            description: "Number of dead rows"   
