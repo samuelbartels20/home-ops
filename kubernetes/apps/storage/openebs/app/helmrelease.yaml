@@ -175,10 +175,10 @@ spec:
           name: storage
     - namespaceSelector:
         matchLabels:
-          name: monitoring
+          name: observability
     - namespaceSelector:
         matchLabels:
-          name: applications
+          name: services
   egress:
   - to: []
     ports:
