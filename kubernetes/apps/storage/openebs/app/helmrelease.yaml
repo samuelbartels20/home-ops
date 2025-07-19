@@ -87,7 +87,6 @@ spec:
         enabled: true
         image:
           registry: quay.io
-          repository: openebs/provisioner-localpv
         
 
         resources:
@@ -107,7 +106,6 @@ spec:
       helperPod:
         image:
           registry: quay.io
-          repository: openebs/linux-utils
       
       # Hostpath storage class configuration
       hostpathClass:
