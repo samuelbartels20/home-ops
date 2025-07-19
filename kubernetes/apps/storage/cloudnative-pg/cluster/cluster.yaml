@@ -34,33 +34,6 @@ spec:
     inProgress: false
     reusePVC: true
 
-bootstrap:
-  initdb:
-    database: postgres
-    owner: postgres
-    secret:
-      name: cloudnative-pg
-    postInitSQL:
-      - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
-      - 'CREATE EXTENSION IF NOT EXISTS pg_buffercache;'
-      - 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
-      - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
-      - 'CREATE EXTENSION IF NOT EXISTS ltree;'
-      - 'CREATE EXTENSION IF NOT EXISTS hstore;'
-      - 'CREATE EXTENSION IF NOT EXISTS citext;'
-      - 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
-      - 'CREATE EXTENSION IF NOT EXISTS btree_gin;'
-      - 'CREATE EXTENSION IF NOT EXISTS btree_gist;'
-      - 'SELECT pg_reload_conf();'
-    postInitApplicationSQL:
-      - 'GRANT CONNECT ON DATABASE postgres TO postgres;'
-      - 'GRANT USAGE ON SCHEMA public TO postgres;'
-      - 'GRANT CREATE ON SCHEMA public TO postgres;'
-      - 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO postgres;'
-      - 'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO postgres;'
-
-
-
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
