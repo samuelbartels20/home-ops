@@ -39,7 +39,7 @@ spec:
       database: app_db
       owner: app_user
       secret:
-        name: postgres-app-secret
+        name: cloudnative-pg
       postInitSQL:
         - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
         - "CREATE EXTENSION IF NOT EXISTS pg_buffercache;"
