@@ -36,9 +36,10 @@ spec:
     inProgress: false
     reusePVC: true
 
+  enableSuperuserAccess: true
   superuserSecret:
     name: cloudnative-pg
-  enableSuperuserAccess: true
+
 
   storage:
     size: 10Gi
@@ -68,12 +69,26 @@ spec:
       data:
         compression: bzip2
         jobs: 2
-      serverName: &currentCluster postgres17-v1
+      serverName: &currentCluster postgres17-003
       tags:
         environment: production
         cluster: postgres17
         backup-type: comprehensive
 
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.161:9000
+        serverName: postgres17-002
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
+            
   bootstrap:
     initdb:
       database: postgres
@@ -97,22 +112,44 @@ spec:
         - 'ALTER SYSTEM SET log_statement = ''all'';'
         - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
         - 'SELECT pg_reload_conf();'
+      recovery:
+        recoveryTarget: "latest"
+        recoveryTargetTime: "2025-07-19 10:00:00"
+        recoveryTargetAction: "promote"
+        recoveryTargetTimeline: "latest"
+        recoveryTargetXID: "0"
+        recoveryTargetXIDAge: "0"
+        source:
+          type: s3
+          s3:
+            endpointURL: http://192.168.8.161:9000
+            bucket: pgbackup
+            accessKeyId:
+              name: cloudnative-pg
+              key: minio_access_key_id
+            secretAccessKey:
+              name: cloudnative-pg
+              key: minio_secret_access_key
+            region: ""
+            prefix: ""
+            ssl: "false"
+            compression: "bzip2"
+            maxParallel: "8"
+            jobs: "2"
+            serverName: "postgres17-002"
+            tags:
+              environment: production
+              cluster: postgres17
+              backup-type: comprehensive
+              tier: data
+              backup-policy: comprehensive
+              cnpg.io/cluster-size: "3"
+              cnpg.io/primary-update-strategy: supervised
+              cnpg.io/hibernation: "off"
+              backup.cnpg.io/retention-policy: "30d"
 
 
 
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: s3://pgbackup
-        endpointURL: http://192.168.8.161:9000
-        serverName: postgres17-backup
-        s3Credentials:
-          accessKeyId:
-            name: cloudnative-pg
-            key: minio_access_key_id
-          secretAccessKey:
-            name: cloudnative-pg
-            key: minio_secret_access_key
   postgresql:
     parameters:
       max_connections: "200"
