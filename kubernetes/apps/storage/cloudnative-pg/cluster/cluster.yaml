@@ -112,21 +112,21 @@ spec:
         - 'ALTER SYSTEM SET log_statement = ''all'';'
         - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
         - 'SELECT pg_reload_conf();'
-      recovery:
-        recoveryTarget: "latest"
-        recoveryTargetTime: "2025-07-19 10:00:00"
-        recoveryTargetAction: "promote"
-        recoveryTargetTimeline: "latest"
-        recoveryTargetXID: "0"
-        recoveryTargetXIDAge: "0"
-        source:
-          type: s3
-          s3:
-            endpointURL: http://192.168.8.161:9000
-            bucket: pgbackup
-            accessKeyId:
-              name: cloudnative-pg
-              key: minio_access_key_id
+    recovery:
+      recoveryTarget: "latest"
+      recoveryTargetTime: "2025-07-19 10:00:00"
+      recoveryTargetAction: "promote"
+      recoveryTargetTimeline: "latest"
+      recoveryTargetXID: "0"
+      recoveryTargetXIDAge: "0"
+      source:
+        type: s3
+        s3:
+          endpointURL: http://192.168.8.161:9000
+          bucket: pgbackup
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
             secretAccessKey:
               name: cloudnative-pg
               key: minio_secret_access_key
