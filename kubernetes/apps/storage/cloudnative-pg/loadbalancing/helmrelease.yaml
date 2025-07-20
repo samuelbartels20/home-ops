@@ -12,6 +12,17 @@ metadata:
     environment: production
     tier: middleware
 spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: haproxy
+      app.kubernetes.io/instance: haproxy-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: haproxy
+        app.kubernetes.io/instance: haproxy-postgres
+        app.kubernetes.io/component: load-balancer
+        monitoring: "true"
   interval: 30m
   chart:
     spec:
@@ -110,6 +121,7 @@ spec:
         pod:
           labels:
             app.kubernetes.io/name: haproxy
+            app.kubernetes.io/instance: haproxy-postgres
             app.kubernetes.io/component: load-balancer
             monitoring: "true"
             security-scan: "required"
