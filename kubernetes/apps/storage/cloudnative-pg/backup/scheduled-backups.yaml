@@ -27,7 +27,6 @@ spec:
   method: barmanObjectStore
   target: primary
 
-  retentionPolicy: "90d"
 
   online: true
 
@@ -70,7 +69,6 @@ spec:
   method: barmanObjectStore
   target: prefer-standby
 
-  retentionPolicy: "365d"
 
   online: true
 
