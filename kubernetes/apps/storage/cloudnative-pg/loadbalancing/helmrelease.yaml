@@ -34,6 +34,10 @@ spec:
   values:
     controllers:
       main:
+        labels:
+          app.kubernetes.io/name: haproxy
+          app.kubernetes.io/instance: haproxy-postgres
+          app.kubernetes.io/component: main
         replicas: 3
         strategy: RollingUpdate
         annotations:
@@ -48,11 +52,9 @@ spec:
               repository: haproxytech/haproxy-alpine
               tag: "2.8"
               pullPolicy: IfNotPresent
-
             env:
               HAPROXY_USER: "haproxy"
               HAPROXY_GROUP: "haproxy"
-
             resources:
               requests:
                 cpu: 1000m
@@ -62,7 +64,6 @@ spec:
                 cpu: 4000m
                 memory: 2Gi
                 ephemeral-storage: 2Gi
-
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -82,12 +83,10 @@ spec:
               repository: prom/haproxy-exporter
               tag: "v0.15.0"
               pullPolicy: IfNotPresent
-
             args:
               - --haproxy.scrape-uri=http://127.0.0.1:8404/stats?stats;csv
               - --web.listen-address=:9101
               - --web.telemetry-path=/metrics
-
             resources:
               requests:
                 cpu: 50m
@@ -95,7 +94,6 @@ spec:
               limits:
                 cpu: 200m
                 memory: 128Mi
-
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
@@ -109,16 +107,14 @@ spec:
           labels:
             app.kubernetes.io/name: haproxy
             app.kubernetes.io/instance: haproxy-postgres
-
+            app.kubernetes.io/component: main
           annotations:
             prometheus.io/scrape: "true"
             prometheus.io/port: "8404"
             prometheus.io/path: "/metrics"
             cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
-            app.kubernetes.io/component: load-balancer
             monitoring: "true"
             security-scan: "required"
-
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -127,7 +123,6 @@ spec:
             fsGroupChangePolicy: OnRootMismatch
             seccompProfile:
               type: RuntimeDefault
-
           affinity:
             podAntiAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
