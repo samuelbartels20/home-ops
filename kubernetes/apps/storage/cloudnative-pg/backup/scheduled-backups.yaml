@@ -46,7 +46,7 @@ metadata:
     backup.cnpg.io/compression: "gzip"
     backup.cnpg.io/encryption: "AES256"
 spec:
-  schedule: "0 1 * * 0"
+  schedule: "0 1 * * 7"
   backupOwnerReference: self
   immediate: false
   suspend: false
