@@ -113,8 +113,6 @@ spec:
         - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
         - 'SELECT pg_reload_conf();'
     recovery:
-      recoveryTargetAction: "promote"
-      recoveryTargetTimeline: "latest"
       source:
         type: s3
         s3:
@@ -133,16 +131,6 @@ spec:
             maxParallel: "8"
             jobs: "2"
             serverName: "postgres17-002"
-            tags:
-              environment: production
-              cluster: postgres17
-              backup-type: comprehensive
-              tier: data
-              backup-policy: comprehensive
-              cnpg.io/cluster-size: "3"
-              cnpg.io/primary-update-strategy: supervised
-              cnpg.io/hibernation: "off"
-              backup.cnpg.io/retention-policy: "30d"
 
 
 
