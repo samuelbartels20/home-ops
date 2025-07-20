@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql-enterprise
+    app.kubernetes.io/part-of: postgresql
     backup-type: daily
     retention: long-term
     environment: production
@@ -50,7 +50,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql-enterprise
+    app.kubernetes.io/part-of: postgresql
     backup-type: weekly
     retention: archive
     environment: production
@@ -93,7 +93,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql-enterprise
+    app.kubernetes.io/part-of: postgresql
     backup-type: monthly
     retention: compliance
     environment: production
