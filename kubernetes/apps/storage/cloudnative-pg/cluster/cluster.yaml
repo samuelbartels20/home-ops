@@ -28,13 +28,9 @@ spec:
   minSyncReplicas: 2
   maxSyncReplicas: 2
 
-  images:
-    - major: 17
-      image: ghcr.io/cloudnative-pg/postgresql:17.2
-      plugins:
-        - name: barman-cloud
-          image: ghcr.io/cloudnative-pg/postgres-barman-cloud:latest
-
+  # PostgreSQL container image
+  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
+  
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
