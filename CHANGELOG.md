@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.20
+
+Date-based release for 2025-07-20
+
+### Changes
+- feat(cloudnative-pg) deployed the cluster
+- fix: Remove invalid preUpgrade field from OpenEBS HelmRelease
+- chore(release): 2025.07.19.55 [skip ci]
+
 ##  v2025.07.19.55
 
 Date-based release for 2025-07-19
