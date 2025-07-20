@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.20.28
+
+Date-based release for 2025-07-20
+
+### Changes
+- feat(postgres): added backup deployment for postgresql
+- chore(release): 2025.07.20.27 [skip ci]
+
 ##  v2025.07.20.27
 
 Date-based release for 2025-07-20
