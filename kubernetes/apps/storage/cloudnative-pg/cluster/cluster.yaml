@@ -20,9 +20,6 @@ metadata:
     backup.cnpg.io/retention-policy: "30d"
     security.cnpg.io/fips-enabled: "true"
     monitoring.cnpg.io/enabled: "true"
-    kubectl.kubernetes.io/last-applied-configuration: |
-      Applied by: samuelbartels20
-      Date: 2025-07-19T10:00:00Z
 spec:
   instances: 3
   minSyncReplicas: 2
@@ -108,7 +105,7 @@ spec:
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.161:9000
-        serverName: postgres17-production
+        serverName: postgres17-backup
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg
