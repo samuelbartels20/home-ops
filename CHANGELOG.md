@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.07.20.48
+
+Date-based release for 2025-07-20
+
+### Changes
+- feat(haproxy): added haproxy loadbalancing for postgresql
+- fix: add controller references for app-template 3.7.0 compatibility
+- chore(release): 2025.07.20.47 [skip ci]
+
 ##  v2025.07.20.47
 
 Date-based release for 2025-07-20
