@@ -3,62 +3,76 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: openebs
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: openebs
-    app.kubernetes.io/component: storage
 spec:
-  interval: 30m
-  timeout: 15m
+  interval: 1h
   chart:
     spec:
       chart: openebs
-      version: "4.1.1"
+      version: 4.3.2
+      interval: 1h
       sourceRef:
         kind: HelmRepository
         name: openebs
         namespace: flux-system
-  install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
-    timeout: 15m
-    replace: true
-  upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 3
-    timeout: 15m
-    force: false
   values:
-    # Enable only Local PV Provisioner (simple configuration)
     localpv-provisioner:
+      rbac:
+        create: true
+
+      localpv:
+        image:
+          registry: quay.io/
+
+      helperPod:
+        image:
+          registry: quay.io/
+
+      hostpathClass:
+        enabled: true
+        name: openebs-hostpath
+        isDefaultClass: false
+        basePath: /var/openebs/local
+
+    openebs-crds:
+      csi:
+        volumeSnapshots:
+          enabled: false
+          keep: false
+
+    zfs-localpv:
       enabled: true
-    
-    # Disable all observability components
-    openebs-loki:
+      zfsNode:
+        encrKeysDir: "/var/zfs"
+      analytics:
+        enabled: false
+      zfs:
+        bin: /usr/local/sbin/zfs
+      crds:
+        csi:
+          volumeSnapshots:
+            enabled: false
+
+    lvm-localpv:
       enabled: false
-    
-    openebs-minio:
-      enabled: false
-    
-    # Disable advanced storage engines
-    ndm:
-      enabled: false
-    
-    webhook:
-      enabled: false
-    
-    # Disable other engines
-    cstor:
-      enabled: false
-    
-    jiva:
-      enabled: false
-    
+
     mayastor:
       enabled: false
 
+    loki:
+      enabled: false
+
+    alloy:
+      enabled: false
+
+    engines:
+      local:
+        lvm:
+          enabled: false
+        zfs:
+          enabled: true
+      replicated:
+        mayastor:
+          enabled: false
 ---
 # Network policy to secure storage namespace
 apiVersion: networking.k8s.io/v1
