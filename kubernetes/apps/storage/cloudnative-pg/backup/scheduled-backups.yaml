@@ -23,22 +23,10 @@ spec:
   suspend: false
   cluster:
     name: postgres
-
   method: barmanObjectStore
   target: primary
-
-
   online: true
 
-  metadata:
-    annotations:
-      backup.cnpg.io/type: "scheduled"
-      backup.cnpg.io/tier: "daily"
-      backup.cnpg.io/compliance: "required"
-    labels:
-      backup-frequency: daily
-      retention-class: long-term
-      environment: production
 
 ---
 apiVersion: postgresql.cnpg.io/v1
@@ -65,22 +53,11 @@ spec:
   suspend: false
   cluster:
     name: postgres
-
   method: barmanObjectStore
   target: prefer-standby
-
-
   online: true
 
-  metadata:
-    annotations:
-      backup.cnpg.io/type: "scheduled"
-      backup.cnpg.io/tier: "weekly"
-      backup.cnpg.io/compliance: "archive"
-    labels:
-      backup-frequency: weekly
-      retention-class: archive
-      environment: production
+
 
 ---
 apiVersion: postgresql.cnpg.io/v1
@@ -108,20 +85,6 @@ spec:
   suspend: false
   cluster:
     name: postgres
-
   method: barmanObjectStore
   target: prefer-standby
-
   online: true
-
-  metadata:
-    annotations:
-      backup.cnpg.io/type: "scheduled"
-      backup.cnpg.io/tier: "monthly"
-      backup.cnpg.io/compliance: "sox-gdpr-required"
-      backup.cnpg.io/legal-hold: "applicable"
-    labels:
-      backup-frequency: monthly
-      retention-class: compliance
-      environment: production
-      legal-retention: required
