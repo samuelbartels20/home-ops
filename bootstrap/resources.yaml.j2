@@ -33,7 +33,6 @@ stringData:
 
 
 ---
-# onepassword secret
 apiVersion: v1
 kind: Secret
 metadata:
@@ -45,7 +44,6 @@ stringData:
 
 
 ---
-# onepassword secret
 apiVersion: v1
 kind: Secret
 metadata:
@@ -56,7 +54,6 @@ stringData:
 
 
 ---
-# tailscale secret
 apiVersion: v1
 kind: Secret
 metadata:
@@ -67,7 +64,6 @@ stringData:
   client_secret: op://K8s/tailscale-operator/CLIENT_SECRET
 
 ---
-# databases/cloudnative-pg/operator/externalsecret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -83,7 +79,6 @@ data:
 
 
 ---
-# databases/cloudnative-pg/operator/externalsecret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -99,7 +94,6 @@ stringData:
 
 
 ---
-# grafana/externalsecret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -111,7 +105,6 @@ stringData:
 
 
 ---
-# vernemq/externalsecret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -163,7 +156,6 @@ metadata:
 stringData:
   CLOUDFLARE_TUNNEL_ID: op://kubernetes/cloudflare/CLOUDFLARE_TUNNEL_ID
 
-# truenas api key
 ---
 apiVersion: v1
 kind: Secret
@@ -192,8 +184,7 @@ metadata:
 stringData:
   API_KEY: op://K8s/truenas-api-key/API_KEY
 
----
-# alertmanager secret
+--- 
 apiVersion: v1
 kind: Secret
 metadata:
