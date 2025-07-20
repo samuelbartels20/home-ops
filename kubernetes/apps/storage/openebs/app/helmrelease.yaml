@@ -40,7 +40,7 @@ spec:
           keep: false
 
     zfs-localpv:
-      enabled: true
+      enabled: false
       zfsNode:
         encrKeysDir: "/var/zfs"
       analytics:
