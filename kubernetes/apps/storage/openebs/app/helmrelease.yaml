@@ -7,18 +7,13 @@ metadata:
   labels:
     app.kubernetes.io/name: openebs
     app.kubernetes.io/component: storage
-  annotations:
-    flux.weave.works/automated: "false"
-    kubectl.kubernetes.io/last-applied-configuration: |
-      Applied by: samuelbartels20
-      Date: 2025-07-19 11:35:34
 spec:
-  interval: 5m
-  timeout: 10m
+  interval: 30m
+  timeout: 15m
   chart:
     spec:
       chart: openebs
-      version: 4.3.1
+      version: "4.1.1"
       sourceRef:
         kind: HelmRepository
         name: openebs
@@ -27,138 +22,42 @@ spec:
     crds: CreateReplace
     remediation:
       retries: 3
-    timeout: 10m
+    timeout: 15m
+    replace: true
   upgrade:
     crds: CreateReplace
     remediation:
       retries: 3
-    timeout: 10m
+    timeout: 15m
+    force: false
   values:
+    # Enable only Local PV Provisioner (simple configuration)
+    localpv-provisioner:
+      enabled: true
+    
     # Disable all observability components
     openebs-loki:
       enabled: false
     
-    openebs-prometheus:
-      enabled: false
-    
-    grafana:
-      enabled: false
-    
-    alertmanager:
-      enabled: false
-    
-    alloy:
-      enabled: false
-
-    # Disable MinIO and backup components
     openebs-minio:
       enabled: false
-
-    # Disable advanced storage engines
-    engines:
-      alloy:
-        enabled: false
-      openebs-minio:
-        enabled: false
-      local:
-        lvm:
-          enabled: false
-        zfs:
-          enabled: false
-      replicated:
-        mayastor:
-          enabled: false
-        jiva:
-          enabled: false
-      cStor:
-        enabled: false
-
-    # Disable volume snapshots
-    openebs-crds:
-      csi:
-        volumeSnapshots:
-          enabled: false
-
-    # Enable only Local PV Provisioner (hostpath)
-    localpv-provisioner:
-      enabled: true
-      localpv:
-        enabled: true
-        image:
-          registry: quay.io
-          repository: openebs/provisioner-localpv
-          tag: "4.3.0"
-          pullPolicy: IfNotPresent
-        
-
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-        
-
-        nodeSelector: {}
-        
-
-        tolerations: []
-        
-      helperPod:
-        image:
-          registry: quay.io
-          repository: openebs/linux-utils
-          tag: "4.2.0"
-          pullPolicy: IfNotPresent
-      
-      # Hostpath storage class configuration
-      hostpathClass:
-        enabled: true
-        name: openebs-hostpath
-        isDefaultClass: false
-        reclaimPolicy: Delete
-        volumeBindingMode: WaitForFirstConsumer
-        basePath: /var/openebs/local
-        
-
-        additionalStorageClasses:
-          - name: openebs-hostpath-ssd
-            isDefaultClass: false
-            reclaimPolicy: Delete
-            volumeBindingMode: WaitForFirstConsumer
-            basePath: /var/openebs/ssd
-            nodeAffinityLabels:
-              - key: node-type
-                operator: In
-                values: ["ssd", "nvme"]
-          
-          - name: openebs-hostpath-hdd
-            isDefaultClass: false
-            reclaimPolicy: Delete
-            volumeBindingMode: WaitForFirstConsumer
-            basePath: /var/openebs/hdd
-            nodeAffinityLabels:
-              - key: node-type
-                operator: In
-                values: ["hdd", "storage"]
-
-
-    ndm:
-      enabled: false
     
-    ndmOperator:
+    # Disable advanced storage engines
+    ndm:
       enabled: false
     
     webhook:
       enabled: false
     
-    # Cleanup configurations
-    cleanup:
-      image:
-        registry: quay.io
-        repository: openebs/linux-utils
-        tag: "4.2.0"
+    # Disable other engines
+    cstor:
+      enabled: false
+    
+    jiva:
+      enabled: false
+    
+    mayastor:
+      enabled: false
 
 ---
 # Network policy to secure storage namespace
