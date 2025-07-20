@@ -151,6 +151,7 @@ spec:
 
     service:
       main:
+        controller: main
         enabled: false
 
     persistence:
@@ -177,6 +178,7 @@ spec:
     # Health checks
     probes:
       liveness:
+        controller: main
         enabled: true
         custom: true
         spec:
@@ -189,6 +191,7 @@ spec:
           failureThreshold: 3
 
       readiness:
+        controller: main
         enabled: true
         custom: true
         spec:
