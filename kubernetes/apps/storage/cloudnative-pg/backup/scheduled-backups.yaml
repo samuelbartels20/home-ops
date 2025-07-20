@@ -25,7 +25,6 @@ spec:
     name: postgres
   method: barmanObjectStore
   target: primary
-  online: true
 
 
 ---
@@ -55,7 +54,6 @@ spec:
     name: postgres
   method: barmanObjectStore
   target: prefer-standby
-  online: true
 
 
 
@@ -87,4 +85,3 @@ spec:
     name: postgres
   method: barmanObjectStore
   target: prefer-standby
-  online: true
