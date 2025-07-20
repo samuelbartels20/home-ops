@@ -1,0 +1,269 @@
+---
+# Cilium L7 Network Policy for PostgreSQL Traffic
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: patroni-l7-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: cilium-policy
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: patroni
+  
+  ingress:
+    # PostgreSQL Protocol-Aware Filtering
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: pgbouncer
+        - matchLabels:
+            app.kubernetes.io/name: haproxy
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+          rules:
+            l7proto: "postgres"
+            l7:
+              - {}  # Allow all PostgreSQL queries (can be restricted)
+    
+    # Patroni API with HTTP filtering
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: patroni
+      toPorts:
+        - ports:
+            - port: "8008"
+              protocol: TCP
+          rules:
+            l7proto: "http"
+            l7:
+              - method: "GET"
+                path: "/cluster|/health|/leader|/replica"
+              - method: "POST"
+                path: "/restart|/switchover"
+    
+    # Metrics collection
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/component: prometheus
+      toPorts:
+        - ports:
+            - port: "9187"
+              protocol: TCP
+          rules:
+            l7proto: "http"
+            l7:
+              - method: "GET"
+                path: "/metrics"
+
+---
+# Cilium Local Redirect Policy for Performance
+apiVersion: cilium.io/v2
+kind: CiliumLocalRedirectPolicy
+metadata:
+  name: patroni-local-redirect
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: cilium-policy
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  redirectFrontend:
+    serviceMatcher:
+      serviceName: patroni-ha-cluster-primary
+      namespace: storage
+    toPorts:
+      - port: "5432"
+        protocol: TCP
+  redirectBackend:
+    localEndpointSelector:
+      matchLabels:
+        app.kubernetes.io/name: patroni
+        postgresql-role: master
+    toPorts:
+      - port: "5432"
+        protocol: TCP
+
+---
+# Cilium BGP Service Advertisement for LoadBalancer IPs
+apiVersion: cilium.io/v2alpha1
+kind: CiliumBGPAdvertisement
+metadata:
+  name: patroni-bgp-advertisement
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: cilium-bgp
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    advertise: bgp
+spec:
+  advertisements:
+    - advertisementType: Service
+      service:
+        addresses:
+          - LoadBalancerIP
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: patroni
+      attributes:
+        communities:
+          standard: ["64512:100"]  # PostgreSQL service community
+        localPreference: 150       # High preference for PostgreSQL
+
+---
+# Cilium Cluster-wide Network Policy for PostgreSQL Security
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: patroni-cluster-security
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: cilium-policy
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: patroni
+  
+  ingress:
+    # Block suspicious PostgreSQL traffic
+    - fromEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+          rules:
+            l7proto: "postgres"
+            l7:
+              # Block dangerous SQL commands
+              - not:
+                  query: ".*(DROP DATABASE|TRUNCATE|DELETE FROM pg_|ALTER USER.*SUPERUSER).*"
+    
+    # Rate limiting for connections
+    - fromEndpoints: []
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+      icmp: []
+      # Rate limit: 100 connections per minute
+      limits:
+        - type: "rps"
+          value: "100"
+
+---
+# Cilium Service Mesh Integration
+apiVersion: v1
+kind: Service
+metadata:
+  name: patroni-service-mesh
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: service-mesh
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+  annotations:
+    # Enable Cilium service mesh features
+    cilium.io/service-mesh: "true"
+    cilium.io/load-balancing-mode: "dsr"
+    cilium.io/service-affinity: "local"
+    # L7 load balancing with session persistence
+    cilium.io/l7-lb: "true"
+    cilium.io/session-persistence: "clientIP"
+    cilium.io/session-persistence-timeout: "3600"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: patroni
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+    - name: patroni-api
+      port: 8008
+      targetPort: 8008
+      protocol: TCP
+
+---
+# Cilium Ingress Gateway for PostgreSQL Admin Interface
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: patroni-admin-route
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  parentRefs:
+    - name: internal
+      namespace: kube-system
+      sectionName: https
+  hostnames:
+    - "patroni.samcloud.online"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: patroni-service-mesh
+          namespace: storage
+          port: 8008
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: X-Forwarded-Proto
+                value: https
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              - name: X-Frame-Options
+                value: DENY
+              - name: X-Content-Type-Options
+                value: nosniff
+
+---
+# Cilium Network Performance Monitoring
+apiVersion: cilium.io/v2alpha1
+kind: CiliumNetworkPerformance
+metadata:
+  name: patroni-network-perf
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: network-monitoring
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: patroni
+  metrics:
+    - name: "tcp_connections"
+      enabled: true
+    - name: "tcp_latency"
+      enabled: true
+    - name: "packet_drops"
+      enabled: true
+    - name: "bandwidth"
+      enabled: true
+  alerting:
+    thresholds:
+      connectionLatency: "10ms"
+      packetDropRate: "0.1%"
+      maxConnections: 1000 

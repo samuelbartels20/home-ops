@@ -104,10 +104,6 @@ spec:
                   - ALL
 
         pod:
-          labels:
-            app.kubernetes.io/name: haproxy
-            app.kubernetes.io/instance: haproxy-postgres
-            app.kubernetes.io/component: main
           annotations:
             prometheus.io/scrape: "true"
             prometheus.io/port: "8404"

@@ -1,0 +1,85 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+metadata:
+  name: pgbouncer-enterprise
+  annotations:
+    description: "Enterprise-grade PgBouncer connection pooler for PostgreSQL"
+    version: "1.23.1"
+    maintainer: "DevOps Team"
+
+resources:
+  - ./helmrelease.yaml
+  - ./configmap.yaml
+  - ./externalsecret.yaml
+  - ./autoscaling.yaml
+
+commonLabels:
+  app.kubernetes.io/name: pgbouncer
+  app.kubernetes.io/instance: pgbouncer-enterprise
+  app.kubernetes.io/component: connection-pooler
+  app.kubernetes.io/part-of: postgresql
+  app.kubernetes.io/version: "1.23.1"
+  environment: production
+  tier: middleware
+
+commonAnnotations:
+  config.kubernetes.io/origin: "kustomize"
+  deployment.kubernetes.io/revision: "1"
+  monitoring.coreos.com/enabled: "true"
+
+# Resource transformations
+patches:
+  - target:
+      kind: HelmRelease
+      name: pgbouncer-enterprise
+    patch: |-
+      - op: add
+        path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1prune
+        value: "true"
+      - op: add
+        path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1ssa
+        value: "merge"
+
+# Resource ordering
+transformers:
+  - |-
+    apiVersion: builtin
+    kind: AnnotationsTransformer
+    metadata:
+      name: add-build-metadata
+    annotations:
+      build.timestamp: "2024-01-01T00:00:00Z"
+      build.version: "v1.0.0"
+
+# Namespace is already specified at the top
+
+# Secret generators for additional configurations
+secretGenerator:
+  - name: pgbouncer-runtime-config
+    literals:
+      - "pool_mode=transaction"
+      - "default_pool_size=50"
+      - "max_client_conn=1000"
+    options:
+      disableNameSuffixHash: true
+
+# ConfigMap generators for runtime settings
+configMapGenerator:
+  - name: pgbouncer-runtime-settings
+    literals:
+      - "log_level=INFO"
+      - "metrics_enabled=true"
+      - "monitoring_interval=30s"
+    options:
+      disableNameSuffixHash: true
+
+# Resource validation
+validators:
+  - |-
+    apiVersion: builtin
+    kind: ResourceQuotaValidator
+    metadata:
+      name: validate-resources 

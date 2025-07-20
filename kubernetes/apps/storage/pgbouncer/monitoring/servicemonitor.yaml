@@ -1,0 +1,265 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pgbouncer-enterprise
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    monitoring: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pgbouncer
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      scheme: http
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'pgbouncer_.*'
+          targetLabel: __name__
+          replacement: '${1}'
+        - sourceLabels: [instance]
+          targetLabel: instance
+          replacement: 'pgbouncer-${1}'
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pgbouncer-enterprise-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: pgbouncer.connection_pool
+      interval: 30s
+      rules:
+        # ==============================
+        # CONNECTION POOL ALERTS
+        # ==============================
+        
+        - alert: PgBouncerHighConnectionUtilization
+          expr: |
+            (
+              pgbouncer_pools_cl_active + pgbouncer_pools_cl_waiting
+            ) / pgbouncer_pools_maxwait * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: connection-pool
+          annotations:
+            summary: "PgBouncer connection pool utilization is high"
+            description: "Pool {{ $labels.database }} on {{ $labels.instance }} is {{ $value }}% utilized"
+            runbook_url: "https://docs.company.com/runbooks/pgbouncer-high-utilization"
+
+        - alert: PgBouncerConnectionPoolExhausted
+          expr: |
+            (
+              pgbouncer_pools_cl_active + pgbouncer_pools_cl_waiting
+            ) / pgbouncer_pools_maxwait * 100 > 95
+          for: 2m
+          labels:
+            severity: critical
+            service: pgbouncer
+            component: connection-pool
+          annotations:
+            summary: "PgBouncer connection pool is nearly exhausted"
+            description: "Pool {{ $labels.database }} on {{ $labels.instance }} is {{ $value }}% utilized"
+            runbook_url: "https://docs.company.com/runbooks/pgbouncer-pool-exhausted"
+
+        - alert: PgBouncerHighWaitTime
+          expr: |
+            rate(pgbouncer_pools_total_wait_time[5m]) / rate(pgbouncer_pools_total_requests[5m]) > 1000
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: performance
+          annotations:
+            summary: "PgBouncer client wait time is high"
+            description: "Average wait time for pool {{ $labels.database }} is {{ $value }}ms"
+
+        - alert: PgBouncerServerConnectionFailures
+          expr: |
+            increase(pgbouncer_pools_server_login_failures[5m]) > 5
+          for: 1m
+          labels:
+            severity: critical
+            service: pgbouncer
+            component: connectivity
+          annotations:
+            summary: "PgBouncer server connection failures detected"
+            description: "{{ $value }} server login failures in the last 5 minutes for pool {{ $labels.database }}"
+
+    - name: pgbouncer.performance
+      interval: 30s
+      rules:
+        # ==============================
+        # PERFORMANCE ALERTS
+        # ==============================
+
+        - alert: PgBouncerHighQueryLatency
+          expr: |
+            rate(pgbouncer_pools_total_query_time[5m]) / rate(pgbouncer_pools_total_requests[5m]) > 5000
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: performance
+          annotations:
+            summary: "PgBouncer query latency is high"
+            description: "Average query time for pool {{ $labels.database }} is {{ $value }}ms"
+
+        - alert: PgBouncerLowThroughput
+          expr: |
+            rate(pgbouncer_pools_total_requests[5m]) < 10
+          for: 10m
+          labels:
+            severity: info
+            service: pgbouncer
+            component: performance
+          annotations:
+            summary: "PgBouncer throughput is unusually low"
+            description: "Pool {{ $labels.database }} is processing {{ $value }} requests per second"
+
+        - alert: PgBouncerTransactionRollbacks
+          expr: |
+            rate(pgbouncer_pools_total_xact_rollback[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: transactions
+          annotations:
+            summary: "High transaction rollback rate detected"
+            description: "Pool {{ $labels.database }} has {{ $value }} rollbacks per second"
+
+    - name: pgbouncer.availability
+      interval: 30s
+      rules:
+        # ==============================
+        # AVAILABILITY ALERTS
+        # ==============================
+
+        - alert: PgBouncerDown
+          expr: |
+            up{job="pgbouncer-enterprise"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: pgbouncer
+            component: availability
+          annotations:
+            summary: "PgBouncer instance is down"
+            description: "PgBouncer instance {{ $labels.instance }} is not responding"
+            runbook_url: "https://docs.company.com/runbooks/pgbouncer-down"
+
+        - alert: PgBouncerRestarted
+          expr: |
+            increase(pgbouncer_process_start_time_seconds[5m]) > 0
+          for: 0m
+          labels:
+            severity: info
+            service: pgbouncer
+            component: availability
+          annotations:
+            summary: "PgBouncer instance restarted"
+            description: "PgBouncer instance {{ $labels.instance }} has restarted"
+
+        - alert: PgBouncerDatabaseUnavailable
+          expr: |
+            pgbouncer_pools_sv_active + pgbouncer_pools_sv_used == 0
+          for: 2m
+          labels:
+            severity: critical
+            service: pgbouncer
+            component: backend
+          annotations:
+            summary: "No active database connections"
+            description: "Pool {{ $labels.database }} has no active server connections"
+
+    - name: pgbouncer.resource_usage
+      interval: 30s
+      rules:
+        # ==============================
+        # RESOURCE USAGE ALERTS
+        # ==============================
+
+        - alert: PgBouncerHighMemoryUsage
+          expr: |
+            (container_memory_working_set_bytes{container="pgbouncer"} / container_spec_memory_limit_bytes{container="pgbouncer"}) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: resources
+          annotations:
+            summary: "PgBouncer memory usage is high"
+            description: "PgBouncer container is using {{ $value }}% of allocated memory"
+
+        - alert: PgBouncerHighCPUUsage
+          expr: |
+            rate(container_cpu_usage_seconds_total{container="pgbouncer"}[5m]) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: resources
+          annotations:
+            summary: "PgBouncer CPU usage is high"
+            description: "PgBouncer container is using {{ $value }}% CPU"
+
+    - name: pgbouncer.security
+      interval: 60s
+      rules:
+        # ==============================
+        # SECURITY ALERTS
+        # ==============================
+
+        - alert: PgBouncerAuthenticationFailures
+          expr: |
+            increase(pgbouncer_pools_cl_cancel_req[5m]) > 10
+          for: 1m
+          labels:
+            severity: warning
+            service: pgbouncer
+            component: security
+          annotations:
+            summary: "High number of authentication failures"
+            description: "{{ $value }} authentication failures detected in the last 5 minutes"
+
+        - alert: PgBouncerSuspiciousActivity
+          expr: |
+            rate(pgbouncer_pools_total_requests[1m]) > 1000
+          for: 1m
+          labels:
+            severity: info
+            service: pgbouncer
+            component: security
+          annotations:
+            summary: "Unusually high request rate detected"
+            description: "Pool {{ $labels.database }} is processing {{ $value }} requests per second" 

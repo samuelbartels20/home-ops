@@ -1,0 +1,289 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+data:
+  pgbouncer.ini: |
+    # ==============================
+    # PgBouncer Enterprise Configuration
+    # Production-Grade Connection Pooling
+    # ==============================
+    
+    [databases]
+    # Primary Database Pool
+    postgres = host=postgres17-rw.storage.svc.cluster.local port=5432 dbname=postgres pool_size=50 reserve_pool=10
+    
+    # Read-Only Database Pool  
+    postgres_ro = host=postgres17-r.storage.svc.cluster.local port=5432 dbname=postgres pool_size=30 reserve_pool=5
+    
+    # Special purpose databases
+    template1 = host=postgres17-rw.storage.svc.cluster.local port=5432 dbname=template1 pool_size=5
+    template0 = host=postgres17-rw.storage.svc.cluster.local port=5432 dbname=template0 pool_size=2
+    
+    # Statistics database for monitoring
+    pgbouncer = host=127.0.0.1 port=6432 dbname=pgbouncer pool_size=2 reserve_pool=1
+    
+    [pgbouncer]
+    # ==============================
+    # CORE CONFIGURATION
+    # ==============================
+    
+    # Listening configuration
+    listen_addr = 0.0.0.0
+    listen_port = 5432
+    unix_socket_dir = /var/run/pgbouncer
+    unix_socket_mode = 0777
+    unix_socket_group = pgbouncer
+    
+    # Authentication
+    auth_type = md5
+    auth_file = /etc/pgbouncer/auth/userlist.txt
+    auth_hba_file = /etc/pgbouncer/pg_hba.conf
+    auth_query = SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+    auth_user = postgres
+    
+    # ==============================
+    # CONNECTION POOLING - ENTERPRISE GRADE
+    # ==============================
+    
+    # Pool mode: session, transaction, statement
+    # transaction = optimal for most OLTP workloads
+    # session = for applications requiring session state
+    pool_mode = transaction
+    
+    # Pool sizing (optimized for high-throughput production)
+    default_pool_size = 50
+    min_pool_size = 10
+    max_client_conn = 1000
+    max_db_connections = 200
+    reserve_pool_size = 10
+    reserve_pool_timeout = 5
+    max_user_connections = 100
+    
+    # ==============================
+    # PERFORMANCE TUNING
+    # ==============================
+    
+    # Server management
+    server_reset_query = DISCARD ALL
+    server_reset_query_always = 0
+    server_check_query = SELECT 1
+    server_check_delay = 30
+    server_fast_close = 1
+    server_login_retry = 15
+    server_round_robin = 1
+    
+    # Timeouts (optimized for production workloads)
+    query_timeout = 300
+    query_wait_timeout = 120
+    client_idle_timeout = 0
+    server_idle_timeout = 600
+    server_lifetime = 3600
+    server_connect_timeout = 15
+    cancel_wait_timeout = 10
+    
+    # Buffer sizes
+    pkt_buf = 8192
+    listen_backlog = 512
+    sbuf_loopcnt = 5
+    
+    # DNS settings
+    dns_max_ttl = 3600
+    dns_nxdomain_ttl = 300
+    dns_zone_check_period = 0
+    
+    # ==============================
+    # SECURITY CONFIGURATION
+    # ==============================
+    
+    # User management
+    ignore_startup_parameters = extra_float_digits,search_path,default_transaction_isolation,timezone,application_name
+    application_name_add_host = 1
+    
+    # Connection security
+    so_reuseport = 1
+    tcp_defer_accept = 1
+    tcp_socket_buffer = 0
+    tcp_keepalive = 1
+    tcp_keepcnt = 3
+    tcp_keepidle = 600
+    tcp_keepintvl = 30
+    tcp_user_timeout = 0
+    
+    # ==============================
+    # MONITORING & LOGGING
+    # ==============================
+    
+    # Admin interface
+    admin_users = postgres,pgbouncer_admin
+    stats_users = postgres,stats,pgbouncer_stats
+    stats_period = 60
+    
+    # Logging configuration
+    log_connections = 1
+    log_disconnections = 1
+    log_pooler_errors = 1
+    verbose = 1
+    
+    # Log destinations
+    syslog = 0
+    syslog_facility = daemon
+    syslog_ident = pgbouncer
+    
+    # ==============================
+    # HIGH AVAILABILITY
+    # ==============================
+    
+    # Failover settings
+    suspend_timeout = 10
+    server_check_delay = 30
+    
+    # Load balancing
+    server_round_robin = 1
+    
+    # Connection validation
+    server_check_query = SELECT 1
+    
+    # ==============================
+    # SECURITY POLICIES
+    # ==============================
+    
+    # Application restrictions
+    disable_pqexec = 0
+    conffile_reload_timeout = 10
+    
+    # Resource limits
+    max_packet_size = 2147483647
+    
+  pg_hba.conf: |
+    # ==============================
+    # PgBouncer Host-Based Authentication
+    # Production Security Configuration
+    # ==============================
+    
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    
+    # Local connections (Unix socket)
+    local   all             postgres                                trust
+    local   all             pgbouncer_admin                         trust
+    local   all             stats                                   trust
+    local   pgbouncer       all                                     trust
+    
+    # IPv4 local connections
+    host    all             postgres        127.0.0.1/32            md5
+    host    all             pgbouncer_admin 127.0.0.1/32            md5
+    host    all             stats           127.0.0.1/32            md5
+    host    pgbouncer       all             127.0.0.1/32            trust
+    
+    # IPv6 local connections  
+    host    all             postgres        ::1/128                 md5
+    host    all             pgbouncer_admin ::1/128                 md5
+    host    all             stats           ::1/128                 md5
+    host    pgbouncer       all             ::1/128                 trust
+    
+    # Kubernetes cluster network (adjust CIDR as needed)
+    host    all             postgres        10.0.0.0/8              md5
+    host    all             all             10.0.0.0/8              md5
+    host    pgbouncer       all             10.0.0.0/8              trust
+    
+    # Application connections
+    host    all             app_user        0.0.0.0/0               md5
+    host    all             readonly_user   0.0.0.0/0               md5
+    
+    # Monitoring connections
+    host    pgbouncer       stats           0.0.0.0/0               trust
+    host    all             monitoring      0.0.0.0/0               md5
+    
+    # Deny all other connections
+    host    all             all             0.0.0.0/0               reject
+
+  # Additional configuration for connection pooling optimization
+  pool_optimization.conf: |
+    # ==============================
+    # POOL OPTIMIZATION PARAMETERS
+    # Big Tech Production Standards
+    # ==============================
+    
+    # Connection patterns for different workload types
+    [oltp_pool]
+    pool_mode = transaction
+    default_pool_size = 50
+    max_client_conn = 1000
+    
+    [analytics_pool] 
+    pool_mode = session
+    default_pool_size = 20
+    max_client_conn = 100
+    
+    [batch_pool]
+    pool_mode = statement
+    default_pool_size = 10
+    max_client_conn = 50
+    
+    # Performance tuning guidelines
+    [performance_tuning]
+    # For high-throughput OLTP
+    server_check_delay = 10
+    query_wait_timeout = 60
+    
+    # For long-running analytics
+    query_timeout = 3600
+    server_lifetime = 7200
+    
+    # Memory optimization
+    pkt_buf = 16384
+    listen_backlog = 1024
+
+  # Enterprise monitoring configuration
+  monitoring.conf: |
+    # ==============================
+    # MONITORING CONFIGURATION  
+    # Enterprise Observability Standards
+    # ==============================
+    
+    [metrics]
+    # Prometheus metrics endpoint
+    stats_period = 60
+    
+    # Key metrics to monitor
+    active_clients = true
+    active_servers = true
+    pools_used = true
+    pools_tested = true
+    pools_connected = true
+    total_xact_count = true
+    total_query_count = true
+    total_received = true
+    total_sent = true
+    total_xact_time = true
+    total_query_time = true
+    total_wait_time = true
+    avg_xact_count = true
+    avg_query_count = true
+    avg_recv = true
+    avg_sent = true
+    avg_xact_time = true
+    avg_query_time = true
+    avg_wait_time = true
+    
+    [alerting]
+    # Alert thresholds for production monitoring
+    max_client_conn_threshold = 900
+    max_db_connections_threshold = 180
+    avg_query_time_threshold = 1000
+    avg_wait_time_threshold = 500
+    pool_utilization_threshold = 80
+    
+    [logging]
+    # Structured logging for observability
+    log_format = json
+    log_level = info
+    log_rotation = daily
+    log_retention = 30d 

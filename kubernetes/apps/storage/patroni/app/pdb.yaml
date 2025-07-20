@@ -1,0 +1,17 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: patroni-ha-cluster-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: patroni
+  unhealthyPodEvictionPolicy: AlwaysAllow 

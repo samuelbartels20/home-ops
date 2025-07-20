@@ -1,0 +1,447 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patroni-backup-scripts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+data:
+  # Full backup script using pg_basebackup
+  full-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Configuration
+    BACKUP_DIR="/var/lib/postgresql/backups"
+    RETENTION_DAYS="30"
+    BACKUP_TAG="full-$(date +%Y%m%d-%H%M%S)"
+    S3_BUCKET="${BACKUP_S3_BUCKET:-patroni-backups}"
+    
+    # Create backup directory
+    mkdir -p "$BACKUP_DIR"
+    
+    # Perform base backup
+    echo "$(date): Starting full backup with tag: $BACKUP_TAG"
+    pg_basebackup \
+      --pgdata="$BACKUP_DIR/$BACKUP_TAG" \
+      --format=tar \
+      --gzip \
+      --compress=9 \
+      --checkpoint=fast \
+      --label="$BACKUP_TAG" \
+      --progress \
+      --verbose \
+      --wal-method=stream \
+      --max-rate=100M
+    
+    # Create backup manifest
+    cat > "$BACKUP_DIR/$BACKUP_TAG/manifest.json" << EOF
+    {
+      "backup_tag": "$BACKUP_TAG",
+      "timestamp": "$(date -Iseconds)",
+      "backup_type": "full",
+      "postgresql_version": "$PG_VERSION",
+      "cluster_name": "$PATRONI_SCOPE",
+      "backup_size": "$(du -sh $BACKUP_DIR/$BACKUP_TAG | cut -f1)",
+      "wal_start": "$(cat $BACKUP_DIR/$BACKUP_TAG/backup_label | grep 'START WAL LOCATION' | awk '{print $4}')",
+      "wal_stop": "$(cat $BACKUP_DIR/$BACKUP_TAG/backup_label | grep 'STOP WAL LOCATION' | awk '{print $4}')"
+    }
+    EOF
+    
+    # Upload to S3 if configured
+    if command -v aws &> /dev/null && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      echo "$(date): Uploading backup to S3: s3://$S3_BUCKET/$BACKUP_TAG"
+      aws s3 sync "$BACKUP_DIR/$BACKUP_TAG" "s3://$S3_BUCKET/$BACKUP_TAG" \
+        --storage-class STANDARD_IA \
+        --server-side-encryption AES256
+    fi
+    
+    # Cleanup old backups
+    find "$BACKUP_DIR" -name "full-*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \;
+    
+    echo "$(date): Full backup completed successfully: $BACKUP_TAG"
+    
+  # Incremental backup using WAL archiving
+  wal-archive.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    WAL_FILE="$1"
+    WAL_PATH="$2"
+    ARCHIVE_DIR="/var/lib/postgresql/wal_archive"
+    S3_BUCKET="${BACKUP_S3_BUCKET:-patroni-backups}"
+    
+    # Create archive directory
+    mkdir -p "$ARCHIVE_DIR"
+    
+    # Copy WAL file locally
+    cp "$WAL_PATH" "$ARCHIVE_DIR/$WAL_FILE"
+    
+    # Compress WAL file
+    gzip "$ARCHIVE_DIR/$WAL_FILE"
+    
+    # Upload to S3 if configured
+    if command -v aws &> /dev/null && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      aws s3 cp "$ARCHIVE_DIR/$WAL_FILE.gz" "s3://$S3_BUCKET/wal/$WAL_FILE.gz" \
+        --storage-class STANDARD_IA \
+        --server-side-encryption AES256
+    fi
+    
+    echo "$(date): WAL file $WAL_FILE archived successfully"
+    
+  # Point-in-time recovery script
+  pitr-restore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    BACKUP_TAG="$1"
+    RECOVERY_TARGET_TIME="${2:-latest}"
+    RESTORE_DIR="/var/lib/postgresql/restore"
+    S3_BUCKET="${BACKUP_S3_BUCKET:-patroni-backups}"
+    
+    echo "$(date): Starting PITR restore from backup: $BACKUP_TAG to time: $RECOVERY_TARGET_TIME"
+    
+    # Create restore directory
+    rm -rf "$RESTORE_DIR"
+    mkdir -p "$RESTORE_DIR"
+    
+    # Download backup from S3
+    if command -v aws &> /dev/null && [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+      echo "$(date): Downloading backup from S3"
+      aws s3 sync "s3://$S3_BUCKET/$BACKUP_TAG" "$RESTORE_DIR" --exclude "*.gz"
+      
+      # Extract base backup
+      cd "$RESTORE_DIR"
+      for tarfile in *.tar.gz; do
+        tar -xzf "$tarfile"
+        rm "$tarfile"
+      done
+    fi
+    
+    # Create recovery configuration
+    cat > "$RESTORE_DIR/postgresql.auto.conf" << EOF
+    # Recovery configuration for PITR
+    restore_command = 'aws s3 cp s3://$S3_BUCKET/wal/%f.gz - | gunzip > %p'
+    recovery_target_time = '$RECOVERY_TARGET_TIME'
+    recovery_target_timeline = 'latest'
+    recovery_target_action = 'promote'
+    EOF
+    
+    # Create recovery signal file
+    touch "$RESTORE_DIR/recovery.signal"
+    
+    echo "$(date): PITR restore preparation completed. Data directory: $RESTORE_DIR"
+    echo "$(date): Start PostgreSQL with -D $RESTORE_DIR to begin recovery"
+    
+  # Backup verification script
+  verify-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    BACKUP_TAG="$1"
+    BACKUP_DIR="/var/lib/postgresql/backups/$BACKUP_TAG"
+    VERIFY_DIR="/tmp/verify-$BACKUP_TAG"
+    
+    echo "$(date): Verifying backup: $BACKUP_TAG"
+    
+    # Extract backup for verification
+    mkdir -p "$VERIFY_DIR"
+    cd "$VERIFY_DIR"
+    
+    # Extract all tar files
+    for tarfile in "$BACKUP_DIR"/*.tar.gz; do
+      tar -xzf "$tarfile"
+    done
+    
+    # Start PostgreSQL in single-user mode for verification
+    postgres --single -D "$VERIFY_DIR" postgres <<EOF
+    SELECT 'Backup verification successful' AS status;
+    EOF
+    
+    # Cleanup verification directory
+    rm -rf "$VERIFY_DIR"
+    
+    echo "$(date): Backup verification completed successfully for: $BACKUP_TAG"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: patroni-full-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: patroni
+            app.kubernetes.io/component: backup
+            job-type: full-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: patroni-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+          containers:
+            - name: backup
+              image: postgres:17.2-alpine
+              imagePullPolicy: IfNotPresent
+              
+              env:
+                - name: PGHOST
+                  value: "patroni-ha-cluster"
+                - name: PGPORT
+                  value: "5432"
+                - name: PGUSER
+                  value: "postgres"
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: patroni-auth
+                      key: postgres_password
+                - name: PATRONI_SCOPE
+                  value: "patroni-ha-cluster"
+                - name: PG_VERSION
+                  value: "17"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-credentials
+                      key: aws_access_key_id
+                      optional: true
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-credentials
+                      key: aws_secret_access_key
+                      optional: true
+                - name: BACKUP_S3_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: backup-config
+                      key: s3_bucket
+                      optional: true
+              
+              command:
+                - "/bin/bash"
+                - "/scripts/full-backup.sh"
+              
+              volumeMounts:
+                - name: backup-scripts
+                  mountPath: /scripts
+                - name: backup-storage
+                  mountPath: /var/lib/postgresql/backups
+                - name: tmp
+                  mountPath: /tmp
+              
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 512Mi
+                  ephemeral-storage: 1Gi
+                limits:
+                  cpu: 1000m
+                  memory: 2Gi
+                  ephemeral-storage: 10Gi
+          
+          volumes:
+            - name: backup-scripts
+              configMap:
+                name: patroni-backup-scripts
+                defaultMode: 0755
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: patroni-backup-storage
+            - name: tmp
+              emptyDir:
+                sizeLimit: 5Gi
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: patroni-backup-verification
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 6 * * 1"  # Weekly on Monday at 6 AM (after backup)
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: patroni
+            app.kubernetes.io/component: backup
+            job-type: backup-verification
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: patroni-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+          containers:
+            - name: verify
+              image: postgres:17.2-alpine
+              imagePullPolicy: IfNotPresent
+              
+              command:
+                - "/bin/bash"
+                - "-c"
+                - |
+                  # Find the latest backup
+                  LATEST_BACKUP=$(ls -1t /var/lib/postgresql/backups/ | grep "^full-" | head -1)
+                  if [ -n "$LATEST_BACKUP" ]; then
+                    /scripts/verify-backup.sh "$LATEST_BACKUP"
+                  else
+                    echo "No backups found to verify"
+                    exit 1
+                  fi
+              
+              volumeMounts:
+                - name: backup-scripts
+                  mountPath: /scripts
+                - name: backup-storage
+                  mountPath: /var/lib/postgresql/backups
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+              
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 512Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+          
+          volumes:
+            - name: backup-scripts
+              configMap:
+                name: patroni-backup-scripts
+                defaultMode: 0755
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: patroni-backup-storage
+            - name: tmp
+              emptyDir:
+                sizeLimit: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patroni-backup-storage
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard-rwo  # Balanced performance for backup storage
+  resources:
+    requests:
+      storage: 500Gi
+  
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: patroni-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: patroni-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+rules:
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: patroni-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: patroni-backup
+subjects:
+  - kind: ServiceAccount
+    name: patroni-backup
+    namespace: storage
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+data:
+  s3_bucket: "patroni-backups-production"
+  retention_days: "30"
+  backup_schedule: "weekly"
+  verification_schedule: "weekly"
+  compression_level: "9"
+  backup_timeout: "3600" 

@@ -1,0 +1,323 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: patroni
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+  annotations:
+    description: "Service account for Patroni PostgreSQL HA cluster"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: patroni-leader
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+rules:
+  # Endpoint management for leader election
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["create", "get", "list", "patch", "update", "watch", "delete"]
+  
+  # ConfigMap management for cluster state
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "patch", "update", "watch", "delete"]
+  
+  # Pod management and labeling
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "patch", "update", "watch"]
+  
+  # Service management for routing
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["create", "get", "list", "patch", "update", "watch"]
+  
+  # Event creation for monitoring
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  
+  # Secret access for credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  
+  # PersistentVolumeClaim management
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: patroni-leader
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: patroni-leader
+subjects:
+  - kind: ServiceAccount
+    name: patroni
+    namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: patroni-cluster-reader
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+rules:
+  # Node information for topology awareness
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  
+  # Namespace information
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  
+  # StorageClass information for PVC management
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: patroni-cluster-reader
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: patroni-cluster-reader
+subjects:
+  - kind: ServiceAccount
+    name: patroni
+    namespace: storage
+
+---
+# NetworkPolicy for Patroni cluster communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: patroni-ha-cluster-netpol
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: patroni
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow PostgreSQL connections from applications
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - namespaceSelector:
+            matchLabels:
+              name: applications
+        - namespaceSelector:
+            matchLabels:
+              name: services
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: pgbouncer
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: haproxy
+      ports:
+        - protocol: TCP
+          port: 5432
+    
+    # Allow Patroni API access for management
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: admin
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: patroni
+      ports:
+        - protocol: TCP
+          port: 8008
+    
+    # Allow metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: prometheus
+      ports:
+        - protocol: TCP
+          port: 9187
+    
+    # Inter-cluster communication for replication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: patroni
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8008
+  
+  egress:
+    # Allow Kubernetes API access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow inter-cluster communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: patroni
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8008
+    
+    # Allow external backup destinations
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 22
+
+---
+# PodSecurityPolicy for enhanced security (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: patroni-psp
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+    ranges:
+      - min: 999
+        max: 999
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 999
+        max: 999
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 999
+        max: 999
+
+---
+# Role for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: patroni-psp-user
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+rules:
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs: ["use"]
+    resourceNames: ["patroni-psp"]
+
+---
+# RoleBinding for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: patroni-psp-user
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: patroni-psp-user
+subjects:
+  - kind: ServiceAccount
+    name: patroni
+    namespace: storage 

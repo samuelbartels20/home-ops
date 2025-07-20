@@ -1,0 +1,510 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patroni-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+data:
+  # Advanced Patroni Configuration
+  patroni.yml: |
+    scope: patroni-ha-cluster
+    namespace: /patroni/
+    name: ${PATRONI_NAME}
+    
+    restapi:
+      listen: 0.0.0.0:8008
+      connect_address: ${PATRONI_KUBERNETES_POD_IP}:8008
+      certfile: /etc/ssl/certs/patroni.crt
+      keyfile: /etc/ssl/private/patroni.key
+      authentication:
+        username: patroni
+        password: ${PATRONI_API_PASSWORD}
+      allowlist_include_members: true
+    
+    ctl:
+      insecure: false
+      cacert: /etc/ssl/certs/ca.crt
+      certfile: /etc/ssl/certs/patroni.crt
+      keyfile: /etc/ssl/private/patroni.key
+    
+    kubernetes:
+      namespace: storage
+      labels:
+        app.kubernetes.io/name: patroni
+      scope: patroni-ha-cluster
+      use_endpoints: true
+      pod_ip: ${PATRONI_KUBERNETES_POD_IP}
+      ports:
+        - name: postgresql
+          port: 5432
+      role_label: postgresql-role
+      leader_label_value: master
+      replica_label_value: replica
+      readiness_probe:
+        endpoint: /readiness
+        schema: http
+        port: 8008
+      
+    watchdog:
+      mode: required
+      device: /dev/watchdog
+      safety_margin: 5
+    
+    bootstrap:
+      dcs:
+        ttl: 30
+        loop_wait: 10
+        retry_timeout: 30
+        maximum_lag_on_failover: 1048576
+        master_start_timeout: 300
+        synchronous_mode: false
+        synchronous_mode_strict: false
+        check_timeline: true
+        postgresql:
+          use_pg_rewind: true
+          use_slots: true
+          recovery_conf:
+            restore_command: 'cp /var/lib/postgresql/wal_archive/%f %p'
+          parameters:
+            # Connection Settings
+            max_connections: 200
+            superuser_reserved_connections: 3
+            
+            # Memory Settings
+            shared_buffers: 256MB
+            effective_cache_size: 1GB
+            maintenance_work_mem: 64MB
+            work_mem: 4MB
+            
+            # Checkpoint Settings
+            checkpoint_completion_target: 0.9
+            checkpoint_timeout: 300s
+            max_wal_size: 4GB
+            min_wal_size: 1GB
+            
+            # WAL Settings
+            wal_buffers: 16MB
+            wal_writer_delay: 200ms
+            commit_delay: 0
+            commit_siblings: 5
+            
+            # Query Planner Settings
+            default_statistics_target: 100
+            random_page_cost: 1.1
+            effective_io_concurrency: 200
+            
+            # Replication Settings
+            hot_standby: on
+            wal_level: replica
+            max_wal_senders: 10
+            max_replication_slots: 10
+            wal_keep_size: 2048MB
+            wal_log_hints: on
+            
+            # Archive Settings
+            archive_mode: on
+            archive_command: 'cp %p /var/lib/postgresql/wal_archive/%f'
+            archive_timeout: 300s
+            
+            # Security Settings
+            ssl: on
+            ssl_cert_file: /var/lib/postgresql/server.crt
+            ssl_key_file: /var/lib/postgresql/server.key
+            ssl_ca_file: /var/lib/postgresql/ca.crt
+            ssl_crl_file: /var/lib/postgresql/server.crl
+            
+            # Logging Settings
+            logging_collector: on
+            log_destination: stderr,csvlog
+            log_directory: /var/log/postgresql
+            log_filename: postgresql-%Y-%m-%d_%H%M%S.log
+            log_file_mode: 0600
+            log_truncate_on_rotation: on
+            log_rotation_age: 1d
+            log_rotation_size: 100MB
+            log_min_duration_statement: 1000
+            log_checkpoints: on
+            log_connections: on
+            log_disconnections: on
+            log_lock_waits: on
+            log_temp_files: 0
+            log_autovacuum_min_duration: 0
+            log_statement: all
+            log_line_prefix: '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+            
+            # Autovacuum Settings
+            autovacuum: on
+            autovacuum_max_workers: 3
+            autovacuum_naptime: 60s
+            autovacuum_vacuum_threshold: 50
+            autovacuum_analyze_threshold: 50
+            autovacuum_vacuum_scale_factor: 0.2
+            autovacuum_analyze_scale_factor: 0.1
+            autovacuum_vacuum_cost_delay: 20ms
+            autovacuum_vacuum_cost_limit: 200
+            
+            # Background Writer Settings
+            bgwriter_delay: 200ms
+            bgwriter_lru_maxpages: 100
+            bgwriter_lru_multiplier: 2.0
+            bgwriter_flush_after: 512kB
+            
+            # Performance Settings
+            seq_page_cost: 1.0
+            cpu_tuple_cost: 0.01
+            cpu_index_tuple_cost: 0.005
+            cpu_operator_cost: 0.0025
+            
+            # Timeout Settings
+            statement_timeout: 0
+            lock_timeout: 0
+            idle_in_transaction_session_timeout: 0
+            tcp_keepalives_idle: 600
+            tcp_keepalives_interval: 30
+            tcp_keepalives_count: 3
+            
+      initdb:
+        - encoding: UTF8
+        - locale: en_US.UTF-8
+        - data-checksums
+        - auth-host: md5
+        - auth-local: trust
+      
+      pg_hba:
+        - local all postgres trust
+        - local all all trust
+        - host all postgres 127.0.0.1/32 trust
+        - host all postgres ::1/128 trust
+        - host replication replicator 0.0.0.0/0 md5
+        - host replication replicator ::/0 md5
+        - host all all 0.0.0.0/0 md5
+        - host all all ::/0 md5
+      
+      users:
+        admin:
+          password: ${PATRONI_SUPERUSER_PASSWORD}
+          options:
+            - createrole
+            - createdb
+            - login
+        replicator:
+          password: ${PATRONI_REPLICATION_PASSWORD}
+          options:
+            - replication
+            - login
+        monitoring:
+          password: ${PATRONI_MONITORING_PASSWORD}
+          options:
+            - login
+    
+    postgresql:
+      listen: 0.0.0.0:5432
+      connect_address: ${PATRONI_KUBERNETES_POD_IP}:5432
+      data_dir: /var/lib/postgresql/data/pgdata
+      bin_dir: /usr/lib/postgresql/17/bin
+      pgpass: /tmp/pgpass
+      authentication:
+        replication:
+          username: replicator
+          password: ${PATRONI_REPLICATION_PASSWORD}
+        superuser:
+          username: postgres
+          password: ${PATRONI_SUPERUSER_PASSWORD}
+        rewind:
+          username: postgres
+          password: ${PATRONI_SUPERUSER_PASSWORD}
+      parameters:
+        unix_socket_directories: /var/run/postgresql
+        stats_temp_directory: /var/run/postgresql/stats_temp
+      callbacks:
+        on_start: /etc/patroni/callbacks/on_start.sh
+        on_stop: /etc/patroni/callbacks/on_stop.sh
+        on_restart: /etc/patroni/callbacks/on_restart.sh
+        on_reload: /etc/patroni/callbacks/on_reload.sh
+        on_role_change: /etc/patroni/callbacks/on_role_change.sh
+      create_replica_methods:
+        - basebackup
+      basebackup:
+        checkpoint: fast
+        max-rate: 100M
+        verbose: true
+      recovery_conf:
+        restore_command: cp /var/lib/postgresql/wal_archive/%f %p
+        recovery_target_timeline: latest
+    
+    tags:
+      nofailover: false
+      noloadbalance: false
+      clonefrom: false
+      nosync: false
+      datacenter: k8s
+      rack: default
+    
+    # Enterprise logging configuration
+    log:
+      level: INFO
+      format: '%(asctime)s %(levelname)s: %(message)s'
+      dateformat: '%Y-%m-%d %H:%M:%S %Z'
+      max_queue_size: 1000
+      dir: /var/log/patroni
+      file_num: 4
+      file_size: 25MB
+    
+  # Callback scripts for enterprise operations
+  on_start.sh: |
+    #!/bin/bash
+    set -e
+    echo "$(date): Patroni node starting up" >> /var/log/patroni/callbacks.log
+    # Custom startup logic here
+    
+  on_stop.sh: |
+    #!/bin/bash
+    set -e
+    echo "$(date): Patroni node stopping" >> /var/log/patroni/callbacks.log
+    # Custom shutdown logic here
+    
+  on_restart.sh: |
+    #!/bin/bash
+    set -e
+    echo "$(date): Patroni node restarting" >> /var/log/patroni/callbacks.log
+    # Custom restart logic here
+    
+  on_reload.sh: |
+    #!/bin/bash
+    set -e
+    echo "$(date): Patroni configuration reloaded" >> /var/log/patroni/callbacks.log
+    # Custom reload logic here
+    
+  on_role_change.sh: |
+    #!/bin/bash
+    set -e
+    NEW_ROLE=$1
+    echo "$(date): Role changed to $NEW_ROLE" >> /var/log/patroni/callbacks.log
+    
+    # Update monitoring labels
+    kubectl label pod $HOSTNAME postgresql-role=$NEW_ROLE --overwrite
+    
+    # Custom role change logic
+    if [ "$NEW_ROLE" = "master" ]; then
+        echo "$(date): Node promoted to master" >> /var/log/patroni/callbacks.log
+        # Master-specific setup
+    elif [ "$NEW_ROLE" = "replica" ]; then
+        echo "$(date): Node demoted to replica" >> /var/log/patroni/callbacks.log
+        # Replica-specific setup
+    fi
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-exporter-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+data:
+  queries.yaml: |
+    # Custom PostgreSQL metrics for enterprise monitoring
+    pg_replication_lag:
+      query: |
+        SELECT
+          client_addr,
+          client_hostname,
+          client_port,
+          state,
+          sent_lsn,
+          write_lsn,
+          flush_lsn,
+          replay_lsn,
+          write_lag,
+          flush_lag,
+          replay_lag,
+          sync_priority,
+          sync_state
+        FROM pg_stat_replication;
+      metrics:
+        - client_addr:
+            usage: "LABEL"
+            description: "Client address of WAL receiver"
+        - client_hostname:
+            usage: "LABEL"
+            description: "Client hostname of WAL receiver"
+        - state:
+            usage: "LABEL"
+            description: "Current WAL receiver state"
+        - write_lag:
+            usage: "GAUGE"
+            description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written it"
+        - flush_lag:
+            usage: "GAUGE"
+            description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written and flushed it"
+        - replay_lag:
+            usage: "GAUGE"
+            description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it"
+        - sync_priority:
+            usage: "GAUGE"
+            description: "Priority of this standby server for being chosen as the synchronous standby"
+        - sync_state:
+            usage: "LABEL"
+            description: "Synchronous state of this standby server"
+    
+    pg_connection_states:
+      query: |
+        SELECT
+          state,
+          COUNT(*) as connections
+        FROM pg_stat_activity
+        WHERE pid <> pg_backend_pid()
+        GROUP BY state;
+      metrics:
+        - state:
+            usage: "LABEL"
+            description: "Connection state"
+        - connections:
+            usage: "GAUGE"
+            description: "Number of connections in this state"
+    
+    pg_database_sizes:
+      query: |
+        SELECT
+          datname,
+          pg_database_size(datname) as size_bytes
+        FROM pg_database;
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Database size in bytes"
+    
+    pg_table_sizes:
+      query: |
+        SELECT
+          schemaname,
+          tablename,
+          pg_total_relation_size(schemaname||'.'||tablename) as size_bytes,
+          pg_relation_size(schemaname||'.'||tablename) as table_size_bytes,
+          pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename) as index_size_bytes
+        FROM pg_tables
+        WHERE schemaname NOT IN ('information_schema', 'pg_catalog');
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Total table size including indexes"
+        - table_size_bytes:
+            usage: "GAUGE"
+            description: "Table size excluding indexes"
+        - index_size_bytes:
+            usage: "GAUGE"
+            description: "Index size"
+    
+    pg_checkpoint_stats:
+      query: |
+        SELECT
+          checkpoints_timed,
+          checkpoints_req,
+          checkpoint_write_time,
+          checkpoint_sync_time,
+          buffers_checkpoint,
+          buffers_clean,
+          maxwritten_clean,
+          buffers_backend,
+          buffers_backend_fsync,
+          buffers_alloc
+        FROM pg_stat_bgwriter;
+      metrics:
+        - checkpoints_timed:
+            usage: "COUNTER"
+            description: "Number of scheduled checkpoints that have been performed"
+        - checkpoints_req:
+            usage: "COUNTER"
+            description: "Number of requested checkpoints that have been performed"
+        - checkpoint_write_time:
+            usage: "COUNTER"
+            description: "Total amount of time that has been spent in the portion of checkpoint processing where files are written to disk"
+        - checkpoint_sync_time:
+            usage: "COUNTER"
+            description: "Total amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk"
+        - buffers_checkpoint:
+            usage: "COUNTER"
+            description: "Number of buffers written during checkpoints"
+        - buffers_clean:
+            usage: "COUNTER"
+            description: "Number of buffers written by the background writer"
+        - maxwritten_clean:
+            usage: "COUNTER"
+            description: "Number of times the background writer stopped a cleaning scan because it had written too many buffers"
+        - buffers_backend:
+            usage: "COUNTER"
+            description: "Number of buffers written directly by a backend"
+        - buffers_backend_fsync:
+            usage: "COUNTER"
+            description: "Number of times a backend had to execute its own fsync call"
+        - buffers_alloc:
+            usage: "COUNTER"
+            description: "Number of buffers allocated"
+    
+    pg_locks:
+      query: |
+        SELECT
+          mode,
+          locktype,
+          COUNT(*) as locks
+        FROM pg_locks
+        GROUP BY mode, locktype;
+      metrics:
+        - mode:
+            usage: "LABEL"
+            description: "Lock mode"
+        - locktype:
+            usage: "LABEL"
+            description: "Lock type"
+        - locks:
+            usage: "GAUGE"
+            description: "Number of locks"
+    
+    pg_slow_queries:
+      query: |
+        SELECT
+          COUNT(*) as slow_queries
+        FROM pg_stat_activity
+        WHERE state = 'active'
+        AND now() - query_start > interval '5 seconds'
+        AND pid <> pg_backend_pid();
+      metrics:
+        - slow_queries:
+            usage: "GAUGE"
+            description: "Number of queries running longer than 5 seconds"
+    
+    patroni_cluster_status:
+      query: |
+        SELECT
+          CASE 
+            WHEN pg_is_in_recovery() THEN 'replica'
+            ELSE 'master'
+          END as role,
+          CASE 
+            WHEN pg_is_in_recovery() THEN 0
+            ELSE 1
+          END as is_leader;
+      metrics:
+        - role:
+            usage: "LABEL"
+            description: "PostgreSQL role in Patroni cluster"
+        - is_leader:
+            usage: "GAUGE"
+            description: "1 if this node is the leader, 0 otherwise" 

@@ -1,0 +1,515 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: patroni-ha-cluster
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: postgresql-ha
+    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/version: "3.3.3"
+    environment: production
+    tier: database
+    criticality: critical
+  annotations:
+    meta.helm.sh/release-name: patroni-ha-cluster
+    meta.helm.sh/release-namespace: storage
+    deployment.kubernetes.io/revision: "1"
+    monitoring.coreos.com/enabled: "true"
+    backup.velero.io/backup-volumes: patroni-config,patroni-data
+    replication.postgresql.org/enabled: "true"
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 3.7.0
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      main:
+        type: statefulset
+        replicas: 3
+        strategy: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1
+        annotations:
+          reloader.stakater.com/auto: "true"
+          deployment.kubernetes.io/revision: "1"
+          cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8008"
+          prometheus.io/path: "/metrics"
+
+        containers:
+          # Main Patroni Container
+          main:
+            image:
+              repository: postgres
+              tag: "17.2-alpine"
+              pullPolicy: IfNotPresent
+
+            env:
+              # PostgreSQL Configuration
+              POSTGRES_DB: postgres
+              POSTGRES_USER: postgres
+              POSTGRES_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: patroni-auth
+                    key: postgres_password
+              
+              # Patroni Configuration
+              PATRONI_KUBERNETES_NAMESPACE: storage
+              PATRONI_KUBERNETES_LABELS: "{app.kubernetes.io/name: patroni}"
+              PATRONI_KUBERNETES_SCOPE: patroni-ha-cluster
+              PATRONI_KUBERNETES_USE_ENDPOINTS: "true"
+              PATRONI_KUBERNETES_POD_IP: 
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+              PATRONI_KUBERNETES_PORTS: "[{\"name\": \"postgresql\", \"port\": 5432}]"
+              
+              # Cluster Configuration
+              PATRONI_SCOPE: patroni-ha-cluster
+              PATRONI_NAME:
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              
+              # PostgreSQL Connection
+              PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data/pgdata
+              PATRONI_POSTGRESQL_PGPASS: /tmp/pgpass
+              PATRONI_POSTGRESQL_LISTEN: "0.0.0.0:5432"
+              PATRONI_POSTGRESQL_CONNECT_ADDRESS:
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+              
+              # Replication Configuration
+              PATRONI_POSTGRESQL_PARAMETERS_MAX_CONNECTIONS: "200"
+              PATRONI_POSTGRESQL_PARAMETERS_SHARED_BUFFERS: "256MB"
+              PATRONI_POSTGRESQL_PARAMETERS_EFFECTIVE_CACHE_SIZE: "1GB"
+              PATRONI_POSTGRESQL_PARAMETERS_MAINTENANCE_WORK_MEM: "64MB"
+              PATRONI_POSTGRESQL_PARAMETERS_CHECKPOINT_COMPLETION_TARGET: "0.9"
+              PATRONI_POSTGRESQL_PARAMETERS_WAL_BUFFERS: "16MB"
+              PATRONI_POSTGRESQL_PARAMETERS_DEFAULT_STATISTICS_TARGET: "100"
+              PATRONI_POSTGRESQL_PARAMETERS_RANDOM_PAGE_COST: "1.1"
+              PATRONI_POSTGRESQL_PARAMETERS_EFFECTIVE_IO_CONCURRENCY: "200"
+              PATRONI_POSTGRESQL_PARAMETERS_WORK_MEM: "4MB"
+              PATRONI_POSTGRESQL_PARAMETERS_MIN_WAL_SIZE: "1GB"
+              PATRONI_POSTGRESQL_PARAMETERS_MAX_WAL_SIZE: "4GB"
+              
+              # High Availability Settings
+              PATRONI_POSTGRESQL_PARAMETERS_HOT_STANDBY: "on"
+              PATRONI_POSTGRESQL_PARAMETERS_WAL_LEVEL: "replica"
+              PATRONI_POSTGRESQL_PARAMETERS_MAX_WAL_SENDERS: "10"
+              PATRONI_POSTGRESQL_PARAMETERS_MAX_REPLICATION_SLOTS: "10"
+              PATRONI_POSTGRESQL_PARAMETERS_WAL_LOG_HINTS: "on"
+              PATRONI_POSTGRESQL_PARAMETERS_ARCHIVE_MODE: "on"
+              PATRONI_POSTGRESQL_PARAMETERS_ARCHIVE_COMMAND: "/bin/true"
+              
+              # Security Configuration
+              PATRONI_POSTGRESQL_PARAMETERS_SSL: "on"
+              PATRONI_POSTGRESQL_PARAMETERS_SSL_CERT_FILE: "/var/lib/postgresql/server.crt"
+              PATRONI_POSTGRESQL_PARAMETERS_SSL_KEY_FILE: "/var/lib/postgresql/server.key"
+              PATRONI_POSTGRESQL_PARAMETERS_SSL_CA_FILE: "/var/lib/postgresql/ca.crt"
+              
+              # Authentication
+              PATRONI_SUPERUSER_USERNAME: postgres
+              PATRONI_SUPERUSER_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: patroni-auth
+                    key: postgres_password
+              PATRONI_REPLICATION_USERNAME: replicator
+              PATRONI_REPLICATION_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: patroni-auth
+                    key: replication_password
+                    
+              # REST API Configuration
+              PATRONI_RESTAPI_LISTEN: "0.0.0.0:8008"
+              PATRONI_RESTAPI_CONNECT_ADDRESS:
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+              
+              # Bootstrap Configuration
+              PATRONI_BOOTSTRAP_DCS_TTL: "30"
+              PATRONI_BOOTSTRAP_DCS_LOOP_WAIT: "10"
+              PATRONI_BOOTSTRAP_DCS_RETRY_TIMEOUT: "30"
+              PATRONI_BOOTSTRAP_DCS_MAXIMUM_LAG_ON_FAILOVER: "1048576"
+              PATRONI_BOOTSTRAP_DCS_SYNCHRONOUS_MODE: "false"
+              PATRONI_BOOTSTRAP_DCS_SYNCHRONOUS_MODE_STRICT: "false"
+              PATRONI_BOOTSTRAP_DCS_POSTGRESQL_USE_PG_REWIND: "true"
+              PATRONI_BOOTSTRAP_DCS_POSTGRESQL_USE_SLOTS: "true"
+
+            command:
+              - "/bin/bash"
+              - "-c"
+              - |
+                # Install Patroni
+                apt-get update && apt-get install -y python3-pip python3-psycopg2
+                pip3 install patroni[kubernetes]==3.3.3
+                
+                # Create Patroni configuration
+                cat > /etc/patroni.yml << 'EOF'
+                scope: patroni-ha-cluster
+                namespace: /patroni/
+                name: ${PATRONI_NAME}
+                
+                restapi:
+                  listen: 0.0.0.0:8008
+                  connect_address: ${PATRONI_KUBERNETES_POD_IP}:8008
+                
+                kubernetes:
+                  namespace: storage
+                  labels:
+                    app.kubernetes.io/name: patroni
+                  scope: patroni-ha-cluster
+                  use_endpoints: true
+                  pod_ip: ${PATRONI_KUBERNETES_POD_IP}
+                  ports:
+                    - name: postgresql
+                      port: 5432
+                
+                bootstrap:
+                  dcs:
+                    ttl: 30
+                    loop_wait: 10
+                    retry_timeout: 30
+                    maximum_lag_on_failover: 1048576
+                    synchronous_mode: false
+                    synchronous_mode_strict: false
+                    postgresql:
+                      use_pg_rewind: true
+                      use_slots: true
+                      parameters:
+                        max_connections: 200
+                        shared_buffers: 256MB
+                        effective_cache_size: 1GB
+                        maintenance_work_mem: 64MB
+                        checkpoint_completion_target: 0.9
+                        wal_buffers: 16MB
+                        default_statistics_target: 100
+                        random_page_cost: 1.1
+                        effective_io_concurrency: 200
+                        work_mem: 4MB
+                        min_wal_size: 1GB
+                        max_wal_size: 4GB
+                        hot_standby: on
+                        wal_level: replica
+                        max_wal_senders: 10
+                        max_replication_slots: 10
+                        wal_log_hints: on
+                        archive_mode: on
+                        archive_command: /bin/true
+                        ssl: on
+                        logging_collector: on
+                        log_destination: stderr
+                        log_directory: /var/log/postgresql
+                        log_filename: postgresql-%Y-%m-%d_%H%M%S.log
+                        log_statement: all
+                        log_min_duration_statement: 1000
+                  initdb:
+                    - encoding: UTF8
+                    - data-checksums
+                  pg_hba:
+                    - host replication replicator 0.0.0.0/0 md5
+                    - host all all 0.0.0.0/0 md5
+                  users:
+                    admin:
+                      password: ${PATRONI_SUPERUSER_PASSWORD}
+                      options:
+                        - createrole
+                        - createdb
+                
+                postgresql:
+                  listen: 0.0.0.0:5432
+                  connect_address: ${PATRONI_KUBERNETES_POD_IP}:5432
+                  data_dir: /var/lib/postgresql/data/pgdata
+                  pgpass: /tmp/pgpass
+                  authentication:
+                    replication:
+                      username: replicator
+                      password: ${PATRONI_REPLICATION_PASSWORD}
+                    superuser:
+                      username: postgres
+                      password: ${PATRONI_SUPERUSER_PASSWORD}
+                  parameters:
+                    unix_socket_directories: /var/run/postgresql
+                
+                tags:
+                  nofailover: false
+                  noloadbalance: false
+                  clonefrom: false
+                  nosync: false
+                EOF
+                
+                # Start Patroni
+                exec patroni /etc/patroni.yml
+
+            ports:
+              - name: postgresql
+                containerPort: 5432
+                protocol: TCP
+              - name: patroni-api
+                containerPort: 8008
+                protocol: TCP
+
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+                ephemeral-storage: 2Gi
+              limits:
+                cpu: 4000m
+                memory: 8Gi
+                ephemeral-storage: 10Gi
+
+            securityContext:
+              runAsUser: 999
+              runAsGroup: 999
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              capabilities:
+                drop:
+                  - ALL
+
+          # PostgreSQL Exporter for Metrics
+          exporter:
+            image:
+              repository: quay.io/prometheuscommunity/postgres-exporter
+              tag: "v0.15.0"
+              pullPolicy: IfNotPresent
+
+            env:
+              DATA_SOURCE_NAME: "postgresql://postgres:${PATRONI_SUPERUSER_PASSWORD}@127.0.0.1:5432/postgres?sslmode=prefer"
+              PG_EXPORTER_WEB_LISTEN_ADDRESS: ":9187"
+              PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
+
+            ports:
+              - name: metrics
+                containerPort: 9187
+                protocol: TCP
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
+              runAsGroup: 65534
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+
+        pod:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "9187"
+            prometheus.io/path: "/metrics"
+            cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+            backup.velero.io/backup-volumes: patroni-data,patroni-config
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+
+          # Anti-affinity for HA across nodes
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: patroni
+                  topologyKey: kubernetes.io/hostname
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: patroni
+                    topologyKey: topology.kubernetes.io/zone
+
+          # Topology spread for even distribution
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: patroni
+
+    serviceAccount:
+      create: true
+      name: patroni
+      annotations:
+        eks.amazonaws.com/role-arn: ""
+
+    service:
+      main:
+        controller: main
+        enabled: true
+        type: ClusterIP
+        ports:
+          postgresql:
+            port: 5432
+            targetPort: 5432
+            protocol: TCP
+          patroni-api:
+            port: 8008
+            targetPort: 8008
+            protocol: TCP
+
+      metrics:
+        controller: main
+        enabled: true
+        type: ClusterIP
+        ports:
+          metrics:
+            port: 9187
+            targetPort: 9187
+            protocol: TCP
+
+      # Headless service for StatefulSet
+      headless:
+        controller: main
+        enabled: true
+        type: ClusterIP
+        clusterIP: None
+        ports:
+          postgresql:
+            port: 5432
+            targetPort: 5432
+            protocol: TCP
+
+    ingress:
+      main:
+        enabled: false
+
+    persistence:
+      patroni-data:
+        type: persistentVolumeClaim
+        size: 100Gi
+        storageClass: premium-rwo  # ZFS with high performance, compression, dedup
+        accessMode: ReadWriteOnce
+        retain: true
+        globalMounts:
+          - path: /var/lib/postgresql/data
+            readOnly: false
+
+      patroni-config:
+        type: configMap
+        name: patroni-config
+        defaultMode: 0644
+        globalMounts:
+          - path: /etc/patroni
+            readOnly: true
+
+      patroni-auth:
+        type: secret
+        name: patroni-auth
+        defaultMode: 0600
+        globalMounts:
+          - path: /etc/patroni/auth
+            readOnly: true
+
+      postgres-exporter-config:
+        type: configMap
+        name: postgres-exporter-config
+        defaultMode: 0644
+        globalMounts:
+          - path: /etc/postgres_exporter
+            readOnly: true
+
+      tmp:
+        type: emptyDir
+        sizeLimit: 1Gi
+        globalMounts:
+          - path: /tmp
+
+      var-run:
+        type: emptyDir
+        sizeLimit: 100Mi
+        globalMounts:
+          - path: /var/run/postgresql
+
+      var-log:
+        type: emptyDir
+        sizeLimit: 1Gi
+        globalMounts:
+          - path: /var/log/postgresql
+
+    # Health checks optimized for production
+    probes:
+      liveness:
+        controller: main
+        enabled: true
+        custom: true
+        spec:
+          httpGet:
+            path: /liveness
+            port: 8008
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+
+      readiness:
+        controller: main
+        enabled: true
+        custom: true
+        spec:
+          httpGet:
+            path: /readiness
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+
+      startup:
+        controller: main
+        enabled: true
+        custom: true
+        spec:
+          httpGet:
+            path: /health
+            port: 8008
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 18
+          successThreshold: 1 

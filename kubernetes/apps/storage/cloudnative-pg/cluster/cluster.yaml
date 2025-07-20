@@ -15,7 +15,6 @@ metadata:
     backup-policy: comprehensive
   annotations:
     cnpg.io/cluster-size: "3"
-    cnpg.io/primary-update-strategy: supervised
     cnpg.io/hibernation: "off"
     backup.cnpg.io/retention-policy: "30d"
     security.cnpg.io/fips-enabled: "true"

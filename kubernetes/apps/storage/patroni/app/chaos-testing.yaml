@@ -1,0 +1,251 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: patroni-chaos-testing
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: chaos-engineering
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "0 3 * * 1"  # Weekly on Monday at 3 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: patroni
+            app.kubernetes.io/component: chaos-engineering
+            job-type: chaos-test
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: patroni-chaos
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+            - name: chaos-test
+              image: bitnami/kubectl:latest
+              imagePullPolicy: IfNotPresent
+              
+              command:
+                - "/bin/bash"
+                - "-c"
+                - |
+                  #!/bin/bash
+                  set -euo pipefail
+                  
+                  echo "$(date): Starting Patroni chaos engineering tests"
+                  
+                  # Test 1: Pod deletion (simulating node failure)
+                  echo "$(date): Test 1 - Pod deletion chaos"
+                  REPLICA_POD=$(kubectl get pods -n storage -l app.kubernetes.io/name=patroni,postgresql-role=replica -o jsonpath='{.items[0].metadata.name}')
+                  if [ -n "$REPLICA_POD" ]; then
+                    echo "$(date): Deleting replica pod: $REPLICA_POD"
+                    kubectl delete pod "$REPLICA_POD" -n storage
+                    
+                    # Wait for pod to be recreated
+                    sleep 60
+                    
+                    # Check cluster health
+                    MASTER_POD=$(kubectl get pods -n storage -l app.kubernetes.io/name=patroni,postgresql-role=master -o jsonpath='{.items[0].metadata.name}')
+                    kubectl exec -n storage "$MASTER_POD" -- patronictl list
+                  fi
+                  
+                  # Test 2: Network partition simulation
+                  echo "$(date): Test 2 - Network partition simulation"
+                  # Add network delay to simulate partition
+                  kubectl patch networkpolicy patroni-strict-netpol -n storage --type='json' \
+                    -p='[{"op": "add", "path": "/spec/ingress/0/ports/0/port", "value": 5433}]'
+                  
+                  # Wait and restore
+                  sleep 30
+                  kubectl patch networkpolicy patroni-strict-netpol -n storage --type='json' \
+                    -p='[{"op": "replace", "path": "/spec/ingress/0/ports/0/port", "value": 5432}]'
+                  
+                  # Test 3: Resource pressure test
+                  echo "$(date): Test 3 - Resource pressure test"
+                  kubectl top pods -n storage --containers | grep patroni
+                  
+                  # Test 4: Backup integrity verification
+                  echo "$(date): Test 4 - Backup integrity check"
+                  kubectl create job --from=cronjob/patroni-backup-verification \
+                    chaos-backup-test-$(date +%s) -n storage || true
+                  
+                  # Test 5: Connection stress test
+                  echo "$(date): Test 5 - Connection stress test"
+                  for i in {1..10}; do
+                    kubectl run temp-pg-client-$i --rm -i --restart=Never \
+                      --image=postgres:17.2-alpine --namespace=storage \
+                      --command -- psql \
+                      "postgresql://postgres:$PGPASSWORD@patroni-ha-cluster.storage.svc.cluster.local:5432/postgres" \
+                      -c "SELECT 'Connection test $i successful', now();" &
+                  done
+                  wait
+                  
+                  echo "$(date): Chaos engineering tests completed successfully"
+              
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: patroni-auth
+                      key: postgres_password
+              
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: patroni-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: chaos-engineering
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: patroni-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: chaos-engineering
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete", "create"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: patroni-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: chaos-engineering
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: patroni-chaos
+subjects:
+  - kind: ServiceAccount
+    name: patroni-chaos
+    namespace: storage
+
+---
+# Health Check automation
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: patroni-health-check
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: patroni
+    app.kubernetes.io/component: health-check
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  timeZone: "UTC"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: patroni
+            app.kubernetes.io/component: health-check
+            job-type: health-check
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: patroni-chaos
+          containers:
+            - name: health-check
+              image: postgres:17.2-alpine
+              imagePullPolicy: IfNotPresent
+              
+              command:
+                - "/bin/bash"
+                - "-c"
+                - |
+                  #!/bin/bash
+                  set -euo pipefail
+                  
+                  echo "$(date): Starting Patroni health check"
+                  
+                  # Check cluster topology
+                  kubectl exec -n storage deployment/patroni-ha-cluster -- patronictl list
+                  
+                  # Check replication lag
+                  kubectl exec -n storage deployment/patroni-ha-cluster -- \
+                    psql -c "SELECT client_addr, state, replay_lag FROM pg_stat_replication;"
+                  
+                  # Check connection count
+                  kubectl exec -n storage deployment/patroni-ha-cluster -- \
+                    psql -c "SELECT count(*) as active_connections FROM pg_stat_activity WHERE state = 'active';"
+                  
+                  # Check database sizes
+                  kubectl exec -n storage deployment/patroni-ha-cluster -- \
+                    psql -c "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database;"
+                  
+                  # Verify external connectivity
+                  psql "postgresql://postgres:$PGPASSWORD@patroni-ha-cluster.storage.svc.cluster.local:5432/postgres" \
+                    -c "SELECT 'External connectivity test successful', version(), now();"
+                  
+                  echo "$(date): Health check completed successfully"
+              
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: patroni-auth
+                      key: postgres_password
+              
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi 

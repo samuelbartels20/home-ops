@@ -1,0 +1,282 @@
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pgbouncer-enterprise-hpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pgbouncer-enterprise
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    
+    # Memory-based scaling  
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    
+    # Custom metrics scaling based on connection pool utilization
+    - type: Object
+      object:
+        metric:
+          name: pgbouncer_pools_connection_utilization
+        target:
+          type: AverageValue
+          averageValue: "70"
+        describedObject:
+          apiVersion: v1
+          kind: Service
+          name: pgbouncer-enterprise
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pgbouncer-enterprise-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pgbouncer-enterprise
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 3
+  resourcePolicy:
+    containerPolicies:
+      - containerName: main
+        minAllowed:
+          cpu: 100m
+          memory: 128Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+      - containerName: metrics
+        minAllowed:
+          cpu: 10m
+          memory: 32Mi
+        maxAllowed:
+          cpu: 500m
+          memory: 512Mi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pgbouncer-enterprise-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pgbouncer
+  minAvailable: 2
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pgbouncer-enterprise-netpol
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pgbouncer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from applications
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - namespaceSelector:
+            matchLabels:
+              name: applications
+        - namespaceSelector:
+            matchLabels:
+              name: services
+      ports:
+        - protocol: TCP
+          port: 5432
+    
+    # Allow admin connections from specific namespaces
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: admin
+      ports:
+        - protocol: TCP
+          port: 6432
+    
+    # Allow metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9127
+          
+    # Allow HAProxy LoadBalancer
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: haproxy
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6432
+  
+  egress:
+    # Allow connections to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres17
+      ports:
+        - protocol: TCP
+          port: 5432
+    
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow external secret access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: security
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer-enterprise-lb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    service-type: loadbalancer
+    environment: production
+  annotations:
+    # Talos Linux LoadBalancer (Cilium L2 IPAM)
+    lbipam.cilium.io/ips: 192.168.8.105
+    external-dns.alpha.kubernetes.io/hostname: pgbouncer.samcloud.online
+    service.beta.kubernetes.io/topology-aware-hints: auto
+spec:
+  type: LoadBalancer
+  loadBalancerClass: cilium
+  ports:
+    - name: pgbouncer
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+    - name: admin
+      port: 6432
+      targetPort: 6432
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pgbouncer
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  externalTrafficPolicy: Local
+  internalTrafficPolicy: Local
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer-enterprise-headless
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    service-type: headless
+    environment: production
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: pgbouncer
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pgbouncer
+  publishNotReadyAddresses: false 
