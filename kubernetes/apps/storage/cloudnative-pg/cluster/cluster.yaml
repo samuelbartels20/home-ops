@@ -113,12 +113,8 @@ spec:
         - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
         - 'SELECT pg_reload_conf();'
     recovery:
-      recoveryTarget: "latest"
-      recoveryTargetTime: "2025-07-19 10:00:00"
       recoveryTargetAction: "promote"
       recoveryTargetTimeline: "latest"
-      recoveryTargetXID: "0"
-      recoveryTargetXIDAge: "0"
       source:
         type: s3
         s3:
