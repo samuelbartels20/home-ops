@@ -337,3 +337,18 @@ stringData:
       password: op://K8s/truenas-iscsi/password
       ssh_username: op://K8s/truenas-iscsi/ssh_username
       ssh_password: op://K8s/truenas-iscsi/ssh_password
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: postgres-backup
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     minio_access_key_id: op://K8s/postgres-backup/minio_access_key_id
+     minio_secret_access_key: op://K8s/postgres-backup/minio_secret_access_key
+     s3_endpoint_url: op://K8s/postgres-backup/s3_endpoint_url
+     s3_bucket_name: op://K8s/postgres-backup/s3_bucket_name

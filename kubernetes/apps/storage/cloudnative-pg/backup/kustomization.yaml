@@ -13,4 +13,4 @@ labels:
     pairs:
       app.kubernetes.io/name: cloudnative-pg
       app.kubernetes.io/component: backup
-      app.kubernetes.io/part-of: postgresql-enterprise
+      app.kubernetes.io/part-of: postgresql

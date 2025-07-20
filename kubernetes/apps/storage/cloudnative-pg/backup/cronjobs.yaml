@@ -8,7 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: validation
-    app.kubernetes.io/part-of: postgresql-enterprise
+    app.kubernetes.io/part-of: postgresql
 spec:
   schedule: "0 4 * * *"
   jobTemplate:
@@ -20,7 +20,7 @@ spec:
             cnpg.io/backup-validation: "true"
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: postgres-enterprise-backup
+          serviceAccountName: postgres-backup
           securityContext:
             runAsNonRoot: true
             runAsUser: 999
@@ -29,21 +29,21 @@ spec:
             - name: backup-validator
               image: ghcr.io/cloudnative-pg/postgresql:17.2
               env:
-                - name: AWS_ACCESS_KEY_ID
+                - name: minio_access_key_id
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: AWS_ACCESS_KEY_ID
-                - name: AWS_SECRET_ACCESS_KEY
+                      name: postgres-backup
+                      key: minio_access_key_id
+                - name: minio_secret_access_key
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: AWS_SECRET_ACCESS_KEY
-                - name: S3_BUCKET_NAME
+                      name: postgres-backup
+                      key: minio_secret_access_key
+                - name: s3_bucket_name
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: S3_BUCKET_NAME
+                      name: postgres-backup
+                      key: s3_bucket_name
               command:
                 - /bin/bash
                 - -c
@@ -51,7 +51,7 @@ spec:
                   echo "Validating PostgreSQL backups..."
 
                   # Check if latest backup exists
-                  latest_backup=$(barman-cloud-backup-list s3://$S3_BUCKET_NAME/pgbackup/ | head -1)
+                  latest_backup=$(barman-cloud-backup-list s3://$s3_bucket_name/pgbackup/ | head -1)
                   if [ -z "$latest_backup" ]; then
                     echo "ERROR: No backups found"
                     exit 1
@@ -60,7 +60,7 @@ spec:
                   echo "Latest backup: $latest_backup"
 
                   # Validate backup integrity
-                  backup_info=$(barman-cloud-backup-show s3://$S3_BUCKET_NAME/pgbackup/ $latest_backup)
+                  backup_info=$(barman-cloud-backup-show s3://$s3_bucket_name/pgbackup/ $latest_backup)
                   if echo "$backup_info" | grep -q "Status: DONE"; then
                     echo "SUCCESS: Backup validation passed"
                     exit 0
@@ -86,7 +86,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: cleanup
-    app.kubernetes.io/part-of: postgresql-enterprise
+    app.kubernetes.io/part-of: postgresql
 spec:
   # Run cleanup weekly on Saturday at 3 AM UTC
   schedule: "0 3 * * 6"
@@ -99,7 +99,7 @@ spec:
             cnpg.io/backup-cleanup: "true"
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: postgres-enterprise-backup
+          serviceAccountName: postgres-backup
           securityContext:
             runAsNonRoot: true
             runAsUser: 999
@@ -108,22 +108,22 @@ spec:
             - name: backup-cleaner
               image: ghcr.io/cloudnative-pg/postgresql:17.2
               env:
-                - name: AWS_ACCESS_KEY_ID
+                - name: minio_access_key_id
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: AWS_ACCESS_KEY_ID
-                - name: AWS_SECRET_ACCESS_KEY
+                      name: postgres-backup
+                      key: minio_access_key_id
+                - name: minio_secret_access_key
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: AWS_SECRET_ACCESS_KEY
-                - name: S3_BUCKET_NAME
+                      name: postgres-backup
+                      key: minio_secret_access_key
+                - name: s3_bucket_name
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-backup-secret
-                      key: S3_BUCKET_NAME
-                - name: RETENTION_POLICY
+                      name: postgres-backup
+                      key: s3_bucket_name
+                - name: barman_cloud_retention_policy
                   value: "90d"
               command:
                 - /bin/bash
@@ -133,8 +133,8 @@ spec:
 
                   # Apply retention policy
                   barman-cloud-backup-delete \
-                    --retention-policy "$RETENTION_POLICY" \
-                    s3://$S3_BUCKET_NAME/pgbackup/ \
+                    --retention-policy "$barman_cloud_retention_policy" \
+                    s3://$s3_bucket_name/pgbackup/ \
                     postgres-v2
 
                   echo "Backup cleanup completed"

@@ -52,6 +52,38 @@ spec:
   targetNamespace: storage
   timeout: 3m
   wait: false
+
+---
+# PostgreSQL Backup System
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-backup
+  namespace: flux-system
+spec:
+  targetNamespace: storage
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: postgres-backup
+      app.kubernetes.io/component: backup-system
+      app.kubernetes.io/part-of: postgresql
+  path: ./kubernetes/apps/storage/cloudnative-pg/backup
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  wait: false
+  interval: 30m
+  retryInterval: 1m
+  timeout: 5m
+  dependsOn:
+    - name: cloudnative-pg-operator
+      namespace: storage
+    - name: external-secrets
+      namespace: security
+    - name: onepassword
+      namespace: security
 # ---
 # # PostgreSQL Analytics Engine
 # apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -116,37 +148,7 @@ spec:
 #     - name: onepassword
 #       namespace: security
 
-# ---
-# # PostgreSQL Backup System
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-backup
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-backup
-#       app.kubernetes.io/component: backup-system
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/backup
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
+
   
 # ---
 # # PostgreSQL Multi-Tenant Isolation
