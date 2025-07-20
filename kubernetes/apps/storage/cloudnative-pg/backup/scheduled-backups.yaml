@@ -114,8 +114,6 @@ spec:
   method: barmanObjectStore
   target: prefer-standby
 
-  retentionPolicy: "2555d" 
-
   online: true
 
   metadata:
