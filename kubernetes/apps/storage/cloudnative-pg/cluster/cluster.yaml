@@ -81,20 +81,6 @@ spec:
             name: cloudnative-pg
             key: minio_secret_access_key
             
-  bootstrap:
-    initdb:
-      database: postgres
-      owner: postgres
-      secret:
-        name: cloudnative-pg
-      options:
-        - "--encoding=UTF8"
-        - "--locale=en_US.UTF-8"
-        - "--data-checksums"
-      postInitSQL:
-        - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
-        - 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
-
   postgresql:
     synchronous:
       method: any
