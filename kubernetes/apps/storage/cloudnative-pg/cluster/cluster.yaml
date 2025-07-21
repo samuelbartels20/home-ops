@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=
----
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -21,15 +19,11 @@ metadata:
     monitoring.cnpg.io/enabled: "true"
 spec:
   instances: 3
-  minSyncReplicas: 2
-  maxSyncReplicas: 2
 
-  # PostgreSQL container image
   imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
   
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
-
 
   nodeMaintenanceWindow:
     inProgress: false
@@ -38,7 +32,6 @@ spec:
   enableSuperuserAccess: true
   superuserSecret:
     name: cloudnative-pg
-
 
   storage:
     size: 10Gi
@@ -102,7 +95,6 @@ spec:
         - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
         - 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
 
-
   postgresql:
     synchronous:
       method: any
@@ -110,5 +102,3 @@ spec:
     parameters:
       max_connections: "400"
       shared_buffers: 256MB
-      
-
