@@ -105,10 +105,8 @@ spec:
 
   postgresql:
     synchronous:
-      maxStandbyNamesFromCluster: 1
-      standbyNamesPost:
-        - postgres17-003
-        - postgres17-002
+      method: any
+      number: 1
     parameters:
       max_connections: "400"
       shared_buffers: 256MB
