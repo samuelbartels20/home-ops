@@ -8,6 +8,4 @@ components:
 resources:
   - ./csi-driver-nfs/ks.yaml
   - ./openebs/ks.yaml  
-  - ./cloudnative-pg/ks.yaml
-  - ./pgbouncer/ks.yaml
-  - ./patroni/ks.yaml
+  # - ./cloudnative-pg/ks.yaml
