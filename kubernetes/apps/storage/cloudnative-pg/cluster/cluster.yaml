@@ -100,17 +100,7 @@ spec:
         - "--data-checksums"
       postInitSQL:
         - 'CREATE EXTENSION IF NOT EXISTS pg_stat_statements;'
-        - 'CREATE EXTENSION IF NOT EXISTS pg_buffercache;'
         - 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
-        - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
-        - 'CREATE EXTENSION IF NOT EXISTS ltree;'
-        - 'CREATE EXTENSION IF NOT EXISTS hstore;'
-        - 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
-        - 'CREATE EXTENSION IF NOT EXISTS btree_gin;'
-        - 'CREATE EXTENSION IF NOT EXISTS btree_gist;'
-        - 'ALTER SYSTEM SET log_statement = ''all'';'
-        - 'ALTER SYSTEM SET log_min_duration_statement = 1000;'
-        - 'SELECT pg_reload_conf();'
 
 
   postgresql:

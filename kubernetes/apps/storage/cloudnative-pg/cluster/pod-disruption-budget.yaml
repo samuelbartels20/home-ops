@@ -12,7 +12,7 @@ spec:
   minAvailable: 2
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: postgres17
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget

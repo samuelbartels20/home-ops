@@ -21,3 +21,45 @@ spec:
       protocol: TCP
       targetPort: 5432
   sessionAffinity: ClientIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-ro
+  namespace: storage
+  labels:
+    cnpg.io/cluster: postgres17
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: postgres17
+    cnpg.io/instanceRole: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-rw
+  namespace: storage
+  labels:
+    cnpg.io/cluster: postgres17
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: postgres17
+    cnpg.io/instanceRole: primary
+  sessionAffinity: None
