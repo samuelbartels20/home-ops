@@ -4,7 +4,7 @@ metadata:
   name: postgres-lb
   namespace: storage
   labels:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
   annotations:
@@ -13,7 +13,7 @@ metadata:
 spec:
   type: LoadBalancer
   selector:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     cnpg.io/instanceRole: primary
   ports:
     - name: postgres
@@ -29,7 +29,7 @@ metadata:
   name: postgres-ro
   namespace: storage
   labels:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
 spec:
@@ -40,7 +40,7 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     cnpg.io/instanceRole: replica
 ---
 apiVersion: v1
@@ -49,7 +49,7 @@ metadata:
   name: postgres-rw
   namespace: storage
   labels:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     app.kubernetes.io/name: postgres
     app.kubernetes.io/component: database
 spec:
@@ -60,6 +60,6 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres17
     cnpg.io/instanceRole: primary
   sessionAffinity: None
