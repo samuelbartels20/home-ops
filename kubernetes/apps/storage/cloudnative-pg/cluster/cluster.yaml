@@ -20,7 +20,7 @@ metadata:
 spec:
   instances: 3
 
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.9-17
+  imageName: "ghcr.io/cloudnative-pg/postgresql:16.9-17"
   
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
