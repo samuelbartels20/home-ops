@@ -139,9 +139,6 @@ spec:
       cpu: "1000m"
       memory: "1Gi"
 
-  startupProbe:
-    failureThreshold: 30
-    periodSeconds: 10
   livenessProbe:
     periodSeconds: 20
     timeoutSeconds: 5
