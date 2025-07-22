@@ -21,7 +21,7 @@ spec:
   instances: 3
 
   imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
-  
+
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
@@ -33,6 +33,13 @@ spec:
   superuserSecret:
     name: cloudnative-pg
 
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: cloudnative-pg
+
   storage:
     size: 10Gi
     storageClass: openebs-hostpath
@@ -42,7 +49,6 @@ spec:
     size: 10Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
-
 
   backup:
     retentionPolicy: "30d"
@@ -81,10 +87,6 @@ spec:
           secretAccessKey:
             name: cloudnative-pg
             key: minio_secret_access_key
-            
-  # bootstrap:
-  #   recovery:
-  #     source: *previousCluster
 
   postgresql:
     synchronous:
