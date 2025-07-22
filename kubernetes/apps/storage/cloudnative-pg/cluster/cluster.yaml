@@ -131,11 +131,3 @@ spec:
       cpu: "1000m"
       memory: "1Gi"
 
-  livenessProbe:
-    periodSeconds: 20
-    timeoutSeconds: 5
-    failureThreshold: 6
-  readinessProbe:
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
