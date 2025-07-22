@@ -3,20 +3,20 @@ kind: Cluster
 metadata:
   name: postgres17
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: database
-    app.kubernetes.io/part-of: postgresql
-    app.kubernetes.io/version: "17.2"
-    environment: production
-    tier: data
-    backup-policy: comprehensive
-  annotations:
-    cnpg.io/cluster-size: "3"
-    cnpg.io/hibernation: "off"
-    backup.cnpg.io/retention-policy: "30d"
-    security.cnpg.io/fips-enabled: "true"
-    monitoring.cnpg.io/enabled: "true"
+  # labels:
+  #   app.kubernetes.io/name: postgres
+  #   app.kubernetes.io/component: database
+  #   app.kubernetes.io/part-of: postgresql
+  #   app.kubernetes.io/version: "17.2"
+  #   environment: production
+  #   tier: data
+  #   backup-policy: comprehensive
+  # annotations:
+  #   cnpg.io/cluster-size: "3"
+  #   cnpg.io/hibernation: "off"
+  #   backup.cnpg.io/retention-policy: "30d"
+  #   security.cnpg.io/fips-enabled: "true"
+  #   monitoring.cnpg.io/enabled: "true"
 spec:
   instances: 3
 
