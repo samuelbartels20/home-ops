@@ -42,18 +42,6 @@ spec:
     highAvailability:
       enabled: true
 
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchExpressions:
-                - key: app.kubernetes.io/name
-                  operator: In
-                  values:
-                    - postgres
-            topologyKey: kubernetes.io/hostname
 
 
   storage:
@@ -65,13 +53,6 @@ spec:
     size: 10Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
-
-  tls:
-    secret:
-      name: postgres-tls
-    certificate:
-      secret:
-        name: postgres-ca
 
   backup:
     retentionPolicy: "30d"
