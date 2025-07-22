@@ -40,6 +40,10 @@ spec:
       secret:
         name: cloudnative-pg
 
+  replicationSlots:
+    highAvailability:
+      enabled: true
+
   storage:
     size: 10Gi
     storageClass: openebs-hostpath
