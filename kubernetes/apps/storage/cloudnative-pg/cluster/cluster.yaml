@@ -71,6 +71,13 @@ spec:
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
 
+  tls:
+    secret:
+      name: postgres-tls
+    certificate:
+      secret:
+        name: postgres-ca
+
   backup:
     retentionPolicy: "30d"
     barmanObjectStore:
@@ -95,6 +102,27 @@ spec:
         cluster: postgres17
         backup-type: comprehensive
 
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.102:9000
+        serverName: postgres17-002
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
+
+  readOnlyService:
+    enabled: true
+    name: postgres17-ro
+
+  monitoring:
+    enablePodMonitor: true
+
   postgresql:
     synchronous:
       method: any
@@ -103,5 +131,22 @@ spec:
       max_connections: "400"
       shared_buffers: 256MB
 
-  monitoring:
-    enablePodMonitor: true
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  startupProbe:
+    failureThreshold: 30
+    periodSeconds: 10
+  livenessProbe:
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 6
+  readinessProbe:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
