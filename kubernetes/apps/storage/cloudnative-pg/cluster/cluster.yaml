@@ -43,13 +43,7 @@ spec:
       enabled: true
 
 
-
   storage:
-    size: 10Gi
-    storageClass: openebs-hostpath
-    resizeInUseVolumes: true
-
-  walStorage:
     size: 10Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
