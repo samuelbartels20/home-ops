@@ -25,9 +25,7 @@ spec:
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
-  nodeMaintenanceWindow:
-    inProgress: false
-    reusePVC: true
+  enablePDB: true
 
   enableSuperuserAccess: true
   superuserSecret:
@@ -43,6 +41,25 @@ spec:
   replicationSlots:
     highAvailability:
       enabled: true
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - postgres
+            topologyKey: kubernetes.io/hostname
+
+  tolerations:
+    - key: "critical-database"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
 
   storage:
     size: 10Gi
@@ -78,20 +95,6 @@ spec:
         cluster: postgres17
         backup-type: comprehensive
 
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: s3://pgbackup
-        endpointURL: http://192.168.8.102:9000
-        serverName: &previousCluster postgres17-002
-        s3Credentials:
-          accessKeyId:
-            name: cloudnative-pg
-            key: minio_access_key_id
-          secretAccessKey:
-            name: cloudnative-pg
-            key: minio_secret_access_key
-
   postgresql:
     synchronous:
       method: any
@@ -99,3 +102,6 @@ spec:
     parameters:
       max_connections: "400"
       shared_buffers: 256MB
+
+  monitoring:
+    enablePodMonitor: true
