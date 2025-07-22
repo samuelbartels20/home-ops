@@ -55,11 +55,6 @@ spec:
                     - postgres
             topologyKey: kubernetes.io/hostname
 
-  tolerations:
-    - key: "critical-database"
-      operator: "Equal"
-      value: "true"
-      effect: "NoSchedule"
 
   storage:
     size: 10Gi
