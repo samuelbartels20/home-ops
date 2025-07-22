@@ -3,17 +3,17 @@ kind: Service
 metadata:
   name: postgres-lb
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: database
+  # labels:
+  #   cnpg.io/cluster: postgres
+  #   app.kubernetes.io/name: postgres
+  #   app.kubernetes.io/component: database
   annotations:
     lbipam.cilium.io/ips: 192.168.8.101
     external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
 spec:
   type: LoadBalancer
   selector:
-    cnpg.io/cluster: postgres17
+    cnpg.io/cluster: postgres
     cnpg.io/instanceRole: primary
   ports:
     - name: postgres
@@ -28,10 +28,10 @@ kind: Service
 metadata:
   name: postgres-ro
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: database
+  # labels:
+  #   cnpg.io/cluster: postgres
+  #   app.kubernetes.io/name: postgres
+  #   app.kubernetes.io/component: database
 spec:
   type: ClusterIP
   ports:
@@ -40,7 +40,7 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres17
+    cnpg.io/cluster: postgres
     cnpg.io/instanceRole: replica
 ---
 apiVersion: v1
@@ -48,10 +48,10 @@ kind: Service
 metadata:
   name: postgres-rw
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: database
+  # labels:
+  #   cnpg.io/cluster: postgres
+  #   app.kubernetes.io/name: postgres
+  #   app.kubernetes.io/component: database
 spec:
   type: ClusterIP
   ports:
@@ -60,6 +60,6 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres17
+    cnpg.io/cluster: postgres
     cnpg.io/instanceRole: primary
   sessionAffinity: None

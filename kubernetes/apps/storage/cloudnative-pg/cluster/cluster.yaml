@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres17
+  name: postgres
   namespace: storage
   # labels:
   #   app.kubernetes.io/name: postgres
@@ -20,7 +20,7 @@ metadata:
 spec:
   instances: 3
 
-  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.9-17
   
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
