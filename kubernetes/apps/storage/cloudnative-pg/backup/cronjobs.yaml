@@ -3,7 +3,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: postgres-backup-validation
+  name: postgres17-backup-validation
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -81,7 +81,7 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: postgres-backup-cleanup
+  name: postgres17-backup-cleanup
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
