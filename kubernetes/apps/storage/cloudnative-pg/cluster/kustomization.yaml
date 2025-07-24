@@ -10,12 +10,6 @@ resources:
   - ./scheduledbackup.yaml
   - ./pod-disruption-budget.yaml
   - ./service-monitor.yaml
-  # - ./resource-quotas.yaml
   - ./horizontal-pod-autoscaler.yaml
   - ./tls-certificates.yaml
-  - ./audit-compliance.yaml
-commonLabels:
-  app.kubernetes.io/name: pg-cluster
-  app.kubernetes.io/instance: pg-cluster
-  app.kubernetes.io/component: database
-  app.kubernetes.io/part-of: storage
+
