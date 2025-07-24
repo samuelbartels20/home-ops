@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-cluster-config
+  name: postgres17-config
   namespace: storage
   labels:
     app.kubernetes.io/name: postgres
