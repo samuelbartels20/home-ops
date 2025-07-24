@@ -2,7 +2,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-pdb
+  name: postgres17-pdb
   namespace: storage
   labels:
     app.kubernetes.io/name: postgres
@@ -17,7 +17,7 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-primary-pdb
+  name: postgres17-primary-pdb
   namespace: storage
   labels:
     app.kubernetes.io/name: postgres
