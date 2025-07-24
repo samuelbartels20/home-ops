@@ -3,9 +3,6 @@ kind: ServiceMonitor
 metadata:
   name: postgres17-metrics
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: monitoring
 spec:
   selector:
     matchLabels:

@@ -4,10 +4,6 @@ kind: PodDisruptionBudget
 metadata:
   name: postgres17-pdb
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
 spec:
   minAvailable: 2
   selector:
@@ -19,10 +15,6 @@ kind: PodDisruptionBudget
 metadata:
   name: postgres17-primary-pdb
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
 spec:
   minAvailable: 1
   selector:

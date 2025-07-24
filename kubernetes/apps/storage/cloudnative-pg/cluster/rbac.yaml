@@ -5,10 +5,6 @@ kind: ServiceAccount
 metadata:
   name: postgres-cluster-sa
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
 
 ---
 # Role for PostgreSQL cluster management
@@ -99,9 +95,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: postgres-cluster-cluster-role
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
 rules:
   # Node access for monitoring
   - apiGroups: [""]
@@ -160,9 +153,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: postgres17-cluster-cluster-rolebinding
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
 subjects:
   - kind: ServiceAccount
     name: postgres17-cluster-sa

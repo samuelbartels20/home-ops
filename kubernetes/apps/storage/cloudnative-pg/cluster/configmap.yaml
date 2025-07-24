@@ -3,10 +3,6 @@ kind: ConfigMap
 metadata:
   name: postgres17-config
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
 data:
   postgresql.conf: |
     listen_addresses = '*'

@@ -3,10 +3,6 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: postgres17-hpa
   namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
 spec:
   scaleTargetRef:
     apiVersion: postgresql.cnpg.io/v1
