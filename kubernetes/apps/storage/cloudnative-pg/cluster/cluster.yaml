@@ -91,14 +91,14 @@ spec:
       method: any
       number: 1
     parameters:
-      max_connections: "400"
-      shared_buffers: 256MB
+      max_connections: "100"
+      shared_buffers: 128MB
 
   resources:
     requests:
-      cpu: "100m"
+      cpu: "15m"
       memory: "256Mi"
     limits:
-      cpu: "500m"
-      memory: "512Mi"
+      cpu: "100m"
+      memory: "256Mi"
 
