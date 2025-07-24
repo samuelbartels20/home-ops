@@ -6,7 +6,7 @@ metadata:
   name: postgres-server-cert
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
+    app.kubernetes.io/name: postgres
     app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
@@ -17,12 +17,12 @@ spec:
   dnsNames:
   - postgres.samcloud.online
   - 192.168.8.101
-  - postgres-rw.storage.svc
-  - postgres-rw.storage.svc.cluster.local
-  - postgres-ro.storage.svc
-  - postgres-ro.storage.svc.cluster.local
-  - "*.postgres.storage.svc"
-  - "*.postgres.storage.svc.cluster.local"
+  - postgres17-rw.storage.svc
+  - postgres17-rw.storage.svc.cluster.local
+  - postgres17-ro.storage.svc
+  - postgres17-ro.storage.svc.cluster.local
+  - "*.postgres17.storage.svc"
+  - "*.postgres17.storage.svc.cluster.local"
   duration: 2160h
   renewBefore: 360h
   privateKey:
@@ -37,7 +37,7 @@ metadata:
   name: postgres-client-cert
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
+    app.kubernetes.io/name: postgres
     app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
@@ -62,7 +62,7 @@ metadata:
   name: postgres-backup-cert
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
+    app.kubernetes.io/name: postgres
     app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
