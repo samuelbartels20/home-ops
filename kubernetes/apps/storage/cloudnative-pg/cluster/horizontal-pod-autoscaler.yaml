@@ -1,11 +1,11 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: postgres-read-replicas-hpa
+  name: postgres17-hpa
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   scaleTargetRef:
