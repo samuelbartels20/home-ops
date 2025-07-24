@@ -3,10 +3,6 @@ kind: Service
 metadata:
   name: postgres17-lb
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
   annotations:
     lbipam.cilium.io/ips: 192.168.8.101
     external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
@@ -28,10 +24,6 @@ kind: Service
 metadata:
   name: postgres17-ro
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
 spec:
   type: ClusterIP
   ports:
@@ -48,10 +40,6 @@ kind: Service
 metadata:
   name: postgres17-rw
   namespace: storage
-  labels:
-    cnpg.io/cluster: postgres17
-    app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: storage
 spec:
   type: ClusterIP
   ports:
