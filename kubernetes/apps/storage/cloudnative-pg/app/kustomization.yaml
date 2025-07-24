@@ -4,9 +4,6 @@ kind: Kustomization
 namespace: storage
 resources:
   - ./helmrelease.yaml
-  - ./configmap.yaml
-  - ./rbac.yaml
-  - ./service.yaml
   - ./prometheus-rules.yaml
   - ./externalsecret.yaml
 commonLabels:

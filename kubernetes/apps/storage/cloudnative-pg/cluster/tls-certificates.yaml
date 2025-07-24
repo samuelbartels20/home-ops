@@ -7,7 +7,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   secretName: postgres-server-tls
@@ -38,7 +38,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   secretName: postgres-client-tls
@@ -63,7 +63,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   secretName: postgres-backup-tls

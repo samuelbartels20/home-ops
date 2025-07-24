@@ -5,7 +5,7 @@ metadata:
   namespace: storage
   labels:
     app.kubernetes.io/name: postgres
-    app.kubernetes.io/component: database
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: postgresql
     app.kubernetes.io/version: "17.2"
     environment: production
@@ -67,10 +67,6 @@ spec:
         compression: bzip2
         jobs: 2
       serverName: &currentCluster postgres17-003
-      tags:
-        environment: production
-        cluster: postgres17
-        backup-type: comprehensive
 
   externalClusters:
     - name: clusterBackup
@@ -100,9 +96,9 @@ spec:
 
   resources:
     requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
       cpu: "500m"
       memory: "512Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
 

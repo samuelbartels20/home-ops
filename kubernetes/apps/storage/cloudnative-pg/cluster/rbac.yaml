@@ -6,8 +6,8 @@ metadata:
   name: postgres-cluster-sa
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 
 ---
@@ -100,8 +100,8 @@ kind: ClusterRole
 metadata:
   name: postgres-cluster-cluster-role
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
 rules:
   # Node access for monitoring
   - apiGroups: [""]
@@ -161,8 +161,8 @@ kind: ClusterRoleBinding
 metadata:
   name: postgres-cluster-cluster-rolebinding
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
 subjects:
   - kind: ServiceAccount
     name: postgres-cluster-sa

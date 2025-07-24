@@ -5,8 +5,8 @@ metadata:
   name: postgres-pdb
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   minAvailable: 2
@@ -20,12 +20,12 @@ metadata:
   name: postgres-primary-pdb
   namespace: storage
   labels:
-    app.kubernetes.io/name: pg-cluster
-    app.kubernetes.io/component: database
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: storage
     app.kubernetes.io/part-of: storage
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: postgres17
       cnpg.io/instanceRole: primary 

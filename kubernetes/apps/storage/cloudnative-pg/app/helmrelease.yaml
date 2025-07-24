@@ -17,10 +17,10 @@ spec:
   install:
     remediation:
       retries: 3
-  # upgrade:
-  #   cleanupOnFail: true
-  #   remediation:
-  #     retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
   uninstall:
     keepHistory: false
   values:
@@ -29,17 +29,17 @@ spec:
     manager:
       resources:
         requests:
-          cpu: "100m"
+          cpu: "15m"
           memory: "128Mi"
         limits:
-          cpu: "500m"
-          memory: "512Mi"
+          cpu: "100m"
+          memory: "256Mi"
     config:
       data:
         INHERITED_ANNOTATIONS: "cnpg.io/*"
         BACKUP_OWNER_USER_ID: "999"
         BACKUP_OWNER_GROUP_ID: "999"
-        BACKUP_COMPRESSION_TYPE: "gzip"
+        BACKUP_COMPRESSION_TYPE: "bzip2"
         BACKUP_COMPRESSION_LEVEL: "6"
         BACKUP_RETENTION_POLICY: "30d"
         BACKUP_DATA_PATH: "/var/lib/postgresql/data"
