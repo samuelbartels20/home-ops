@@ -7,7 +7,7 @@ namespace: storage
 resources:
   - ./externalsecret.yaml
   - ./helmrelease.yaml
-  - ./oci-repository.yaml
+  # - ./oci-repository.yaml
   # - ./vpa.yaml
   - ./poddisruptionbudget.yaml
   - ./networkpolicy.yaml
