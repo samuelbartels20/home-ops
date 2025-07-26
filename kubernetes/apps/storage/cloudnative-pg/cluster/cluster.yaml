@@ -57,12 +57,9 @@ spec:
           name: cloudnative-pg
           key: minio-secret-access-key
   bootstrap:
-    recovery:
-      source: &previousCluster postgres-v1
-
-  externalClusters:
-    - name: *previousCluster
-      barmanObjectStore:
-        <<: *barmanObjectStore
-        serverName: *previousCluster
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: cloudnative-pg
 
