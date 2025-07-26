@@ -11,5 +11,5 @@ resources:
   - ./pod-disruption-budget.yaml
   - ./service-monitor.yaml
   - ./horizontal-pod-autoscaler.yaml
-  - ./tls-certificates.yaml
+  # - ./tls-certificates.yaml
 
