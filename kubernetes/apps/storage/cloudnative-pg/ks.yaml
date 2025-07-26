@@ -4,7 +4,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app cloudnative-pg
-  namespace: &namespace storage
+  namespace: &namespace dbms
 spec:
   commonMetadata:
     labels:
@@ -26,14 +26,14 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app cloudnative-pg-cluster
-  namespace: &namespace storage
+  namespace: &namespace dbms
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: cloudnative-pg
-      namespace: storage
+      namespace: dbms
   healthCheckExprs:
     - apiVersion: &postgresVersion postgresql.cnpg.io/v1
       kind: &postgresKind Cluster
@@ -56,14 +56,14 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app cloudnative-pg-backup
-  namespace: &namespace storage
+  namespace: &namespace dbms
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: cloudnative-pg-cluster
-      namespace: storage
+      namespace: dbms
   interval: 1h
   path: ./kubernetes/apps/storage/cloudnative-pg/backup
   prune: true
