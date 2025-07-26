@@ -4,6 +4,7 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgres
+  namespace: storage
 spec:
   imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
   instances: 3
