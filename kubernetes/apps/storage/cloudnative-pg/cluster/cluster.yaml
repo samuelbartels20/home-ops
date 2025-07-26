@@ -54,19 +54,19 @@ spec:
         jobs: 2
       serverName: postgres17-003
 
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: s3://pgbackup
-        endpointURL: http://192.168.8.102:9000
-        serverName: postgres17-002
-        s3Credentials:
-          accessKeyId:
-            name: cloudnative-pg
-            key: minio_access_key_id
-          secretAccessKey:
-            name: cloudnative-pg
-            key: minio_secret_access_key
+  # externalClusters:
+  #   - name: clusterBackup
+  #     barmanObjectStore:
+  #       destinationPath: s3://pgbackup
+  #       endpointURL: http://192.168.8.102:9000
+  #       serverName: postgres17-002
+  #       s3Credentials:
+  #         accessKeyId:
+  #           name: cloudnative-pg
+  #           key: minio_access_key_id
+  #         secretAccessKey:
+  #           name: cloudnative-pg
+  #           key: minio_secret_access_key
 
 
   monitoring:
