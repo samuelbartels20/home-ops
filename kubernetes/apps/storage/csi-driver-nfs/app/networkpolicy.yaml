@@ -3,12 +3,12 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: csi-driver-nfs-allow-internal
-  namespace: storage
+  namespace: dbms
   labels:
     app.kubernetes.io/name: csi-driver-nfs
     app.kubernetes.io/instance: csi-driver-nfs
     app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: storage
+    app.kubernetes.io/part-of: dbms
     production-grade: "true"
     security-hardened: "true"
 spec:
