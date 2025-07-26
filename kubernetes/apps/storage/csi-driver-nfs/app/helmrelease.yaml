@@ -13,7 +13,7 @@ metadata:
   labels:
     app.kubernetes.io/name: csi-driver-nfs
     app.kubernetes.io/instance: csi-driver-nfs
-    app.kubernetes.io/component: storage
+    app.kubernetes.io/component: dbms
     app.kubernetes.io/part-of: dbms
     app.kubernetes.io/version: "4.11.0"
     production-grade: "true"
