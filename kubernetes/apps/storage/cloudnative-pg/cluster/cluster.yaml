@@ -1,91 +1,70 @@
+---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/cluster_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres17
-  namespace: storage
+  name: postgres
+  annotations:
+    kyverno.io/ignore: "true"
 spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.9-17
   instances: 3
-
-  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
-
   primaryUpdateStrategy: unsupervised
-  primaryUpdateMethod: switchover
-
-  enablePDB: true
-
-  enableSuperuserAccess: true
-  superuserSecret:
-    name: cloudnative-pg
-
-  bootstrap:
-    initdb:
-      database: postgres
-      owner: postgres
-      secret:
-        name: cloudnative-pg
-
-
-  replicationSlots:
-    highAvailability:
-      enabled: true
-
-
   storage:
     size: 10Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
-
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      destinationPath: s3://pgbackup
-      endpointURL: http://192.168.8.102:9000
-      s3Credentials:
-        accessKeyId:
-          name: cloudnative-pg
-          key: minio_access_key_id
-        secretAccessKey:
-          name: cloudnative-pg
-          key: minio_secret_access_key
-      wal:
-        compression: bzip2
-        maxParallel: 8
-      data:
-        compression: bzip2
-        jobs: 2
-      serverName: postgres17-003
-
-  # externalClusters:
-  #   - name: clusterBackup
-  #     barmanObjectStore:
-  #       destinationPath: s3://pgbackup
-  #       endpointURL: http://192.168.8.102:9000
-  #       serverName: postgres17-002
-  #       s3Credentials:
-  #         accessKeyId:
-  #           name: cloudnative-pg
-  #           key: minio_access_key_id
-  #         secretAccessKey:
-  #           name: cloudnative-pg
-  #           key: minio_secret_access_key
-
-
-  monitoring:
-    enablePodMonitor: true
-
+  superuserSecret:
+    name: cloudnative-pg
+  enableSuperuserAccess: true
   postgresql:
     synchronous:
       method: any
       number: 1
     parameters:
-      max_connections: "100"
-      shared_buffers: 128MB
-
+      max_connections: "400"
+      shared_buffers: 256MB
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: true
   resources:
     requests:
-      cpu: "15m"
-      memory: "256Mi"
+      cpu: 50m
+      memory: 256Mi
     limits:
-      cpu: "100m"
-      memory: "256Mi"
+      memory: 640Mi
+  monitoring:
+    enablePodMonitor: true
+    # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
+    podMonitorMetricRelabelings:
+      - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
+      - { regex: cluster, action: labeldrop }
+  backup:
+    retentionPolicy: 30d
+    barmanObjectStore: &barmanObjectStore
+      data:
+        compression: bzip2
+      wal:
+        compression: bzip2
+        maxParallel: 8
+      destinationPath: s3://pgbackup
+      endpointURL: http://192.168.8.102:9000
+
+      serverName: &currentCluster postgres-v1
+      s3Credentials:
+        accessKeyId:
+          name: cloudnative-pg
+          key: minio-access-key-id
+        secretAccessKey:
+          name: cloudnative-pg
+          key: minio-secret-access-key
+  bootstrap:
+    recovery:
+      source: &previousCluster postgres-v1
+
+  externalClusters:
+    - name: *previousCluster
+      barmanObjectStore:
+        <<: *barmanObjectStore
+        serverName: *previousCluster
 

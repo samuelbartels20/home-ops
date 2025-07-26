@@ -1,15 +1,9 @@
-# PostgreSQL cluster configuration
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: storage
 resources:
   - ./cluster.yaml
-  - ./configmap.yaml
-  - ./rbac.yaml
-  - ./service.yaml
   - ./scheduledbackup.yaml
-  - ./pod-disruption-budget.yaml
-  - ./service-monitor.yaml
-  - ./horizontal-pod-autoscaler.yaml
-  # - ./tls-certificates.yaml
-
+  - ./prometheusrule.yaml
+  - ./service.yaml

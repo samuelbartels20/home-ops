@@ -1,313 +1,76 @@
 ---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/kustomize.toolkit.fluxcd.io/kustomization_v1.json
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app cloudnative-pg-operator
-  namespace: flux-system
+  name: &app cloudnative-pg
+  namespace: &namespace dbms
 spec:
-  targetNamespace: storage
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-      app.kubernetes.io/component: postgresql-operator
-      app.kubernetes.io/part-of: postgresql
-  path: ./kubernetes/apps/storage/cloudnative-pg/app
+  interval: 1h
+  path: ./kubernetes/main/apps/storage/cloudnative-pg/app
   prune: true
+  retryInterval: 2m
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
+  targetNamespace: *namespace
   timeout: 5m
-  dependsOn:
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
-
+  wait: true
 ---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/kustomize.toolkit.fluxcd.io/kustomization_v1.json
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-cluster
-  namespace: storage
+  name: &app cloudnative-pg-cluster
+  namespace: &namespace dbms
 spec:
-  dependsOn:
-    - name: cloudnative-pg-operator
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
-  interval: 30m
-  path: ./kubernetes/apps/storage/cloudnative-pg/cluster
-  prune: true
-  retryInterval: 1m
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  targetNamespace: storage
-  timeout: 3m
-  wait: false
-
----
-# PostgreSQL Backup System
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: cloudnative-pg-backup
-  namespace: flux-system
-spec:
-  targetNamespace: storage
   commonMetadata:
     labels:
-      app.kubernetes.io/name: postgres-backup
-      app.kubernetes.io/component: backup-system
-      app.kubernetes.io/part-of: postgresql
-  path: ./kubernetes/apps/storage/cloudnative-pg/backup
+      app.kubernetes.io/name: *app
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: dbms
+  healthCheckExprs:
+    - apiVersion: &postgresVersion postgresql.cnpg.io/v1
+      kind: &postgresKind Cluster
+      failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
+      current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
+  interval: 1h
+  path: ./kubernetes/main/apps/storage/cloudnative-pg/cluster
   prune: true
+  retryInterval: 2m
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
+  targetNamespace: *namespace
   timeout: 5m
+  wait: true
+---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app cloudnative-pg-backup
+  namespace: &namespace dbms
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
   dependsOn:
-    - name: cloudnative-pg-operator
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
-
-# ---
-# # PostgreSQL HAProxy Load Balancing
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-loadbalancing
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-loadbalancing
-#       app.kubernetes.io/component: loadbalancing
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/loadbalancing
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-# ---
-# # PostgreSQL Analytics Engine
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-analytics
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-analytics
-#       app.kubernetes.io/component: analytics-engine
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/analytics
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-
-# ---
-# # PostgreSQL Blue-Green Automation
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-automation
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-automation
-#       app.kubernetes.io/component: blue-green-automation
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/automation
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-
-
-  
-# ---
-# # PostgreSQL Multi-Tenant Isolation
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-isolation
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-isolation
-#       app.kubernetes.io/component: multi-tenant-isolation
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/isolation
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-
-
-
-# ---
-# # PostgreSQL Monitoring
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-monitoring
-#   namespace: flux-system
-# spec:
-#   targetNamespace: observability
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-monitoring
-#       app.kubernetes.io/component: monitoring
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/monitoring
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-
-# ---
-# # PostgreSQL Performance Optimization
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-performance
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-performance
-#       app.kubernetes.io/component: performance-optimization
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/performance
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
-
-# ---
-# # PostgreSQL Connection Pooling
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: cloudnative-pg-pooling
-#   namespace: flux-system
-# spec:
-#   targetNamespace: storage
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: postgres-pooling
-#       app.kubernetes.io/component: connection-pooling
-#       app.kubernetes.io/part-of: postgresql
-#   path: ./kubernetes/apps/storage/cloudnative-pg/pooling
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: false
-#   interval: 30m
-#   retryInterval: 1m
-#   timeout: 5m
-#   dependsOn:
-#     - name: cloudnative-pg-operator
-#       namespace: storage
-#     - name: external-secrets
-#       namespace: security
-#     - name: onepassword
-#       namespace: security
+    - name: cloudnative-pg-cluster
+      namespace: dbms
+  interval: 1h
+  path: ./kubernetes/main/apps/storage/cloudnative-pg/backup
+  prune: true
+  retryInterval: 2m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: *namespace
+  timeout: 5m

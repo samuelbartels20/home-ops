@@ -1,29 +1,30 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres17-lb
-  namespace: storage
+  name: postgres-lb
   annotations:
-    lbipam.cilium.io/ips: 192.168.8.101
     external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
+    lbipam.cilium.io/ips: 192.168.8.101
 spec:
   type: LoadBalancer
-  selector:
-    cnpg.io/cluster: postgres17
-    cnpg.io/instanceRole: primary
+  externalIPs: ["192.168.8.101"]
+  externalTrafficPolicy: Local
+  ipFamilies: [IPv4]
+  ipFamilyPolicy: SingleStack
   ports:
     - name: postgres
       port: 5432
       protocol: TCP
       targetPort: 5432
-  sessionAffinity: ClientIP
-
+  selector:
+    cnpg.io/cluster: postgres
+    role: primary
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres17-ro
-  namespace: storage
+  name: postgres-r
 spec:
   type: ClusterIP
   ports:
@@ -32,14 +33,13 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres17
-    cnpg.io/instanceRole: replica
+    cnpg.io/cluster: postgres
+    cnpg.io/podRole: instance
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres17-rw
-  namespace: storage
+  name: postgres-ro
 spec:
   type: ClusterIP
   ports:
@@ -48,6 +48,21 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres17
-    cnpg.io/instanceRole: primary
+    cnpg.io/cluster: postgres
+    role: replica
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-rw
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: postgres
+    role: primary
   sessionAffinity: None

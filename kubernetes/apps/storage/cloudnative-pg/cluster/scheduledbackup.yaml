@@ -1,12 +1,12 @@
 ---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/scheduledbackup_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres17-backup
-  namespace: storage
+  name: postgres-backup
 spec:
-  cluster:
-    name: postgres17
-  schedule: "0 0 * * *"
-  backupOwnerReference: self
+  schedule: "@daily"
   immediate: true
+  backupOwnerReference: self
+  cluster:
+    name: postgres
