@@ -68,4 +68,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: openebs-localpv-provisioner
-    namespace: storage 
+    namespace: dbms 

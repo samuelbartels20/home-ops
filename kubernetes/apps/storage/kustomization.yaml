@@ -2,10 +2,10 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: storage
+namespace: dbms
 components:
   - ../../components/common
-# resources:
+resources:
 #   - ./csi-driver-nfs/ks.yaml
-#   - ./openebs/ks.yaml  
+  - ./openebs/ks.yaml  
 #   - ./cloudnative-pg/ks.yaml

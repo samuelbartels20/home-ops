@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: &name pg-postgres-restore
+  namespace: dbms
 spec:
   ttlSecondsAfterFinished: 86400
   template:
