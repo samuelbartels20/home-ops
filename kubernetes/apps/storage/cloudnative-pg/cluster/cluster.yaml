@@ -23,6 +23,16 @@ spec:
       owner: postgres
       secret:
         name: cloudnative-pg
+      initdbArgs:
+        - --locale=en_US.UTF-8
+        - --encoding=UTF8
+        - --lc-collate=en_US.UTF-8
+        - --lc-ctype=en_US.UTF-8
+        - --lc-messages=en_US.UTF-8
+        - --lc-monetary=en_US.UTF-8
+        - --lc-numeric=en_US.UTF-8
+        - --lc-time=en_US.UTF-8
+        - --data-checksums=true
 
   replicationSlots:
     highAvailability:
