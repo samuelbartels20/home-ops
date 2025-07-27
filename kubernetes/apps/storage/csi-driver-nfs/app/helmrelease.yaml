@@ -4,17 +4,17 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: csi-driver-nfs
-  namespace: dbms
+  namespace: storage
   annotations:
     meta.helm.sh/release-name: csi-driver-nfs
-    meta.helm.sh/release-namespace: dbms
+    meta.helm.sh/release-namespace: storage
     fluxcd.io/automated: "true"
     fluxcd.io/tag.chart-image: glob:4.11.*
   labels:
     app.kubernetes.io/name: csi-driver-nfs
     app.kubernetes.io/instance: csi-driver-nfs
-    app.kubernetes.io/component: dbms
-    app.kubernetes.io/part-of: dbms
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: storage
     app.kubernetes.io/version: "4.11.0"
     production-grade: "true"
     security-hardened: "true"
