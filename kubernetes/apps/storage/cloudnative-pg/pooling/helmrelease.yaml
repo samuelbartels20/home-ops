@@ -241,6 +241,54 @@ spec:
           clientIP:
             timeoutSeconds: 3600
 
+    configMaps:
+      config:
+        enabled: true
+        data:
+          pgbouncer.ini: |
+            [databases]
+            postgres = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 reserve_pool=5
+            application_db = host=192.168.8.101 port=5432 dbname=postgres pool_size=30 reserve_pool=5
+            * = host=192.168.8.101 port=5432
+
+            [pgbouncer]
+            listen_addr = 0.0.0.0
+            listen_port = 5432
+            unix_socket_dir = /tmp
+            auth_type = scram-sha-256
+            auth_file = /etc/pgbouncer/secrets/userlist.txt
+            pool_mode = transaction
+            max_client_conn = 10000
+            default_pool_size = 25
+            min_pool_size = 10
+            reserve_pool_size = 5
+            max_db_connections = 50
+            max_user_connections = 50
+            server_reset_query = DISCARD ALL
+            server_check_delay = 30
+            server_check_query = SELECT 1
+            server_lifetime = 3600
+            server_idle_timeout = 600
+            client_idle_timeout = 0
+            client_login_timeout = 60
+            query_timeout = 0
+            query_wait_timeout = 120
+            tcp_keepalive = 1
+            tcp_keepcnt = 3
+            tcp_keepidle = 600
+            tcp_keepintvl = 30
+            tcp_user_timeout = 30000
+            pkt_buf = 4096
+            listen_backlog = 128
+            log_connections = 1
+            log_disconnections = 1
+            log_pooler_errors = 1
+            admin_users = pgbouncer,postgres
+            stats_users = pgbouncer,postgres
+            dns_max_ttl = 15
+            dns_nxdomain_ttl = 15
+            application_name_add_host = 1
+            ignore_startup_parameters = extra_float_digits,geqo,search_path
 
     persistence:
       config:
