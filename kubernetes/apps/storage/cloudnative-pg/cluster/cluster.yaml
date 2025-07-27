@@ -53,10 +53,10 @@ spec:
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg
-          key: minio-access-key-id
+          key: minio_access_key_id
         secretAccessKey:
           name: cloudnative-pg
-          key: minio-secret-access-key
+          key: minio_secret_access_key
   bootstrap:
     initdb:
       database: postgres
