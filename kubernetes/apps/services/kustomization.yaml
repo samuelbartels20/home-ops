@@ -5,7 +5,7 @@ kind: Kustomization
 namespace: services
 components:
   - ../../components/common
-# resources:
-#   - ./trilium/ks.yaml
+resources:
+  - ./trilium/ks.yaml
 
 

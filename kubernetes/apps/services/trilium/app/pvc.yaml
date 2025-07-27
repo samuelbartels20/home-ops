@@ -8,4 +8,4 @@ spec:
   resources:
     requests:
       storage: 8Gi
-  storageClassName: openebs-hostpath
+  storageClassName: truenas-nfs-prod
