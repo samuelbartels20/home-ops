@@ -12,7 +12,7 @@ metadata:
 data:
   pgbouncer.ini: |
     [databases]
-    * = host=postgres-rw.storage.svc.cluster.local port=5432 dbname=postgres pool_size=25 max_db_connections=100
+    * = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 max_db_connections=100
 
     [pgbouncer]
     # Network settings
