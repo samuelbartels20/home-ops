@@ -130,14 +130,15 @@ spec:
               tag: v0.7.0
               pullPolicy: IfNotPresent
 
-            env:
-              PGBOUNCER_EXPORTER_HOST: "127.0.0.1"
-              PGBOUNCER_EXPORTER_PORT: "6432"
-              PGBOUNCER_USER: "pgbouncer"
+            args:
+              - --pgBouncer.connectionString=postgres://pgbouncer:${password}@127.0.0.1:5432/pgbouncer?sslmode=disable
 
-            envFrom:
-              - secretRef:
-                  name: pgbouncer-admin-secret
+            env:
+              - name: password
+                valueFrom:
+                  secretKeyRef:
+                    name: pgbouncer-admin-secret
+                    key: password
 
             probes:
               liveness:

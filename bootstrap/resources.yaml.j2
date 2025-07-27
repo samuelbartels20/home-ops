@@ -229,15 +229,11 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-    name: pgbouncer-exporter-secret
+    name: pgbouncer-admin-secret
     namespace: storage
-    labels:
-        app.kubernetes.io/name: pgbouncer-exporter
-        app.kubernetes.io/component: observability
-        app.kubernetes.io/part-of: postgresql
 type: Opaque
 stringData:
-      PGBOUNCER_PASSWORD: op://K8s/pgbouncer-exporter-secret/PGBOUNCER_PASSWORD
+      password: op://K8s/pgbouncer-admin-secret/password
 
 
 ---
