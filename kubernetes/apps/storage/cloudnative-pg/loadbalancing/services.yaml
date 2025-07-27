@@ -1,0 +1,88 @@
+---
+# HAProxy Service for Read/Write
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-lb-readwrite
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
+    app.kubernetes.io/part-of: postgresql
+    service-type: readwrite
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9101"
+    prometheus.io/path: "/metrics"
+    lbipam.cilium.io/ips: 192.168.8.102
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+    - name: stats
+      port: 8404
+      targetPort: 8404
+      protocol: TCP
+    - name: metrics
+      port: 9101
+      targetPort: 9101
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
+
+---
+# HAProxy Service for Read-Only
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-lb-readonly
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
+    app.kubernetes.io/part-of: postgresql
+    service-type: readonly
+  annotations:
+    lbipam.cilium.io/ips: 192.168.8.104
+spec:
+  type: LoadBalancer
+  sessionAffinity: None
+  ports:
+    - name: postgres-ro
+      port: 5433
+      targetPort: 5433
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
+
+---
+# HAProxy Service for Admin
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-lb-admin
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
+    app.kubernetes.io/part-of: postgresql
+    service-type: admin
+spec:
+  type: ClusterIP
+  ports:
+    - name: pgbouncer-admin
+      port: 6432
+      targetPort: 6432
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/component: load-balancer
