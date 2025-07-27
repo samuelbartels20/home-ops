@@ -1,4 +1,3 @@
----
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -215,6 +214,7 @@ spec:
 
     service:
       main:
+        controller: main  # <-- Added as required by schema
         type: LoadBalancer
         annotations:
           prometheus.io/scrape: "true"
@@ -234,10 +234,10 @@ spec:
             port: 6432
             targetPort: 6432
             protocol: TCP
-        metrics:
-          port: 9127
-          targetPort: 9127
-          protocol: TCP
+          metrics: # Moved metrics port here, if needed
+            port: 9127
+            targetPort: 9127
+            protocol: TCP
         externalTrafficPolicy: Local
         sessionAffinity: ClientIP
         sessionAffinityConfig:
