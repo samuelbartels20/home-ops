@@ -3,7 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: &name pg-postgres-restore
-  namespace: dbms
+  namespace: storage
 spec:
   ttlSecondsAfterFinished: 86400
   template:
@@ -14,7 +14,7 @@ spec:
         - name: backup
           nfs:
             server: 192.168.8.102
-            path: /homelab/applications
+            path: /mnt/homelab/applications/volumes
 
       securityContext:
         fsGroup: 1022
