@@ -81,7 +81,7 @@ spec:
 
             envFrom:
               - secretRef:
-                  name: cloudnative-pg-secret
+                  name: cloudnative-pg
 
             probes:
               liveness:
