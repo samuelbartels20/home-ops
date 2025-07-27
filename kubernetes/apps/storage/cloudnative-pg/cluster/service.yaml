@@ -8,10 +8,6 @@ metadata:
     lbipam.cilium.io/ips: 192.168.8.101
 spec:
   type: LoadBalancer
-  externalIPs: ["192.168.8.101"]
-  externalTrafficPolicy: Local
-  ipFamilies: [IPv4]
-  ipFamilyPolicy: SingleStack
   ports:
     - name: postgres
       port: 5432
