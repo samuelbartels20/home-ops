@@ -123,6 +123,7 @@ spec:
               seccompProfile:
                 type: RuntimeDefault
 
+          # PgBouncer Exporter sidecar
           exporter:
             image:
               repository: prometheuscommunity/pgbouncer-exporter
@@ -253,8 +254,6 @@ spec:
             [pgbouncer]
             listen_addr = 0.0.0.0
             listen_port = 5432
-            admin_users = pgbouncer,postgres
-            stats_users = pgbouncer,postgres
             unix_socket_dir = /tmp
             auth_type = scram-sha-256
             auth_file = /etc/pgbouncer/secrets/userlist.txt
@@ -284,12 +283,12 @@ spec:
             log_connections = 1
             log_disconnections = 1
             log_pooler_errors = 1
+            admin_users = pgbouncer,postgres
+            stats_users = pgbouncer,postgres
             dns_max_ttl = 15
             dns_nxdomain_ttl = 15
             application_name_add_host = 1
             ignore_startup_parameters = extra_float_digits,geqo,search_path
-            admin_listen_addr = 0.0.0.0
-            admin_listen_port = 6432
 
     persistence:
       config:

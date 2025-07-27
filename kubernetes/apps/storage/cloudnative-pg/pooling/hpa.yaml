@@ -1,3 +1,5 @@
+---
+# Horizontal Pod Autoscaler for PgBouncer
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
