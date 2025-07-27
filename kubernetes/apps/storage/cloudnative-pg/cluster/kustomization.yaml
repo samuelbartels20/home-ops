@@ -7,3 +7,8 @@ resources:
   - ./scheduledbackup.yaml
   - ./prometheusrule.yaml
   - ./service.yaml
+  - ./service-monitor.yaml
+  - ./rbac.yaml
+  - ./horizontal-pod-autoscaler.yaml
+  - ./pod-disruption-budget.yaml
+  - ./configmap.yaml
