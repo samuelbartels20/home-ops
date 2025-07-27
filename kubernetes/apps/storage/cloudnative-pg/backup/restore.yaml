@@ -40,7 +40,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: cloudnative-pg
-                  key: pg_password
+                  key: password
             - name: TZ
               value: ${TIMEZONE:=Etc/UTC}
           volumeMounts:
