@@ -131,10 +131,10 @@ spec:
               pullPolicy: IfNotPresent
 
             args:
-              - --pgBouncer.connectionString=postgres://pgbouncer:${password}@192.168.8.101:5432/pgbouncer?sslmode=disable
+              --pgBouncer.connectionString="postgres://pgbouncer:${PGBOUNCER_PASSWORD}@127.0.0.1:5432/pgbouncer?sslmode=disable"
 
             env:
-              - name: password
+              - name: PGBOUNCER_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: pgbouncer-admin-secret
