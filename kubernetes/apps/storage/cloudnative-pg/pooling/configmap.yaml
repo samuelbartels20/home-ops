@@ -13,6 +13,8 @@ data:
   pgbouncer.ini: |
     [databases]
     * = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 max_db_connections=100
+    application_db = host=192.168.8.101 port=5432 dbname=application_db pool_size=30 max_db_connections=50
+    * = host=192.168.8.101 port=5432
 
     [pgbouncer]
     # Network settings
@@ -88,7 +90,6 @@ data:
     ignore_startup_parameters = extra_float_digits,geqo,search_path
     application_name_add_host = 1
 
-    # Enterprise features
     max_packet_size = 2147483647
     listen_backlog = 128
     sbuf_loopcnt = 5
