@@ -75,7 +75,6 @@ spec:
         type: nfs
         server: 192.168.8.102
         path: /mnt/homelab/applications/volumes
-        mountPath: /backup
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
