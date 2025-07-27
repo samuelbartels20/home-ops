@@ -52,7 +52,7 @@ spec:
               # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql versioning=redhat
               tag: 17.2
             env:
-              PGHOST: postgres-rw.dbms
+              PGHOST: 192.168.8.101
               PGPORT: "5432"
               PGUSER: postgres
               PGPASSWORD:
