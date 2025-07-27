@@ -6,6 +6,6 @@ namespace: storage
 components:
   - ../../components/common
 resources:
-#   - ./csi-driver-nfs/ks.yaml
+  - ./csi-driver-nfs/ks.yaml
   - ./openebs/ks.yaml  
 #   - ./cloudnative-pg/ks.yaml
