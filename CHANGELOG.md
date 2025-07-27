@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.07.27.64
+
+Date-based release for 2025-07-27
+
+### Changes
+- feat(haproxy): added haproxy loadbalancing for postgresql
+- chore(release): 2025.07.27.63 [skip ci]
+
 ##  v2025.07.27.63
 
 Date-based release for 2025-07-27
