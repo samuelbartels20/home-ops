@@ -39,7 +39,7 @@ spec:
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-backup
+                  name: cloudnative-pg
                   key: password
             - name: TZ
               value: ${TIMEZONE:=Etc/UTC}

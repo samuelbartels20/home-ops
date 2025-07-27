@@ -1,0 +1,42 @@
+---
+# PgBouncer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9127"
+    prometheus.io/path: "/metrics"
+    io.cilium/lb-ipam-ips: "192.168.8.106"
+    haproxy.org/check: "true"
+    haproxy.org/check-interval: "10s"
+    haproxy.org/timeout-server: "3600s"
+    service.cilium.io/global: "true"
+spec:
+  type: LoadBalancer
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  ports:
+    - name: pgbouncer
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+    - name: admin
+      port: 6432
+      targetPort: 6432
+      protocol: TCP
+    - name: metrics
+      port: 9127
+      targetPort: 9127
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
