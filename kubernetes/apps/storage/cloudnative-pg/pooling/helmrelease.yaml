@@ -181,11 +181,6 @@ spec:
             app.kubernetes.io/component: connection-pooler
             monitoring: "true"
             security-scan: "required"
-          selectorLabels:
-            app.kubernetes.io/name: pgbouncer
-            app.kubernetes.io/component: connection-pooler
-            monitoring: "true"
-            security-scan: "required"
           annotations:
             prometheus.io/scrape: "true"
             prometheus.io/port: "9127"
