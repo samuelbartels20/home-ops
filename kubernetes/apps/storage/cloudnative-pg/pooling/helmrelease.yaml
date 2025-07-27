@@ -51,7 +51,7 @@ spec:
               pullPolicy: IfNotPresent
 
             env:
-              DATABASES_HOST: "postgres-rw.storage.svc.cluster.local"
+              DATABASES_HOST: "192.168.8.101"
               DATABASES_PORT: "5432"
               DATABASES_DBNAME: "postgres"
               POOL_MODE: "transaction"
@@ -106,13 +106,11 @@ spec:
 
             resources:
               requests:
-                cpu: 500m
-                memory: 256Mi
-                ephemeral-storage: 1Gi
+                cpu: 100m
+                memory: 128Mi
               limits:
-                cpu: 2000m
-                memory: 1Gi
-                ephemeral-storage: 2Gi
+                cpu: 500m
+                memory: 128Mi
 
             securityContext:
               allowPrivilegeEscalation: false
@@ -252,9 +250,9 @@ spec:
         data:
           pgbouncer.ini: |
             [databases]
-            postgres = host=postgres-rw.storage.svc.cluster.local port=5432 dbname=postgres pool_size=25 reserve_pool=5
-            application_db = host=postgres-rw.storage.svc.cluster.local port=5432 dbname=application_db pool_size=30 reserve_pool=5
-            * = host=postgres-rw.storage.svc.cluster.local port=5432
+            postgres = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 reserve_pool=5
+            application_db = host=192.168.8.101 port=5432 dbname=application_db pool_size=30 reserve_pool=5
+            * = host=192.168.8.101 port=5432
 
             [pgbouncer]
             listen_addr = 0.0.0.0

@@ -217,16 +217,13 @@ metadata:
     name: pgbouncer-secrets
     namespace: storage
     labels:
-        app.kubernetes.io/name: pgbouncer
-        app.kubernetes.io/component: connection-pooler
-        app.kubernetes.io/part-of: postgresql
-type: Opaque
+        reloader.stakater.com/auto: "true"
 stringData:
-      POSTGRES_USER: op://K8s/pgbouncer-secrets/POSTGRES_USER
-      POSTGRES_PASSWORD: op://K8s/pgbouncer-secrets/POSTGRES_PASSWORD
-      PGBOUNCER_AUTH_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_AUTH_PASSWORD
-      PGBOUNCER_ADMIN_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_ADMIN_PASSWORD
-      PGBOUNCER_STATS_PASSWORD: op://K8s/pgbouncer-secrets/PGBOUNCER_STATS_PASSWORD
+    pg_username: op://K8s/pgbouncer-secrets/pg_username
+    pg_password: op://K8s/pgbouncer-secrets/pg_password
+    pgbouncer_auth_password: op://K8s/pgbouncer-secrets/pgbouncer_auth_password
+    pgbouncer_admin_password: op://K8s/pgbouncer-secrets/pgbouncer_admin_password
+    pgbouncer_stats_password: op://K8s/pgbouncer-secrets/pgbouncer_stats_password
 
 ---
 apiVersion: v1

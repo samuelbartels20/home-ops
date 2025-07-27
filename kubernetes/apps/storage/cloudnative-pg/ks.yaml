@@ -82,7 +82,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: cloudnative-pg-loadbalancing
-  namespace: flux-system
+  namespace: storage
 spec:
   targetNamespace: storage
   commonMetadata:
@@ -91,6 +91,39 @@ spec:
       app.kubernetes.io/component: loadbalancing
       app.kubernetes.io/part-of: postgresql
   path: ./kubernetes/apps/storage/cloudnative-pg/loadbalancing
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  wait: false
+  interval: 1h
+  retryInterval: 2m
+  timeout: 5m
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: storage
+    - name: external-secrets
+      namespace: security
+    - name: onepassword
+      namespace: security
+
+
+---
+# PostgreSQL Connection Pooling
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg-pooling
+  namespace: storage
+spec:
+  targetNamespace: storage
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: postgres-pooling
+      app.kubernetes.io/component: connection-pooling
+      app.kubernetes.io/part-of: postgresql
+  path: ./kubernetes/apps/storage/cloudnative-pg/pooling
   prune: true
   sourceRef:
     kind: GitRepository
