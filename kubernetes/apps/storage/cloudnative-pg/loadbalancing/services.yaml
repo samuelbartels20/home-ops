@@ -14,7 +14,7 @@ metadata:
     prometheus.io/scrape: "true"
     prometheus.io/port: "9101"
     prometheus.io/path: "/metrics"
-    lbipam.cilium.io/ips: 192.168.8.102
+    lbipam.cilium.io/ips: 192.168.8.105
 spec:
   type: LoadBalancer
   sessionAffinity: ClientIP
