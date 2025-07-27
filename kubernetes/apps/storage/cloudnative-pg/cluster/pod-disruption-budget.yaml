@@ -1,0 +1,23 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  namespace: storage
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-primary-pdb
+  namespace: storage
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres
+      cnpg.io/instanceRole: primary 
