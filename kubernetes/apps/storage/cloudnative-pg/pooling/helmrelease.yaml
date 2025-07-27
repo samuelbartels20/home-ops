@@ -241,6 +241,7 @@ spec:
           clientIP:
             timeoutSeconds: 3600
 
+
     persistence:
       config:
         enabled: true

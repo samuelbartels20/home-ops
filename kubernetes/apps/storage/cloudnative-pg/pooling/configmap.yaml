@@ -12,8 +12,8 @@ metadata:
 data:
   pgbouncer.ini: |
     [databases]
-    * = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 max_db_connections=100
-    application_db = host=192.168.8.101 port=5432 dbname=application_db pool_size=30 max_db_connections=50
+    postgres = host=192.168.8.101 port=5432 dbname=postgres pool_size=25 reserve_pool=5
+    application_db = host=192.168.8.101 port=5432 dbname=postgres pool_size=30 reserve_pool=5 max_db_connections=50
     * = host=192.168.8.101 port=5432
 
     [pgbouncer]
@@ -83,22 +83,19 @@ data:
     idle_transaction_timeout = 0
 
     # Admin interface
-    admin_users = pgbouncer_admin
-    stats_users = pgbouncer_stats
+    admin_users = pgbouncer,postgres,pgbouncer_admin
+    stats_users = pgbouncer,postgres,pgbouncer_stats
 
     # Application name tracking
     ignore_startup_parameters = extra_float_digits,geqo,search_path
     application_name_add_host = 1
 
-    max_packet_size = 2147483647
+    # Extra from File One
+    pkt_buf = 4096
     listen_backlog = 128
     sbuf_loopcnt = 5
     suspend_timeout = 10
-
-    # Multi-tenant settings
-    default_pool_size = 25
-    min_pool_size = 5
-    reserve_pool_size = 3
+    max_packet_size = 2147483647
 
   # Multi-tenant configuration for performance isolation
   tenant-config.ini: |
