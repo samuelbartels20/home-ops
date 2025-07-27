@@ -5,7 +5,7 @@ kind: Kustomization
 
 resources:
   - ./rbac.yaml
-  - ./configmap.yaml
+  # - ./configmap.yaml
   - ./externalsecrets.yaml
   - ./service.yaml
   # - ./hpa.yaml
