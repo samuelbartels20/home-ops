@@ -413,7 +413,7 @@ spec:
         storageclass.kubernetes.io/description: "Production NFS storage class"
         storageclass.kubernetes.io/allow-volume-expansion: "true"
       parameters:
-        server: "192.168.8.161"
+        server: "192.168.8.102"
         share: "/mnt/homelab/applications/volumes"
       reclaimPolicy: Retain
       volumeBindingMode: WaitForFirstConsumer
