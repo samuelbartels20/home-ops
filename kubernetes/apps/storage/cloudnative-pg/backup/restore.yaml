@@ -31,7 +31,7 @@ spec:
             - "gunzip < /backup/postgres-cluster.dump.gz | pg_restore -U $PGUSER -f -"
           env:
             - name: PGHOST
-              value: postgres-rw.dbms
+              value: 192.168.8.101
             - name: PGPORT
               value: "5432"
             - name: PGUSER
@@ -97,17 +97,17 @@ spec:
                 - name: minio_access_key_id
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: minio_access_key_id
                 - name: minio_secret_access_key
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: minio_secret_access_key
                 - name: s3_bucket_name
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: s3_bucket_name
               command:
                 - /bin/bash
@@ -176,17 +176,17 @@ spec:
                 - name: minio_access_key_id
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: minio_access_key_id
                 - name: minio_secret_access_key
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: minio_secret_access_key
                 - name: s3_bucket_name
                   valueFrom:
                     secretKeyRef:
-                      name: cloudnative-pg
+                      name: postgres-backup
                       key: s3_bucket_name
                 - name: barman_cloud_retention_policy
                   value: "90d"
