@@ -63,7 +63,7 @@ spec:
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.102:9000
-        serverName: postgres17-002
+        serverName: postgres-v2
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg
