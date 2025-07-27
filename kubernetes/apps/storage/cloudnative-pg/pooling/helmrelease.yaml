@@ -3,12 +3,12 @@ kind: HelmRelease
 metadata:
   name: pgbouncer
   namespace: storage
-  # labels:
-  #   app.kubernetes.io/name: pgbouncer
-  #   app.kubernetes.io/component: connection-pooler
-  #   app.kubernetes.io/part-of: postgresql
-  #   environment: production
-  #   tier: middleware
+  labels:
+    app.kubernetes.io/name: pgbouncer
+    app.kubernetes.io/component: connection-pooler
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    tier: middleware
 spec:
   interval: 15m
   timeout: 10m
@@ -181,7 +181,11 @@ spec:
             app.kubernetes.io/component: connection-pooler
             monitoring: "true"
             security-scan: "required"
-
+          selectorLabels:
+            app.kubernetes.io/name: pgbouncer
+            app.kubernetes.io/component: connection-pooler
+            monitoring: "true"
+            security-scan: "required"
           annotations:
             prometheus.io/scrape: "true"
             prometheus.io/port: "9127"
@@ -214,7 +218,7 @@ spec:
 
     service:
       main:
-        controller: main  # <-- Added as required by schema
+        controller: main
         type: LoadBalancer
         annotations:
           prometheus.io/scrape: "true"
@@ -234,7 +238,7 @@ spec:
             port: 6432
             targetPort: 6432
             protocol: TCP
-          metrics: # Moved metrics port here, if needed
+          metrics:
             port: 9127
             targetPort: 9127
             protocol: TCP
