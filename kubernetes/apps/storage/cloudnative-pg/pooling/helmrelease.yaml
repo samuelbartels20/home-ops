@@ -45,8 +45,8 @@ spec:
         containers:
           main:
             image:
-              repository: pgbouncer/pgbouncer
-              tag: 1.21.0
+              repository: ghcr.io/cloudnative-pg/pgbouncer
+              tag: latest
               pullPolicy: IfNotPresent
 
             env:
