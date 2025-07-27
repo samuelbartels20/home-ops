@@ -3,12 +3,12 @@ kind: HelmRelease
 metadata:
   name: pgbouncer
   namespace: storage
-  labels:
-    app.kubernetes.io/name: pgbouncer
-    app.kubernetes.io/component: connection-pooler
-    app.kubernetes.io/part-of: postgresql
-    environment: production
-    tier: middleware
+  # labels:
+  #   app.kubernetes.io/name: pgbouncer
+  #   app.kubernetes.io/component: connection-pooler
+  #   app.kubernetes.io/part-of: postgresql
+  #   environment: production
+  #   tier: middleware
 spec:
   interval: 15m
   timeout: 10m
