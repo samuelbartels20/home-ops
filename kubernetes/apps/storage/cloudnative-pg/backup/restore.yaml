@@ -115,7 +115,7 @@ spec:
                   echo "Validating PostgreSQL backups..."
 
                   # Check if latest backup exists
-                  latest_backup=$(barman-cloud-backup-list s3://$s3_bucket_name/pgbackup/ | head -1)
+                  latest_backup=$(barman-cloud-backup-list s3://$s3_bucket_name/postgres-backup/ | head -1)
                   if [ -z "$latest_backup" ]; then
                     echo "ERROR: No backups found"
                     exit 1
@@ -124,7 +124,7 @@ spec:
                   echo "Latest backup: $latest_backup"
 
                   # Validate backup integrity
-                  backup_info=$(barman-cloud-backup-show s3://$s3_bucket_name/pgbackup/ $latest_backup)
+                  backup_info=$(barman-cloud-backup-show s3://$s3_bucket_name/postgres-backup/ $latest_backup)
                   if echo "$backup_info" | grep -q "Status: DONE"; then
                     echo "SUCCESS: Backup validation passed"
                     exit 0
@@ -198,7 +198,7 @@ spec:
                   # Apply retention policy
                   barman-cloud-backup-delete \
                     --retention-policy "$barman_cloud_retention_policy" \
-                    s3://$s3_bucket_name/pgbackup/ \
+                    s3://$s3_bucket_name/postgres-backup/ \
                     postgres-v2
 
                   echo "Backup cleanup completed"
