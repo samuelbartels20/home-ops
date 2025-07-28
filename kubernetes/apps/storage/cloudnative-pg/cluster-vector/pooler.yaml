@@ -34,7 +34,6 @@ spec:
     serverCheckQuery: "SELECT 1"
     serverLifetime: 3600
     serverIdleTimeout: 600
-    clientIdleTimeout: 0
     clientLoginTimeout: 60
 
     authType: scram-sha-256
