@@ -336,3 +336,19 @@ stringData:
      minio_secret_access_key: op://K8s/postgres-backup/minio_secret_access_key
      s3_endpoint_url: op://K8s/postgres-backup/s3_endpoint_url
      s3_bucket_name: op://K8s/postgres-backup/s3_bucket_name
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cnpg-vector-backup
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+type: Opaque
+stringData:
+      POSTGRES_HOST: op://K8s/cnpg-vector-backup/POSTGRES_HOST
+      POSTGRES_USER: op://K8s/cnpg-vector-backup/POSTGRES_USER
+      POSTGRES_PASSWORD: op://K8s/cnpg-vector-backup/POSTGRES_PASSWORD
+      POSTGRES_PORT: op://K8s/cnpg-vector-backup/POSTGRES_PORT

@@ -27,7 +27,7 @@ spec:
               EXCLUDE_DBS: app postgres template0 template1
             envFrom: &envFrom
               - secretRef:
-                  name: cnpg-vector-backup-secret
+                  name: cnpg-vector-backup
         containers:
           app:
             image:
@@ -70,7 +70,7 @@ spec:
             readOnly: true
       nas:
         type: nfs
-        server: nas01.${SECRET_DOMAIN_INT}
-        path: /mnt/data/backup
+        server: 192.168.1.102
+        path: /mnt/homelab/applications/volumes
         globalMounts:
           - path: /backups
