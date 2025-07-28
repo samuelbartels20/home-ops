@@ -28,7 +28,7 @@ spec:
           command: ["/bin/sh"]
           args:
             - "-c"
-            - "gunzip < /backup/postgres-cluster.dump.gz | pg_restore -U $PGUSER -f -"
+            - "gunzip < /backup/postgres-cluster.dump.gz | psql -U $PGUSER -f -"
           env:
             - name: PGHOST
               value: 192.168.8.101
