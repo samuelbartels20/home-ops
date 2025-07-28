@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-policy
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
     security.kubernetes.io/policy: restricted
     security.cnpg.io/hardened: "true"
   annotations:
@@ -24,7 +24,7 @@ metadata:
     compliance.cnpg.io/hipaa: "applicable"
 
     hardening.cnpg.io/version: "v1.0"
-    hardening.cnpg.io/profile: "enterprise"
+    hardening.cnpg.io/profile: "vector"
 spec:
   securityContext:
     runAsNonRoot: true
@@ -42,7 +42,7 @@ spec:
       type: "spc_t"
       level: "s0:c123,c456"
 
-  serviceAccountName: postgres-instance
+  serviceAccountName: postgres-vector-instance
   automountServiceAccountToken: false
 
   nodeSelector:
@@ -67,7 +67,7 @@ spec:
         - labelSelector:
             matchLabels:
               app.kubernetes.io/name: postgresql
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: postgres-vector
           topologyKey: kubernetes.io/hostname
 
   tolerations:
@@ -233,11 +233,11 @@ spec:
   volumes:
     - name: pgdata
       persistentVolumeClaim:
-        claimName: pgdata-postgres-1
+        claimName: pgdata-postgres-vector-1
 
     - name: pgwal
       persistentVolumeClaim:
-        claimName: pgwal-postgres-1
+        claimName: pgwal-postgres-vector-1
 
     - name: tmp
       emptyDir:
@@ -250,12 +250,12 @@ spec:
 
     - name: config
       configMap:
-        name: postgres-config
+        name: postgres-vector-config
         defaultMode: 0444
 
     - name: tls-certs
       secret:
-        secretName: postgres-tls-certs
+        secretName: postgres-vector-tls-certs
         defaultMode: 0400
         items:
           - key: tls.crt
@@ -287,12 +287,12 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-security-config
+  name: postgres-vector-security-config
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-config
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 data:
   postgresql.conf: |
     ssl = on
@@ -354,7 +354,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector  
     security-level: strict
 spec:
   podSelector:

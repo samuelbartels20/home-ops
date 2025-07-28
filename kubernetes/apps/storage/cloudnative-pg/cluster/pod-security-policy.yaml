@@ -24,7 +24,7 @@ metadata:
     compliance.cnpg.io/hipaa: "applicable"
 
     hardening.cnpg.io/version: "v1.0"
-    hardening.cnpg.io/profile: "enterprise"
+    hardening.cnpg.io/profile: "standard"
 spec:
   securityContext:
     runAsNonRoot: true
