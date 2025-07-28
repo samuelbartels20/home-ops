@@ -1,0 +1,32 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ./operator-servicemonitor.yaml
+  - ./instances-servicemonitor.yaml
+  - ./podmonitor.yaml
+  - ./custom-queries.yaml
+
+# Ensure monitoring resources go to observability namespace
+patches:
+  - target:
+      kind: ServiceMonitor
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: observability
+  - target:
+      kind: PodMonitor
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: observability
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/component: monitoring
+      app.kubernetes.io/part-of: postgresql-enterprise

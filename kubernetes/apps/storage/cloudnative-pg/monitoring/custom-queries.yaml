@@ -1,0 +1,62 @@
+---
+# Custom Metrics Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-custom-queries
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: postgresql-enterprise
+data:
+  custom-queries.yaml: |
+    # Custom PostgreSQL queries for monitoring
+    pg_custom_database_size:
+      query: "SELECT datname as database, pg_database_size(datname) as size_bytes FROM pg_database WHERE datistemplate = false"
+      metrics:
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Database size in bytes"
+
+    pg_custom_table_sizes:
+      query: |
+        SELECT schemaname, tablename,
+               pg_total_relation_size(schemaname||'.'||tablename) as total_bytes,
+               pg_relation_size(schemaname||'.'||tablename) as size_bytes,
+               pg_indexes_size(schemaname||'.'||tablename) as index_bytes
+        FROM pg_tables
+        WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - total_bytes:
+            usage: "GAUGE"
+            description: "Total table size including indexes"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Table size without indexes"
+        - index_bytes:
+            usage: "GAUGE"
+            description: "Index size"
+
+    pg_custom_replication_lag:
+      query: |
+        SELECT client_addr,
+               extract(epoch from (now() - pg_stat_get_wal_senders_lag(s.pid))) as lag_seconds
+        FROM pg_stat_replication r
+        JOIN pg_stat_get_wal_senders() s ON r.pid = s.pid
+      metrics:
+        - client_addr:
+            usage: "LABEL"
+            description: "Client IP address"
+        - lag_seconds:
+            usage: "GAUGE"
+            description: "Replication lag in seconds"
