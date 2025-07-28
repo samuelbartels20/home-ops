@@ -1,0 +1,66 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-vector
+spec:
+  instances: 3
+  imageName: ghcr.io/tensorchord/cloudnative-vectorchord:17.5-0.4.2@sha256:4a6f5ca2212018322823a92250230d471e2fa33c287ed8b400bd58a3cc3a4e6b
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 10Gi
+    storageClass: openebs-hostpath
+  superuserSecret:
+    name: cloudnative-pg
+  enableSuperuserAccess: true
+  postgresql:
+    shared_preload_libraries: ["vchord.so"]
+    parameters:
+      max_connections: "100"
+      shared_buffers: 256MB
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 384Mi
+  monitoring:
+    enablePodMonitor: true
+  backup:
+    retentionPolicy: 30d
+    barmanObjectStore: &barmanObjectStore
+      data:
+        compression: bzip2
+      wal:
+        compression: bzip2
+        maxParallel: 8
+      destinationPath: s3://pgbackup/
+      endpointURL: http://192.168.8.102:9000
+      serverName: &currentCluster postgres-vector-v1
+      s3Credentials:
+        accessKeyId:
+          name: cloudnative-pg
+          key: minio_access_key_id
+        secretAccessKey:
+          name: cloudnative-pg
+          key: minio_secret_access_key
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.102:9000
+        serverName: postgres-v2
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: cloudnative-pg
+
