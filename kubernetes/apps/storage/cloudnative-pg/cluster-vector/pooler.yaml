@@ -26,18 +26,6 @@ spec:
       server_idle_timeout: "600"
       client_idle_timeout: "0"
       client_login_timeout: "60"
-
-      tcp_keepalive: "true"
-      tcp_keepalive_idle: "600"
-      tcp_keepalive_interval: "30"
-      tcp_keepalive_count: "3"
-      tcp_user_timeout: "30000"
-
-      query_timeout: "0"
-      query_wait_timeout: "120"
-      cancel_delay: "10"
-      pkt_buf: "4096"
-
       log_connections: "true"
       log_disconnections: "true"
       log_pooler_errors: "true"
