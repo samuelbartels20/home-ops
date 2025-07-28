@@ -14,5 +14,5 @@ resources:
   - ./configmap.yaml
   - ./pooler.yaml
   - ./podmonitor.yaml
-  - ./network-policy.yaml
   - ./pod-security-policy.yaml
+  - ./network-policy.yaml

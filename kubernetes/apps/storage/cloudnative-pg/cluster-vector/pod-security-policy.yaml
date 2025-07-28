@@ -1,0 +1,421 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: postgres-vector-security-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: postgresql
+    security.kubernetes.io/policy: restricted
+    security.cnpg.io/hardened: "true"
+  annotations:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+    security.alpha.kubernetes.io/sysctls: "net.core.somaxconn=65535"
+    security.alpha.kubernetes.io/seccomp: runtime/default
+
+    compliance.cnpg.io/sox: "required"
+    compliance.cnpg.io/pci-dss: "applicable"
+    compliance.cnpg.io/gdpr: "required"
+    compliance.cnpg.io/hipaa: "applicable"
+
+    hardening.cnpg.io/version: "v1.0"
+    hardening.cnpg.io/profile: "enterprise"
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: "OnRootMismatch"
+
+    seccompProfile:
+      type: RuntimeDefault
+
+    supplementalGroups: [999]
+
+    seLinuxOptions:
+      type: "spc_t"
+      level: "s0:c123,c456"
+
+  serviceAccountName: postgres-instance
+  automountServiceAccountToken: false
+
+  nodeSelector:
+    kubernetes.io/os: linux
+    node.kubernetes.io/database: "true"
+    security.kubernetes.io/hardened: "true"
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: security.kubernetes.io/trusted
+                operator: In
+                values: ["true"]
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values: ["spot", "preemptible"]
+
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+              cnpg.io/cluster: postgres
+          topologyKey: kubernetes.io/hostname
+
+  tolerations:
+    - key: "database"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/memory-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/disk-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+  priorityClassName: system-cluster-critical
+  preemptionPolicy: Never
+
+  containers:
+    - name: postgres
+      image: ghcr.io/cloudnative-pg/postgresql:17.2
+      imagePullPolicy: IfNotPresent
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  
+
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - NET_BIND_SERVICE  
+
+        seccompProfile:
+          type: RuntimeDefault
+
+        privileged: false
+
+      resources:
+        requests:
+          cpu: "2000m"
+          memory: "8Gi"
+          ephemeral-storage: "10Gi"
+        limits:
+          cpu: "8000m"
+          memory: "16Gi"
+          ephemeral-storage: "20Gi"
+
+      env:
+        - name: PGUSER
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "postgres"
+        - name: PGTZ
+          value: "UTC"
+        - name: TZ
+          value: "UTC"
+
+        - name: POSTGRES_INITDB_ARGS
+          value: "--data-checksums --encoding=UTF8 --locale=C"
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "scram-sha-256"
+
+      volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+          readOnly: false
+        - name: pgwal
+          mountPath: /var/lib/postgresql/wal
+          readOnly: false
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+        - name: run
+          mountPath: /var/run/postgresql
+          readOnly: false
+        - name: config
+          mountPath: /etc/postgresql
+          readOnly: true
+        - name: tls-certs
+          mountPath: /etc/ssl/certs/postgresql
+          readOnly: true
+
+      livenessProbe:
+        httpGet:
+          path: /readyz
+          port: 8000
+          scheme: HTTP
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+        successThreshold: 1
+
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: 8000
+          scheme: HTTP
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+
+      startupProbe:
+        httpGet:
+          path: /readyz
+          port: 8000
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+
+  initContainers:
+    - name: setup-permissions
+      image: busybox:1.36
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - CHOWN
+            - FOWNER
+        seccompProfile:
+          type: RuntimeDefault
+      command:
+        - sh
+        - -c
+        - |
+          echo "Setting up PostgreSQL data directory permissions..."
+          chown -R 999:999 /var/lib/postgresql/data
+          chmod 750 /var/lib/postgresql/data
+          chown -R 999:999 /var/lib/postgresql/wal
+          chmod 750 /var/lib/postgresql/wal
+          chown -R 999:999 /var/run/postgresql
+          chmod 755 /var/run/postgresql
+          echo "Permission setup completed"
+      volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+        - name: pgwal
+          mountPath: /var/lib/postgresql/wal
+        - name: run
+          mountPath: /var/run/postgresql
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+  volumes:
+    - name: pgdata
+      persistentVolumeClaim:
+        claimName: pgdata-postgres-1
+
+    - name: pgwal
+      persistentVolumeClaim:
+        claimName: pgwal-postgres-1
+
+    - name: tmp
+      emptyDir:
+        sizeLimit: 1Gi
+
+    - name: run
+      emptyDir:
+        medium: Memory
+        sizeLimit: 100Mi
+
+    - name: config
+      configMap:
+        name: postgres-config
+        defaultMode: 0444
+
+    - name: tls-certs
+      secret:
+        secretName: postgres-tls-certs
+        defaultMode: 0400
+        items:
+          - key: tls.crt
+            path: server.crt
+          - key: tls.key
+            path: server.key
+          - key: ca.crt
+            path: ca.crt
+
+  dnsPolicy: ClusterFirst
+  dnsConfig:
+    options:
+      - name: ndots
+        value: "2"
+      - name: edns0
+
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false
+
+  restartPolicy: Always
+
+  terminationGracePeriodSeconds: 180
+
+  imagePullSecrets:
+    - name: postgres-registry-secret
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-security-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: security-config
+    app.kubernetes.io/part-of: postgresql
+data:
+  postgresql.conf: |
+    ssl = on
+    ssl_prefer_server_ciphers = on
+    ssl_min_protocol_version = 'TLSv1.2'
+    ssl_max_protocol_version = 'TLSv1.3'
+    ssl_cert_file = '/etc/ssl/certs/postgresql/server.crt'
+    ssl_key_file = '/etc/ssl/certs/postgresql/server.key'
+    ssl_ca_file = '/etc/ssl/certs/postgresql/ca.crt'
+
+    password_encryption = scram-sha-256
+
+    tcp_keepalives_idle = 600
+    tcp_keepalives_interval = 30
+    tcp_keepalives_count = 3
+
+    log_connections = on
+    log_disconnections = on
+    log_hostname = on
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_statement = 'ddl'
+    log_min_duration_statement = 1000
+
+    shared_preload_libraries = 'pg_stat_statements'
+
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+    local   all             all                                     scram-sha-256
+
+    hostssl all             all             127.0.0.1/32            scram-sha-256
+
+    hostssl all             all             ::1/128                 scram-sha-256
+
+    hostssl replication     streaming_replica 0.0.0.0/0            cert map=replication
+
+    hostssl all             all             0.0.0.0/0               scram-sha-256
+
+    host    all             all             0.0.0.0/0               reject
+
+  pg_ident.conf: |
+    replication     postgres                streaming_replica
+
+  security-audit.conf: |
+    audit.log_catalog = on
+    audit.log_client = on
+    audit.log_level = log
+    audit.log_parameter = on
+    audit.log_relation = on
+    audit.log_statement_once = off
+    audit.role = 'auditor'
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-vector-security-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: network-security
+    app.kubernetes.io/part-of: postgresql
+    security-level: strict
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres-vector
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              postgres-access: "allowed"
+        - podSelector:
+            matchLabels:
+              postgres-client: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 9187  
+        - protocol: TCP
+          port: 8000  
+
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-vector
+      ports:
+        - protocol: TCP
+          port: 5432
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-vector
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443
