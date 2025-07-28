@@ -146,6 +146,9 @@ data:
         server pgbouncer-1 postgres-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
         server pgbouncer-2 postgres-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
         server pgbouncer-3 postgres-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
+        server pgbouncer-4 postgres-vector-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
+        server pgbouncer-5 postgres-vector-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
+        server pgbouncer-6 postgres-vector-pgbouncer-rw.storage.svc.cluster.local:5432 check port 5432 maxconn 2000 weight 100
 
     # Frontend for PostgreSQL Read/Write (Primary)
     frontend postgres-readwrite
