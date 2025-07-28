@@ -13,3 +13,4 @@ resources:
   - ./pod-disruption-budget.yaml
   - ./configmap.yaml
   - ./pooler.yaml
+  - ./podmonitor.yaml
