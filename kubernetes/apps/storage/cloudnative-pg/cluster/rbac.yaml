@@ -20,6 +20,7 @@ metadata:
   annotations:
     kubernetes.io/service-account.name: postgres-instance
 automountServiceAccountToken: true
+
 ---
 # Role for PostgreSQL cluster management
 apiVersion: rbac.authorization.k8s.io/v1
@@ -32,72 +33,72 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "pods/log", "pods/exec"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Service management
   - apiGroups: [""]
     resources: ["services", "endpoints"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # ConfigMap and Secret management
   - apiGroups: [""]
     resources: ["configmaps", "secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # PersistentVolumeClaim management
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Events
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
-  
+
   # Jobs for backup/restore operations
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # CronJobs for scheduled operations
   - apiGroups: ["batch"]
     resources: ["cronjobs"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # StatefulSet management
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Deployment management
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # ReplicaSet management
   - apiGroups: ["apps"]
     resources: ["replicasets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Monitoring resources
   - apiGroups: ["monitoring.coreos.com"]
     resources: ["servicemonitors", "prometheusrules", "podmonitors"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Network policies
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # Ingress management
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # HorizontalPodAutoscaler
   - apiGroups: ["autoscaling"]
     resources: ["horizontalpodautoscalers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # PodDisruptionBudget
   - apiGroups: ["policy"]
     resources: ["poddisruptionbudgets"]
@@ -114,32 +115,32 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
-  
+
   # Namespace access
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch"]
-  
+
   # PersistentVolume access
   - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  
+
   # StorageClass access
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
-  
+
   # PriorityClass access
   - apiGroups: ["scheduling.k8s.io"]
     resources: ["priorityclasses"]
     verbs: ["get", "list", "watch"]
-  
+
   # Custom Resource Definitions
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["get", "list", "watch"]
-  
+
   # CloudNativePG CRDs
   - apiGroups: ["postgresql.cnpg.io"]
     resources: ["clusters", "backups", "scheduledbackups", "poolers"]
@@ -176,7 +177,6 @@ roleRef:
   kind: ClusterRole
   name: postgres-cluster-cluster-role
 
-
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -189,20 +189,6 @@ metadata:
     app.kubernetes.io/part-of: postgresql
   annotations:
     kubernetes.io/service-account.name: postgres-operator
-automountServiceAccountToken: true
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: postgres-instance
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-  annotations:
-    kubernetes.io/service-account.name: postgres-instance
 automountServiceAccountToken: true
 
 ---
