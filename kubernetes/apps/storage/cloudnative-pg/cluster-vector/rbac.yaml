@@ -196,7 +196,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-operator
+  name: postgres-vector-operator
   labels:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: rbac
@@ -292,7 +292,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-instance
+  name: postgres-vector-instance
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -346,7 +346,7 @@ roleRef:
   name: postgres-vector-instance
 subjects:
   - kind: ServiceAccount
-    name: postgres-instance
+    name: postgres-vector-instance
     namespace: storage
 
 ---
@@ -403,7 +403,7 @@ metadata:
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-backup
+    kubernetes.io/service-account.name: postgres-vector-backup
 automountServiceAccountToken: true
 
 ---
@@ -420,10 +420,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-backup
+  name: postgres-vector-backup
 subjects:
   - kind: ServiceAccount
-    name: postgres-backup
+    name: postgres-vector-backup
     namespace: storage
 
 ---
@@ -431,7 +431,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-monitoring
+  name: postgres-vector-monitoring
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-monitoring
@@ -465,7 +465,7 @@ metadata:
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-monitoring
+    kubernetes.io/service-account.name: postgres-vector-monitoring
 automountServiceAccountToken: true
 
 ---
@@ -482,10 +482,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-monitoring
+  name: postgres-vector-monitoring
 subjects:
   - kind: ServiceAccount
-    name: postgres-monitoring
+    name: postgres-vector-monitoring
     namespace: storage
 
 ---
@@ -520,5 +520,5 @@ roleRef:
   name: postgres-vector-monitoring-cluster
 subjects:
   - kind: ServiceAccount
-    name: postgres-monitoring
+    name: postgres-vector-monitoring
     namespace: storage
