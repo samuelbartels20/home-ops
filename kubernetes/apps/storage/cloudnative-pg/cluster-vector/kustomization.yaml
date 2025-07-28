@@ -13,6 +13,5 @@ resources:
   - ./rbac.yaml
   - ./pod-disruption-budget.yaml
   - ./pooler.yaml
-  - ./operator-service-monitor.yaml
   - ./operator-servicemonitor.yaml
   - ./podmonitor.yaml
