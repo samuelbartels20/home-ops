@@ -10,7 +10,7 @@ resources:
   - ./configmap.yaml
   - ./horizontal-pod-autoscaler.yaml
   - ./prometheusrule.yaml
-  # - ./rbac.yaml
+  - ./rbac.yaml
   - ./pod-disruption-budget.yaml
   - ./pooler.yaml
   - ./operator-servicemonitor.yaml
