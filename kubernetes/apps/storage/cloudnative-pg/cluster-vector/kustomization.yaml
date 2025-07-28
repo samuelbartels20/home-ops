@@ -12,4 +12,4 @@ resources:
   - ./prometheusrule.yaml
   - ./rbac.yaml
   - ./pod-disruption-budget.yaml
-  # - ./pooler.yaml
+  - ./pooler.yaml
