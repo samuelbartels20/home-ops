@@ -108,66 +108,33 @@ spec:
     - name: onepassword
       namespace: security
 
-
 ---
-# PostgreSQL Connection Pooling
+# PostgreSQL Vector Cluster
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-pooling
-  namespace: storage
+  name: &app cloudnative-pg-cluster-vector
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: postgres-pooling
-      app.kubernetes.io/component: connection-pooling
-      app.kubernetes.io/part-of: postgresql
-  path: ./kubernetes/apps/storage/cloudnative-pg/pooling
+      app.kubernetes.io/name: *app
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: *namespace
+  healthCheckExprs:
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
+      current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
+  path: ./kubernetes/apps/storage/cloudnative-pg/cluster-vector
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  wait: false
+  wait: true
   interval: 1h
   retryInterval: 2m
   timeout: 5m
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
-
-# ---
-# # PostgreSQL Vector Cluster
-# apiVersion: kustomize.toolkit.fluxcd.io/v1
-# kind: Kustomization
-# metadata:
-#   name: &app cloudnative-pg-cluster-vector
-#   namespace: &namespace storage
-# spec:
-#   targetNamespace: *namespace
-#   commonMetadata:
-#     labels:
-#       app.kubernetes.io/name: *app
-#   dependsOn:
-#     - name: cloudnative-pg
-#       namespace: *namespace
-#   healthCheckExprs:
-#     - apiVersion: postgresql.cnpg.io/v1
-#       kind: Cluster
-#       failed: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'False')
-#       current: status.conditions.filter(e, e.type == 'Ready').all(e, e.status == 'True')
-#   path: ./kubernetes/apps/storage/cloudnative-pg/cluster-vector
-#   prune: true
-#   sourceRef:
-#     kind: GitRepository
-#     name: flux-system
-#     namespace: flux-system
-#   wait: true
-#   interval: 1h
-#   retryInterval: 2m
-#   timeout: 5m
