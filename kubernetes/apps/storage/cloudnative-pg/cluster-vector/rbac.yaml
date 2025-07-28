@@ -186,7 +186,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
   annotations:
     kubernetes.io/service-account.name: postgres-vector-instance
 automountServiceAccountToken: true
@@ -297,7 +297,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 rules:
   # ConfigMap permissions for PostgreSQL configuration
   - apiGroups: [""]
@@ -359,7 +359,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 rules:
   # Secret permissions for backup credentials
   - apiGroups: [""]
@@ -401,7 +401,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
   annotations:
     kubernetes.io/service-account.name: postgres-vector-backup
 automountServiceAccountToken: true
@@ -416,7 +416,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -463,7 +463,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
   annotations:
     kubernetes.io/service-account.name: postgres-vector-monitoring
 automountServiceAccountToken: true
@@ -478,7 +478,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -497,7 +497,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 rules:
   # Read-only access to nodes for monitoring
   - apiGroups: [""]
@@ -513,7 +513,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
