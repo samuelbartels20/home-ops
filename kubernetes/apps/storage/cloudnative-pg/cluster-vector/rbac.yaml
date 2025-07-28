@@ -391,20 +391,20 @@ rules:
     resources: ["volumesnapshots"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 
-# ---
-# # ServiceAccount for Backup Operations
-# apiVersion: v1
-# kind: ServiceAccount
-# metadata:
-#   name: postgres-vector-backup
-#   namespace: storage
-#   labels:
-#     app.kubernetes.io/name: postgresql-backup
-#     app.kubernetes.io/component: rbac
-#     app.kubernetes.io/part-of: postgresql
-#   annotations:
-#     kubernetes.io/service-account.name: postgres-vector-backup
-# automountServiceAccountToken: true
+---
+# ServiceAccount for Backup Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-vector-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+  annotations:
+    kubernetes.io/service-account.name: postgres-vector-backup
+automountServiceAccountToken: true
 
 ---
 # RoleBinding for Backup Operations
