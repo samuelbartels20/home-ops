@@ -1,5 +1,15 @@
 # Changelog
 
+##  v2025.07.28.12
+
+Date-based release for 2025-07-28
+
+### Changes
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- chore(release): 2025.07.28.11 [skip ci]
+
 ##  v2025.07.28.11
 
 Date-based release for 2025-07-28
