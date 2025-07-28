@@ -420,7 +420,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-backup
+  name: postgres-vector-backup
 subjects:
   - kind: ServiceAccount
     name: postgres-vector-backup
@@ -436,7 +436,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: postgresql-vector
 rules:
   # Pod permissions for metrics collection
   - apiGroups: [""]
