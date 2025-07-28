@@ -420,7 +420,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-vector-backup
+  name: postgres-backup
 subjects:
   - kind: ServiceAccount
     name: postgres-vector-backup
