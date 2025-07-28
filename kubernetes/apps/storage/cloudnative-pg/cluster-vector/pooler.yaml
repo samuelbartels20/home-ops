@@ -56,7 +56,6 @@ spec:
     cancelDelay: 10
 
     logConnections: true
-    logDisconnections: true
     logPoolerErrors: true
 
     adminUsers: "pgbouncer,postgres"
