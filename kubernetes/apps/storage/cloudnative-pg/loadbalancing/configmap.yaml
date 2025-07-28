@@ -134,6 +134,8 @@ data:
         # Read-only replicas
         server postgres-r postgres-ro.storage.svc.cluster.local:5432 check port 5432 maxconn 1000 weight 100
         server postgres-ro postgres-ro.storage.svc.cluster.local:5432 check port 5432 maxconn 1000 weight 100 backup
+        server postgres-r postgres-vector-ro.storage.svc.cluster.local:5432 check port 5432 maxconn 1000 weight 100 backup
+        server postgres-ro postgres-vector-ro.storage.svc.cluster.local:5432 check port 5432 maxconn 1000 weight 100 backup
 
     # # PgBouncer Backend
     backend pgbouncer-pool
