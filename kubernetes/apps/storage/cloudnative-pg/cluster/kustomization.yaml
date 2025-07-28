@@ -10,6 +10,6 @@ resources:
   - ./service-monitor.yaml
   - ./rbac.yaml
   - ./horizontal-pod-autoscaler.yaml
-  - ./pod-disruption-budget.yaml
+  # - ./pod-disruption-budget.yaml
   - ./configmap.yaml
   - ./pooler.yaml
