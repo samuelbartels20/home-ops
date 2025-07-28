@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-config
+  name: postgres-vector-config
   namespace: storage
 data:
   postgresql.conf: |
@@ -52,3 +52,83 @@ data:
     backup_retention = '7_days'
     backup_retention_policy = '7_days'
     backup_retention_policy = '7_days'
+
+  tenant-config.ini: |
+    [tenant:priority-high]
+    pool_size = 50
+    max_db_connections = 200
+    reserve_pool_size = 10
+    query_timeout = 30000
+
+    [tenant:priority-standard]
+    pool_size = 25
+    max_db_connections = 100
+    reserve_pool_size = 5
+    query_timeout = 60000
+
+    [tenant:priority-low]
+    pool_size = 10
+    max_db_connections = 50
+    reserve_pool_size = 2
+    query_timeout = 120000
+
+  custom-queries.yaml: |
+    pg_custom_database_size:
+      query: "SELECT datname as database, pg_database_size(datname) as size_bytes FROM pg_database WHERE datistemplate = false"
+      metrics:
+        - database:
+            usage: "LABEL"
+            description: "Database name"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Database size in bytes"
+
+    pg_custom_table_sizes:
+      query: |
+        SELECT schemaname, tablename,
+               pg_total_relation_size(schemaname||'.'||tablename) as total_bytes,
+               pg_relation_size(schemaname||'.'||tablename) as size_bytes,
+               pg_indexes_size(schemaname||'.'||tablename) as index_bytes
+        FROM pg_tables
+        WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - total_bytes:
+            usage: "GAUGE"
+            description: "Total size in bytes"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Table size in bytes"
+        - index_bytes:
+            usage: "GAUGE"
+            description: "Index size in bytes"
+
+    pg_custom_table_sizes_vector:
+      query: |
+        SELECT schemaname, tablename,
+               pg_total_relation_size(schemaname||'.'||tablename) as total_bytes,
+               pg_relation_size(schemaname||'.'||tablename) as size_bytes,
+               pg_indexes_size(schemaname||'.'||tablename) as index_bytes
+        FROM pg_tables
+        WHERE schemaname NOT IN ('information_schema', 'pg_catalog')
+      metrics:
+        - schemaname:
+            usage: "LABEL"
+            description: "Schema name"
+        - tablename:
+            usage: "LABEL"
+            description: "Table name"
+        - total_bytes:
+            usage: "GAUGE"
+            description: "Total size in bytes"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Table size in bytes"
+        - index_bytes:
+            usage: "GAUGE"
+            description: "Index size in bytes"

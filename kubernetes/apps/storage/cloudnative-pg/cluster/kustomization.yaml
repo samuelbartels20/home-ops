@@ -11,5 +11,5 @@ resources:
   - ./rbac.yaml
   - ./horizontal-pod-autoscaler.yaml
   - ./pod-disruption-budget.yaml
-  - ./configmap.yaml
+  # - ./configmap.yaml
   - ./pooler.yaml
