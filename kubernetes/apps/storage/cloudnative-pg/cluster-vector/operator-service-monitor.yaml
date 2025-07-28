@@ -3,10 +3,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cloudnative-pg-operator
+  name: postgres-vector-operator
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: postgres-vector
     app.kubernetes.io/component: monitoring
     app.kubernetes.io/part-of: postgresql
     monitoring: prometheus
@@ -17,7 +17,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/name: postgres-vector
   endpoints:
     - port: metrics
       interval: 30s
