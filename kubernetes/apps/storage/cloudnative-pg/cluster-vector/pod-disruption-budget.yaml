@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       cnpg.io/cluster: postgres-vector
+      cnpg.io/instanceRole: replica
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
