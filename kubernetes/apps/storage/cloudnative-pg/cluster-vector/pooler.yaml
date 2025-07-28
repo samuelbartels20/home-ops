@@ -26,6 +26,3 @@ spec:
       server_idle_timeout: "600"
       client_idle_timeout: "0"
       client_login_timeout: "60"
-      log_connections: "true"
-      log_disconnections: "true"
-      log_pooler_errors: "true"
