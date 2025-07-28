@@ -1,4 +1,5 @@
 ---
+# yaml-language-server: $schema=https://json.schemastore.org/k8s
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
