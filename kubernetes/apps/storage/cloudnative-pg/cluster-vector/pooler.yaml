@@ -55,7 +55,6 @@ spec:
     queryTimeout: 0
     queryWaitTimeout: 120
     cancelDelay: 10
-    pktBuf: 4096
 
     logConnections: true
     logDisconnections: true
