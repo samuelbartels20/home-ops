@@ -15,5 +15,5 @@ resources:
   - ./pooler.yaml
   - ./operator-servicemonitor.yaml
   - ./podmonitor.yaml
-  - ./pod-security-policy.yaml
+  # - ./pod-security-policy.yaml
   - ./network-policy.yaml
