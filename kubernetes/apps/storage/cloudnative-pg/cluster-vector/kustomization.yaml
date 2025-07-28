@@ -15,3 +15,4 @@ resources:
   - ./pooler.yaml
   - ./operator-service-monitor.yaml
   - ./operator-servicemonitor.yaml
+  - ./podmonitor.yaml
