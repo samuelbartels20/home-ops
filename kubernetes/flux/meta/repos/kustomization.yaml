@@ -6,6 +6,6 @@ resources:
   - ./external-dns.yaml
   - ./external-secrets.yaml
   - ./bjw-s.yaml
-  - ./openebs.yaml
+  # - ./openebs.yaml
   - ./cloudnative-pg.yaml
 
