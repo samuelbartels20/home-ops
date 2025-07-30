@@ -43,6 +43,30 @@ spec:
       provisioner:
         hostNetwork: true
         dnsPolicy: ClusterFirstWithHostNet
+        # Environment variables to fix API server connectivity issues
+        env:
+          - name: KUBERNETES_SERVICE_HOST
+            value: "127.0.0.1"
+          - name: KUBERNETES_SERVICE_PORT
+            value: "7445"
+          - name: KUBERNETES_SERVICE_PORT_HTTPS
+            value: "7445"
+          - name: OPENEBS_IO_ENABLE_ANALYTICS
+            value: "false"
+          - name: OPENEBS_IO_BASE_PATH
+            value: "/var/openebs/local"
+          - name: OPENEBS_IO_HELPER_IMAGE
+            value: "quay.io/openebs/linux-utils:4.2.0"
+          - name: OPENEBS_IO_HELPER_POD_HOST_NETWORK
+            value: "true"
+          - name: LEADER_ELECTION_ENABLED
+            value: "true"
+          - name: LEADER_ELECTION_LEASE_DURATION
+            value: "15s"
+          - name: LEADER_ELECTION_RENEW_DEADLINE
+            value: "10s"
+          - name: LEADER_ELECTION_RETRY_PERIOD
+            value: "2s"
         # Additional resource limits for stability
         resources:
           requests:
@@ -51,6 +75,25 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "100m"
+        # Security context for Talos compatibility
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - NET_ADMIN
+        # Volume mounts for host path access
+        volumeMounts:
+          - name: host-path
+            mountPath: /var/openebs/local
+        volumes:
+          - name: host-path
+            hostPath:
+              path: /var/openebs/local
+              type: DirectoryOrCreate
 
     # CRD Configuration
     openebs-crds:
@@ -97,3 +140,12 @@ spec:
       cleanup:
         image:
           registry: quay.io/
+      
+      # Talos-specific configurations
+      talos:
+        enabled: true
+        # Use host networking for API server access
+        hostNetwork: true
+        # Disable analytics to reduce network calls
+        analytics:
+          enabled: false

@@ -68,4 +68,19 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: openebs
-    namespace: storage 
+    namespace: storage
+  - kind: ServiceAccount
+    name: openebs-localpv-provisioners
+    namespace: storage
+
+---
+# ServiceAccount for OpenEBS LocalPV Provisioner
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openebs-localpv-provisioners
+  namespace: storage
+  labels:
+    app: openebs
+    component: openebs
+    openebs.io/component-name: openebs-localpv-provisioner 
