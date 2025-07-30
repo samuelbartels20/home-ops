@@ -82,7 +82,6 @@ spec:
       effect: "NoSchedule"
 
   priorityClassName: system-cluster-critical
-  # preemptionPolicy: Never  # <-- Removed this line to fix the error
 
   containers:
     - name: postgres
@@ -284,6 +283,34 @@ spec:
 
 ---
 apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgdata-postgres-vector-1
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: openebs-hostpath
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgwal-postgres-vector-1
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: openebs-hostpath
+
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-vector-security-config
@@ -343,4 +370,3 @@ data:
     audit.log_relation = on
     audit.log_statement_once = off
     audit.role = 'auditor'
-
