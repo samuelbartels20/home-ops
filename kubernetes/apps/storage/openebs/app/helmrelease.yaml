@@ -16,93 +16,169 @@ spec:
         name: openebs
         namespace: flux-system
   values:
-    # LocalPV Provisioner Configuration
-    localpv-provisioner:
-      rbac:
-        create: true
-        # Ensure proper RBAC permissions for API access
-        pspEnabled: false
+    rawfile-localpv:
+      provisionerName: "rawfile.csi.openebs.io"
+      logLevel: INFO
+      logFormat: json
+      reservedCapacity: "10%"
+      capacityOverride: "500Gi"
 
-      localpv:
+      global:
+        imageRegistry: quay.io
+        k8sImageRegistry: registry.k8s.io
+        imagePullPolicy: IfNotPresent
+        imagePullSecrets:
+          - openebs-registry-secret
+        analytics:
+          enabled: false
+
+      image:
+        registry: quay.io
+        repository: openebs/rawfile-localpv
+        tag: "4.3.2"
+        pullPolicy: IfNotPresent
+
+      controller:
         image:
-          registry: quay.io/
-
-      helperPod:
-        image:
-          registry: quay.io/
-
-      # Hostpath storage class configuration
-      hostpathClass:
-        enabled: true
-        name: openebs-hostpath
-        isDefaultClass: false
-        basePath: /var/openebs/local
-        reclaimPolicy: Delete
-
-      # Critical fix: Host network and DNS configuration for API connectivity
-      provisioner:
-        hostNetwork: true
-        dnsPolicy: ClusterFirstWithHostNet
-        # Environment variables to fix API server connectivity issues
-        env:
-          - name: KUBERNETES_SERVICE_HOST
-            value: "127.0.0.1"
-          - name: KUBERNETES_SERVICE_PORT
-            value: "7445"
-          - name: KUBERNETES_SERVICE_PORT_HTTPS
-            value: "7445"
-          - name: OPENEBS_IO_ENABLE_ANALYTICS
-            value: "false"
-          - name: OPENEBS_IO_BASE_PATH
-            value: "/var/openebs/local"
-          - name: OPENEBS_IO_HELPER_IMAGE
-            value: "quay.io/openebs/linux-utils:4.2.0"
-          - name: OPENEBS_IO_HELPER_POD_HOST_NETWORK
-            value: "true"
-          - name: LEADER_ELECTION_ENABLED
-            value: "true"
-          - name: LEADER_ELECTION_LEASE_DURATION
-            value: "15s"
-          - name: LEADER_ELECTION_RENEW_DEADLINE
-            value: "10s"
-          - name: LEADER_ELECTION_RETRY_PERIOD
-            value: "2s"
-        # Additional resource limits for stability
+          repository: openebs/rawfile-localpv
+          tag: "4.3.2"
+          pullPolicy: IfNotPresent
+        externalResizer:
+          image:
+            registry: quay.io
+            repository: sig-storage/csi-resizer
+            tag: v1.13.2
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
+            memory: "256Mi"
+            cpu: "250m"
           limits:
-            memory: "128Mi"
-            cpu: "100m"
-        # Security context for Talos compatibility
+            memory: "512Mi"
+            cpu: "500m"
+        priorityClassName: system-cluster-critical
+        tolerations:
+          - key: "node-role.kubernetes.io/master"
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        grpcWorkers: 10
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-          runAsGroup: 0
-          allowPrivilegeEscalation: true
-          capabilities:
-            add:
-              - SYS_ADMIN
-              - NET_ADMIN
-        # Volume mounts for host path access
-        volumeMounts:
-          - name: host-path
-            mountPath: /var/openebs/local
-        volumes:
-          - name: host-path
-            hostPath:
-              path: /var/openebs/local
-              type: DirectoryOrCreate
+          runAsUser: 1000
+          runAsNonRoot: true
+          fsGroup: 2000
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:9809"]
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:9809"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 1
 
-    # CRD Configuration
-    openebs-crds:
-      csi:
-        volumeSnapshots:
-          enabled: false
-          keep: false
+      node:
+        image:
+          repository: openebs/rawfile-localpv
+          tag: "4.3.2"
+          pullPolicy: IfNotPresent
+        driverRegistrar:
+          image:
+            registry: quay.io
+            repository: sig-storage/csi-node-driver-registrar
+            tag: v2.13.0
+        externalProvisioner:
+          image:
+            registry: quay.io
+            repository: sig-storage/csi-provisioner
+            tag: v5.2.0
+        externalSnapshotter:
+          image:
+            registry: quay.io
+            repository: sig-storage/csi-snapshotter
+            tag: v8.2.1
+        snapshotController:
+          image:
+            registry: quay.io
+            repository: sig-storage/snapshot-controller
+            tag: v8.2.1
+        dataDirPath: /var/csi/rawfile
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        metrics:
+          enabled: true
+        priorityClassName: system-node-critical
+        tolerations:
+          - key: "node-role.kubernetes.io/master"
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        grpcWorkers: 10
+        securityContext:
+          runAsUser: 1000
+          runAsNonRoot: true
+          fsGroup: 2000
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:9808"]
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command: ["/bin/grpc_health_probe", "-addr=:9808"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 1
 
-    # Disable unused engines to reduce complexity
+      imagePullSecrets:
+        - openebs-registry-secret
+
+      metrics:
+        enabled: true
+        port: 9100
+        serviceMonitor:
+          enabled: true
+          interval: 1m
+
+      storageClasses:
+        - name: openebs-hostpath
+          enabled: true
+          volumeBindingMode: WaitForFirstConsumer
+          allowVolumeExpansion: true
+          reclaimPolicy: Delete
+          fsType: ext4
+          thinProvision: false
+          mountOptions: []
+          formatOptions: []
+          isDefaultClass: true
+
+      crds:
+        enabled: true
+        csi:
+          volumeSnapshots:
+            enabled: true
+
+    # Disable unused engines
     zfs-localpv:
       enabled: false
       analytics:
@@ -114,14 +190,13 @@ spec:
     mayastor:
       enabled: false
 
-    # Disable observability components that can cause issues
+    # Disable observability components not in use
     loki:
       enabled: false
 
     alloy:
       enabled: false
 
-    # Engine configuration - only enable what we need
     engines:
       local:
         lvm:
@@ -132,20 +207,15 @@ spec:
         mayastor:
           enabled: false
 
-    # Global settings
     global:
-      # Ensure consistent registry
       imageRegistry: "quay.io/"
-      # Set resource cleanup policies
       cleanup:
         image:
           registry: quay.io/
-      
-      # Talos-specific configurations
       talos:
         enabled: true
-        # Use host networking for API server access
         hostNetwork: true
-        # Disable analytics to reduce network calls
         analytics:
           enabled: false
+
+# Note: For full security, also create and apply a Kubernetes NetworkPolicy to restrict OpenEBS pod traffic.
