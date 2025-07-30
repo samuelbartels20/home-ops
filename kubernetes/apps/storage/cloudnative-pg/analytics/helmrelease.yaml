@@ -1,0 +1,123 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: postgres-analytics
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgres-analytics
+    app.kubernetes.io/component: analytics
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    tier: analytics
+spec:
+  interval: 15m
+  timeout: 10m
+  chart:
+    spec:
+      chart: app-template
+      version: 3.5.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      interval: 15m
+  install:
+    createNamespace: false
+    timeout: 10m
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    timeout: 10m
+    remediation:
+      strategy: rollback
+      retries: 3
+
+  values:
+    controllers:
+      main:
+        replicas: 2
+        strategy: RollingUpdate
+
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        containers:
+          main:
+            image:
+              repository: postgres
+              tag: "17.2"
+              pullPolicy: IfNotPresent
+
+            command: ["/bin/bash", "-c"]
+            args:
+              - |
+                while true; do
+                  echo "Query accelerator running..."
+                  sleep 60
+                done
+
+            env:
+              POSTGRES_HOST: "postgres-analytics-engine-rw.storage.svc.cluster.local"
+              POSTGRES_PORT: "5432"
+              POSTGRES_DB: "analytics"
+
+            envFrom:
+              - secretRef:
+                  name: postgres-analytics
+
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 999
+              capabilities:
+                drop:
+                  - ALL
+              seccompProfile:
+                type: RuntimeDefault
+
+        pod:
+          labels:
+            app.kubernetes.io/name: postgres-analytics
+            app.kubernetes.io/component: analytics
+            monitoring: "true"
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+
+    persistence:
+      query-cache:
+        enabled: true
+        type: emptyDir
+        sizeLimit: 10Gi
+        globalMounts:
+          - path: /var/cache/queries
+
+      analytics-scripts:
+        enabled: true
+        type: configMap
+        name: postgres-analytics-config
+        defaultMode: 0755
+        globalMounts:
+          - path: /scripts
+            readOnly: true
+
+    serviceAccount:
+      create: false
+      name: postgres-analytics
