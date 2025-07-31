@@ -41,10 +41,10 @@ spec:
 
   postgresql:
     parameters:
-      shared_buffers: "2GB"
+      shared_buffers: "1GB"
       effective_cache_size: "1GB"
       work_mem: "128MB"
-      maintenance_work_mem: "512MB"
+      maintenance_work_mem: "256MB"
       random_page_cost: "1.1"
       seq_page_cost: "1.0"
       cpu_tuple_cost: "0.01"
@@ -85,14 +85,13 @@ spec:
       log_min_duration_statement: "1000"
       log_checkpoints: "on"
       log_autovacuum_min_duration: "0"
-      shared_preload_libraries: "citus,columnar,timescaledb,pg_stat_statements,pg_hint_plan,pg_cron"
 
   resources:
     requests:
-      memory: "512Mi"
+      memory: "1Gi"
       cpu: "500m"
     limits:
-      memory: "512Mi"
+      memory: "1Gi"
       cpu: "1000m"
 
   storage:
