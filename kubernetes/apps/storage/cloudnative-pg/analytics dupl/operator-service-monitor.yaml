@@ -1,0 +1,46 @@
+---
+# ServiceMonitor for CloudNative PostgreSQL Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloudnative-pg-operator
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: postgresql
+    monitoring: prometheus
+    environment: production
+  annotations:
+    prometheus.io/scrape: "true"
+    monitoring.cnpg.io/operator: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+          targetLabel: service_name
+        - sourceLabels: [__meta_kubernetes_service_label_app_kubernetes_io_component]
+          targetLabel: component
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'cnpg_.*|controller_runtime_.*|workqueue_.*'
+          action: keep
+        - targetLabel: cluster
+          replacement: postgres
+  namespaceSelector:
+    matchNames:
+      - storage

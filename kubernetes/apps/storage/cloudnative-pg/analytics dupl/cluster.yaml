@@ -1,0 +1,80 @@
+---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/cluster_v1.json
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres
+  namespace: storage
+spec:
+  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 10Gi
+    storageClass: openebs-hostpath
+    resizeInUseVolumes: true
+  superuserSecret:
+    name: cloudnative-pg
+  enableSuperuserAccess: true
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+    parameters:
+      max_connections: "400"
+      shared_buffers: 256MB
+  nodeMaintenanceWindow:
+    inProgress: false
+    reusePVC: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 640Mi
+  monitoring:
+    enablePodMonitor: true
+    # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
+    podMonitorMetricRelabelings:
+      - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
+      - { regex: cluster, action: labeldrop }
+  backup:
+    retentionPolicy: 30d
+    barmanObjectStore: &barmanObjectStore
+      data:
+        compression: bzip2
+      wal:
+        compression: bzip2
+        maxParallel: 8
+      destinationPath: s3://pgbackup
+      endpointURL: http://192.168.8.102:9000
+
+      serverName: &currentCluster postgres-v1
+      s3Credentials:
+        accessKeyId:
+          name: cloudnative-pg
+          key: minio_access_key_id
+        secretAccessKey:
+          name: cloudnative-pg
+          key: minio_secret_access_key
+
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.102:9000
+        serverName: postgres-v2
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      secret:
+        name: cloudnative-pg
+

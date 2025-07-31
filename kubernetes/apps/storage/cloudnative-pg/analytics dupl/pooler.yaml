@@ -1,0 +1,28 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: postgres-pgbouncer-rw
+spec:
+  cluster:
+    name: postgres
+  instances: 3
+  type: rw
+  monitoring:
+    enablePodMonitor: true
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "100"
+      min_pool_size: "5"
+      reserve_pool_size: "5"
+      max_db_connections: "100"
+      max_user_connections: "100"
+      server_reset_query: "DISCARD ALL"
+      server_check_delay: "30"
+      server_check_query: "SELECT 1"
+      server_lifetime: "3600"
+      server_idle_timeout: "600"
+      client_idle_timeout: "0"
+      client_login_timeout: "60"
