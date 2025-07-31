@@ -23,6 +23,7 @@ spec:
         namespace: flux-system
       interval: 15m
   install:
+    crds: CreateReplace
     createNamespace: false
     timeout: 10m
     remediation:
