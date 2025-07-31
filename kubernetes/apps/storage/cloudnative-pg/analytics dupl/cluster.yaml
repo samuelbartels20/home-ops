@@ -3,11 +3,19 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres
+  name: postgres-analytics
   namespace: storage
+  labels:
+    app.kubernetes.io/name: postgres-analytics
+    app.kubernetes.io/component: analytics
+    app.kubernetes.io/part-of: postgresql
+  annotations:
+    cnpg.io/analytics-engine: "enabled"
+    cnpg.io/columnar-store: "citus"
+    cnpg.io/query-acceleration: "enabled"
 spec:
   imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
-  instances: 3
+  instances: 5
   primaryUpdateStrategy: unsupervised
   storage:
     size: 10Gi

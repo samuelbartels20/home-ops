@@ -15,7 +15,7 @@ metadata:
 spec:
   instances: 5
 
-  imageName: postgres:17.2
+  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
 
   bootstrap:
     initdb:
