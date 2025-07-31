@@ -73,8 +73,23 @@ spec:
             key: minio_secret_access_key
   bootstrap:
     initdb:
-      database: postgres
-      owner: postgres
+      database: analytics
+      owner: analytics
       secret:
-        name: cloudnative-pg
+        name: postgres-analytics
+      postInitApplicationSQL:
+        - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_hint_plan CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS hypopg CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_cron CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS postgres_fdw CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS dblink CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS btree_gin CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS btree_gist CASCADE;"
+        - "SELECT citus_set_coordinator_host('localhost', 5432);"
 
