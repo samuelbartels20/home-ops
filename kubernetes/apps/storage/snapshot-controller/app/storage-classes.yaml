@@ -70,7 +70,6 @@ allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Retain
 ---
-# Storage Quota Management
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -78,13 +77,10 @@ metadata:
   namespace: storage
 spec:
   hard:
-    # Total storage capacity across all PVCs
     requests.storage: "1Ti"
-    # Quota per storage class
     premium-rwo.storageclass.storage.k8s.io/requests.storage: "200Gi"
     standard-rwo.storageclass.storage.k8s.io/requests.storage: "500Gi"
     archive-rwo.storageclass.storage.k8s.io/requests.storage: "300Gi"
-    # PVC count limits
     persistentvolumeclaims: "50"
     premium-rwo.storageclass.storage.k8s.io/persistentvolumeclaims: "10"
     standard-rwo.storageclass.storage.k8s.io/persistentvolumeclaims: "30"

@@ -12,56 +12,33 @@ metadata:
 driver: zfs.csi.openebs.io
 deletionPolicy: Retain
 parameters:
-  # Snapshot settings
   type: zfs
   incremental: "true"
   compression: "zstd-3"
   checksum: "sha512"
   encryption: "aes-256-gcm"
-
-  # Performance settings
   iops: "10000"
   throughput: "500"
-
-  # Enhanced Retention settings
+  
   retentionDuration: "2160h" 
   maxSnapshots: "180"
-  retentionTiers:
-    - tier: "hourly"
-      retain: "24"
-    - tier: "daily"
-      retain: "30"
-    - tier: "weekly"
-      retain: "52"
-    - tier: "monthly"
-      retain: "12"
-
-  # Enhanced Backup settings
+  retentionTiers: "hourly:24,daily:30,weekly:52,monthly:12"
   backupLocation: "s3" 
   backupEncryption: "true"
   backupCompression: "zstd"
   crossRegionReplication: "true"
   replicationRegions: "us-east-1,us-west-2"
-
-  # Compliance and Audit settings
   auditEnabled: "true"
   auditRetention: "8760h" 
   complianceRetention: "8760h" 
   dataClassification: "confidential"
   gdprCompliant: "true"
   hipaaCompliant: "true"
-
-  # Enhanced Recovery settings
   recoveryPointObjective: "15m" 
   recoveryTimeObjective: "1h"   
   automatedRecoveryTesting: "true"
   testingSchedule: "0 0 * * 0"  
   failoverAutomation: "true"
-
-  # Monitoring and Alerting
+  
   monitoringEnabled: "true"
-  alertingThresholds:
-    snapshotFailure: "true"
-    backupFailure: "true"
-    replicationLag: "30m"
-    storageUsage: "85"
+  alertingThresholds: "snapshotFailure:true,backupFailure:true,replicationLag:30m,storageUsage:85"
