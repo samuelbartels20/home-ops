@@ -20,7 +20,7 @@ spec:
   bootstrap:
     initdb:
       database: analytics
-      owner: analytics_user
+      owner: postgres
       secret:
         name: postgres-analytics
       postInitApplicationSQL:
@@ -98,6 +98,3 @@ spec:
   storage:
     size: "50Gi"
     storageClass: "openebs-hostpath"
-
-  monitoring:
-    enabled: true
