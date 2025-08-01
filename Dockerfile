@@ -21,14 +21,22 @@ RUN apt-get update && apt-get install -y \
     gnupg2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Citus repository and find available package
+# Add Citus repository
 RUN curl -s https://install.citusdata.com/community/deb.sh | bash && \
     apt-get update
 
 # Install the latest available Citus package for PostgreSQL 17
-RUN CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | grep -E 'postgresql-17-citus-[0-9]+\.[0-9]+' | head -n 1 | awk '{print $1}') && \
-    echo "Installing Citus package: $CITUS_PACKAGE" && \
-    apt-get install -y $CITUS_PACKAGE && \
+RUN CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | grep -E 'postgresql-17-citus-[0-9]+\.[0-9]+' | sort -V | tail -n 1 | awk '{print $1}') && \
+    if [ -z "$CITUS_PACKAGE" ]; then \
+        echo "No Citus package found for PostgreSQL 17, trying alternative approach"; \
+        CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | head -n 1 | awk '{print $1}'); \
+    fi && \
+    if [ -n "$CITUS_PACKAGE" ]; then \
+        echo "Installing Citus package: $CITUS_PACKAGE" && \
+        apt-get install -y $CITUS_PACKAGE; \
+    else \
+        echo "No Citus package available for PostgreSQL 17"; \
+    fi && \
     rm -rf /var/lib/apt/lists/*
 
 # Add TimescaleDB repository
@@ -38,8 +46,12 @@ RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_releas
 
 # Install TimescaleDB (find latest available version)
 RUN TIMESCALEDB_PACKAGE=$(apt-cache search timescaledb-2-postgresql-17 | head -n 1 | awk '{print $1}') && \
-    echo "Installing TimescaleDB package: $TIMESCALEDB_PACKAGE" && \
-    apt-get install -y $TIMESCALEDB_PACKAGE && \
+    if [ -n "$TIMESCALEDB_PACKAGE" ]; then \
+        echo "Installing TimescaleDB package: $TIMESCALEDB_PACKAGE" && \
+        apt-get install -y $TIMESCALEDB_PACKAGE; \
+    else \
+        echo "No TimescaleDB package available for PostgreSQL 17"; \
+    fi && \
     rm -rf /var/lib/apt/lists/*
 
 # Install additional extensions (with fallback if not available)
@@ -72,8 +84,18 @@ RUN apt-get remove -y \
     && apt-get autoremove -y \
     && apt-get clean
 
-# Update shared_preload_libraries
-RUN echo "shared_preload_libraries = 'citus,timescaledb,pg_stat_statements,pg_hint_plan,pg_cron'" >> /usr/share/postgresql/17/postgresql.conf.sample
+# Create a script to dynamically configure shared_preload_libraries based on installed extensions
+RUN echo '#!/bin/bash' > /usr/local/bin/configure-extensions.sh && \
+    echo 'EXTENSIONS=""' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'if [ -f /usr/lib/postgresql/17/lib/citus.so ]; then EXTENSIONS="${EXTENSIONS},citus"; fi' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'if [ -f /usr/lib/postgresql/17/lib/timescaledb.so ]; then EXTENSIONS="${EXTENSIONS},timescaledb"; fi' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'EXTENSIONS="${EXTENSIONS},pg_stat_statements"' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'if [ -f /usr/lib/postgresql/17/lib/pg_hint_plan.so ]; then EXTENSIONS="${EXTENSIONS},pg_hint_plan"; fi' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'if [ -f /usr/lib/postgresql/17/lib/pg_cron.so ]; then EXTENSIONS="${EXTENSIONS},pg_cron"; fi' >> /usr/local/bin/configure-extensions.sh && \
+    echo 'EXTENSIONS=$(echo $EXTENSIONS | sed "s/^,//")'  >> /usr/local/bin/configure-extensions.sh && \
+    echo 'echo "shared_preload_libraries = '\''$EXTENSIONS'\''" >> /usr/share/postgresql/17/postgresql.conf.sample' >> /usr/local/bin/configure-extensions.sh && \
+    chmod +x /usr/local/bin/configure-extensions.sh && \
+    /usr/local/bin/configure-extensions.sh
 
 # Switch back to postgres user
 USER 26
