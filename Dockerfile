@@ -23,6 +23,23 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     lsb-release \
     gnupg2 \
+    flex \
+    bison \
+    liblz4-1 \
+    liblz4-dev \
+    libzstd-dev \
+    libzstd1 \
+    libzstd-dev \
+    liblz4-dev \
+    libzstd-dev \
+    libzstd1 \
+    libzstd-dev \
+    libzstd1 \
+    libzstd-dev \
+    libzstd1 \
+    libzstd-dev \
+    libzstd1 \
+    libzstd-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Citus repository
