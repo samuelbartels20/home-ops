@@ -145,15 +145,6 @@ spec:
       cpu: "4"
       memory: "1Gi"
 
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: node-type
-            operator: In
-            values: ["database"]
-
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
