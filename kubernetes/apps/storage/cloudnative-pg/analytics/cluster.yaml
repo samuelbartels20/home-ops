@@ -1,4 +1,3 @@
----
 # yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/cluster_v1.json
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -14,7 +13,8 @@ metadata:
     cnpg.io/columnar-store: "citus"
     cnpg.io/query-acceleration: "enabled"
 spec:
-  imageName: "ghcr.io/cloudnative-pg/postgresql:17.2"
+  # Use CitusDB image instead of standard PostgreSQL
+  imageName: "citusdata/citus:12.1-pg17"
   instances: 5
   primaryUpdateStrategy: unsupervised
   storage:
@@ -84,7 +84,6 @@ spec:
       memory: 640Mi
   monitoring:
     enablePodMonitor: true
-    # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
     podMonitorMetricRelabelings:
       - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
       - { regex: cluster, action: labeldrop }
@@ -98,7 +97,6 @@ spec:
         maxParallel: 8
       destinationPath: s3://pgbackup
       endpointURL: http://192.168.8.102:9000
-
       serverName: &currentCluster postgres-v1
       s3Credentials:
         accessKeyId:
@@ -107,7 +105,6 @@ spec:
         secretAccessKey:
           name: cloudnative-pg
           key: minio_secret_access_key
-
   externalClusters:
     - name: clusterBackup
       barmanObjectStore:
