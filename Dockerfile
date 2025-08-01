@@ -1,7 +1,11 @@
-FROM ghcr.io/cloudnative-pg/postgresql:17.2 as base
+FROM ghcr.io/cloudnative-pg/postgresql:17.2 AS base
 
 # Switch to root to install packages
 USER root
+
+# Set environment variables to prevent debconf interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
 
 # Install dependencies for building extensions
 RUN apt-get update && apt-get install -y \
@@ -66,7 +70,7 @@ RUN apt-get update && \
     done && \
     rm -rf /var/lib/apt/lists/*
 
-# Install pg_hint_plan from source
+# Install pg_hint_plan from source - FIXED TAG
 WORKDIR /tmp
 RUN git clone https://github.com/ossc-db/pg_hint_plan.git && \
     cd pg_hint_plan && \
