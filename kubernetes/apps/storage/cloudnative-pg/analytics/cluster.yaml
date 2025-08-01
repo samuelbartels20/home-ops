@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/component: analytics
     app.kubernetes.io/part-of: postgresql
 spec:
-  imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
+  imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:main-195b143"
   instances: 5
   primaryUpdateStrategy: unsupervised
   
