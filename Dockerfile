@@ -3,6 +3,9 @@ FROM ghcr.io/cloudnative-pg/postgresql:17.2 AS base
 # Switch to root to install packages
 USER root
 
+# Build argument to determine target architecture
+ARG TARGETARCH
+
 # Set environment variables to prevent debconf interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBCONF_NONINTERACTIVE_SEEN=true
@@ -29,36 +32,27 @@ RUN apt-get update && apt-get install -y \
     liblz4-dev \
     libzstd-dev \
     libzstd1 \
-    libzstd-dev \
-    liblz4-dev \
-    libzstd-dev \
-    libzstd1 \
-    libzstd-dev \
-    libzstd1 \
-    libzstd-dev \
-    libzstd1 \
-    libzstd-dev \
-    libzstd1 \
-    libzstd-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Citus repository
-RUN curl -s https://install.citusdata.com/community/deb.sh | bash && \
-    apt-get update
-
-# Install the latest available Citus package for PostgreSQL 17
-RUN CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | grep -E 'postgresql-17-citus-[0-9]+\.[0-9]+' | sort -V | tail -n 1 | awk '{print $1}') && \
-    if [ -z "$CITUS_PACKAGE" ]; then \
-        echo "No Citus package found for PostgreSQL 17, trying alternative approach"; \
-        CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | head -n 1 | awk '{print $1}'); \
-    fi && \
-    if [ -n "$CITUS_PACKAGE" ]; then \
-        echo "Installing Citus package: $CITUS_PACKAGE" && \
-        apt-get install -y $CITUS_PACKAGE; \
+# Conditionally add Citus repository and install package (only for amd64)
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      curl -s https://install.citusdata.com/community/deb.sh | bash && \
+      apt-get update && \
+      CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | grep -E 'postgresql-17-citus-[0-9]+\.[0-9]+' | sort -V | tail -n 1 | awk '{print $1}') && \
+      if [ -z "$CITUS_PACKAGE" ]; then \
+          echo "No Citus package found for PostgreSQL 17, trying alternative approach"; \
+          CITUS_PACKAGE=$(apt-cache search postgresql-17-citus | head -n 1 | awk '{print $1}'); \
+      fi && \
+      if [ -n "$CITUS_PACKAGE" ]; then \
+          echo "Installing Citus package: $CITUS_PACKAGE" && \
+          apt-get install -y $CITUS_PACKAGE; \
+      else \
+          echo "No Citus package available for PostgreSQL 17"; \
+      fi && \
+      rm -rf /var/lib/apt/lists/*; \
     else \
-        echo "No Citus package available for PostgreSQL 17"; \
-    fi && \
-    rm -rf /var/lib/apt/lists/*
+      echo "Skipping Citus installation for architecture: $TARGETARCH"; \
+    fi
 
 # Add TimescaleDB repository
 RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
