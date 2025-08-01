@@ -3,13 +3,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: postgres-vector-rules
+  name: postgres-analytics-rules
   labels:
     prometheus: k8s
     role: alert-rules
 spec:
   groups:
-    - name: postgres-vector.rules
+    - name: postgres-analytics.rules
       rules:
         - alert: LongRunningTransaction
           annotations:
