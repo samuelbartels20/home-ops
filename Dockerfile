@@ -1,10 +1,13 @@
 FROM ghcr.io/cloudnative-pg/postgresql:17.2 AS base
 
+# Build arguments for versioning and metadata
+ARG IMAGE_VERSION=1.0.0
+ARG BUILD_DATE=2025-08-01T20:25:50Z
+ARG VCS_REF
+ARG TARGETARCH
+
 # Switch to root to install packages
 USER root
-
-# Build argument to determine target architecture
-ARG TARGETARCH
 
 # Set environment variables to prevent debconf interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -115,10 +118,25 @@ RUN echo '#!/bin/bash' > /usr/local/bin/configure-extensions.sh && \
 # Switch back to postgres user
 USER 26
 
-# Set labels
+# Set labels following OCI annotation standards and semantic versioning
 LABEL maintainer="Samuel Bartels <samuelbartels20@github.com>"
 LABEL description="PostgreSQL 17.2 with CloudNative-PG, Citus, TimescaleDB and analytics extensions"
-LABEL version="17.2-latest-cnpg"
+LABEL version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.source="https://github.com/samuelbartels20/postgres-extended"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.opencontainers.image.vendor="Samuel Bartels"
+LABEL org.opencontainers.image.title="PostgreSQL Extended"
+LABEL org.opencontainers.image.description="PostgreSQL 17.2 with CloudNative-PG, Citus, TimescaleDB and analytics extensions"
+LABEL org.opencontainers.image.authors="Samuel Bartels <samuelbartels20@github.com>"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL postgres.version="17.2"
+LABEL base.image="ghcr.io/cloudnative-pg/postgresql:17.2"
+LABEL extensions.citus="conditional-amd64"
+LABEL extensions.timescaledb="included"
+LABEL extensions.pg_hint_plan="REL17_1_7_0"
+LABEL extensions.additional="partman,cron,hypopg,contrib"
 
 # Expose PostgreSQL port
 EXPOSE 5432
