@@ -8,96 +8,175 @@ metadata:
     app.kubernetes.io/name: postgres-analytics
     app.kubernetes.io/component: analytics
     app.kubernetes.io/part-of: postgresql
-  annotations:
-    cnpg.io/analytics-engine: "enabled"
-    cnpg.io/columnar-store: "citus"
-    cnpg.io/query-acceleration: "enabled"
 spec:
-  # Use CitusDB image instead of standard PostgreSQL
-  imageName: "citusdata/citus:12.1-pg17"
+  imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
   instances: 5
   primaryUpdateStrategy: unsupervised
+  
   storage:
-    size: 10Gi
-    storageClass: openebs-hostpath
+    size: 50Gi  
+    storageClass: openebs-hostpath  
     resizeInUseVolumes: true
+  
+  walStorage:
+    size: 50Gi
+    storageClass: openebs-hostpath
+  
+  tablespaces:
+    - name: hot_data
+      storage:
+        size: 50Gi
+        storageClass: openebs-hostpath
+    - name: warm_data
+      storage:
+        size: 100Gi
+        storageClass: openebs-hostpath
+    - name: cold_data
+      storage:
+        size: 50Gi
+        storageClass: openebs-hostpath
+
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
+  
   postgresql:
     synchronous:
       method: any
-      number: 1
+      number: 2  
+    
     parameters:
-      max_connections: "400"
-      shared_buffers: 256MB
-      effective_cache_size: "1GB"
-      work_mem: "128MB"
-      maintenance_work_mem: "256MB"
-      random_page_cost: "1.1"
+      max_connections: "1000"
+      shared_buffers: "1GB"  
+      effective_cache_size: "1GB"  
+      work_mem: "256MB"  
+      maintenance_work_mem: "1GB"  
+      autovacuum_work_mem: "1GB"
+      
+      random_page_cost: "1.0"  
       seq_page_cost: "1.0"
       cpu_tuple_cost: "0.01"
       cpu_index_tuple_cost: "0.005"
       cpu_operator_cost: "0.0025"
-      max_worker_processes: "8"
-      max_parallel_workers: "8"
-      max_parallel_workers_per_gather: "4"
-      max_parallel_maintenance_workers: "4"
+      
+      max_worker_processes: "32"
+      max_parallel_workers: "32"
+      max_parallel_workers_per_gather: "16"
+      max_parallel_maintenance_workers: "16"
       parallel_tuple_cost: "0.1"
       parallel_setup_cost: "1000.0"
-      effective_io_concurrency: "100"
-      maintenance_io_concurrency: "50"
-      wal_buffers: "32MB"
+      min_parallel_table_scan_size: "8MB"
+      min_parallel_index_scan_size: "512kB"
+      
+      effective_io_concurrency: "200"  
+      maintenance_io_concurrency: "200"
+      
+      wal_buffers: "64MB"
+      wal_writer_delay: "200ms"
+      wal_writer_flush_after: "1MB"
+      commit_delay: "0"
+      commit_siblings: "5"
+      
       checkpoint_completion_target: "0.9"
       checkpoint_timeout: "15min"
-      statement_timeout: "1h"
-      lock_timeout: "1min"
-      idle_in_transaction_session_timeout: "10min"
-      columnar.compression: "pglz"
-      columnar.compression_level: "7"
-      columnar.chunk_group_row_limit: "50000"
-      columnar.stripe_row_limit: "75000"
+      max_wal_size: "16GB"
+      min_wal_size: "2GB"
+      checkpoint_flush_after: "256kB"
+      
+      autovacuum_max_workers: "8"
+      autovacuum_naptime: "15s"
+      autovacuum_vacuum_threshold: "1000"
+      autovacuum_vacuum_scale_factor: "0.05"  
+      autovacuum_analyze_threshold: "1000"
+      autovacuum_analyze_scale_factor: "0.025"  
+      autovacuum_vacuum_cost_delay: "2ms"
+      autovacuum_vacuum_cost_limit: "2000"
+
+      statement_timeout: "6h"  
+      lock_timeout: "5min"
+      idle_in_transaction_session_timeout: "30min"
+      
       citus.multi_shard_commit_protocol: "2pc"
       citus.enable_repartition_joins: "on"
       citus.enable_binary_protocol: "on"
-      citus.max_adaptive_executor_pool_size: "8"
+      citus.max_adaptive_executor_pool_size: "16"
       citus.executor_slow_start_interval: "10ms"
-      timescaledb.max_background_workers: "4"
+      citus.max_intermediate_result_size: "1GB"
+      citus.max_cached_conns_per_worker: "10"
+      citus.remote_task_check_interval: "10ms"
+      
+      timescaledb.max_background_workers: "16"
       timescaledb.telemetry_level: "off"
+      timescaledb.restoring: "off"
+      
       jit: "on"
       jit_above_cost: "100000"
       jit_inline_above_cost: "500000"
       jit_optimize_above_cost: "500000"
+      
       track_io_timing: "on"
       track_functions: "all"
-      log_min_duration_statement: "1000"
+      track_activities: "on"
+      track_counts: "on"
+      log_min_duration_statement: "5000"  
       log_checkpoints: "on"
+      log_connections: "on"
+      log_disconnections: "on"
+      log_lock_waits: "on"
       log_autovacuum_min_duration: "0"
+      log_temp_files: "100MB"
+      
+      temp_buffers: "32MB"
+      max_prepared_transactions: "100"
+      
+      shared_preload_libraries: "citus,timescaledb,pg_stat_statements,pg_hint_plan,pg_cron,pg_prewarm,auto_explain"
+      
+      auto_explain.log_min_duration: "10s"
+      auto_explain.log_analyze: "on"
+      auto_explain.log_buffers: "on"
+      auto_explain.log_timing: "on"
+      auto_explain.log_triggers: "on"
+      auto_explain.log_verbose: "on"
+
+  resources:
+    requests:
+      cpu: "4"
+      memory: "1Gi"
+    limits:
+      cpu: "4"
+      memory: "1Gi"
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node-type
+            operator: In
+            values: ["database"]
+
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      memory: 640Mi
+
   monitoring:
     enablePodMonitor: true
     podMonitorMetricRelabelings:
       - { sourceLabels: ["cluster"], targetLabel: cnpg_cluster, action: replace }
       - { regex: cluster, action: labeldrop }
+
   backup:
-    retentionPolicy: 30d
-    barmanObjectStore: &barmanObjectStore
+    retentionPolicy: 90d  
+    barmanObjectStore:
       data:
-        compression: bzip2
+        compression: bzip2  
+        jobs: 8  
       wal:
         compression: bzip2
-        maxParallel: 8
+        maxParallel: 16
       destinationPath: s3://pgbackup
       endpointURL: http://192.168.8.102:9000
-      serverName: &currentCluster postgres-v1
+      serverName: postgres-analytics-prod
       s3Credentials:
         accessKeyId:
           name: cloudnative-pg
@@ -105,19 +184,7 @@ spec:
         secretAccessKey:
           name: cloudnative-pg
           key: minio_secret_access_key
-  externalClusters:
-    - name: clusterBackup
-      barmanObjectStore:
-        destinationPath: s3://pgbackup
-        endpointURL: http://192.168.8.102:9000
-        serverName: postgres-v2
-        s3Credentials:
-          accessKeyId:
-            name: cloudnative-pg
-            key: minio_access_key_id
-          secretAccessKey:
-            name: cloudnative-pg
-            key: minio_secret_access_key
+
   bootstrap:
     initdb:
       database: analytics
@@ -127,15 +194,32 @@ spec:
       postInitApplicationSQL:
         - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_hint_plan CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS hypopg CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_cron CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS hypopg CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS postgres_fdw CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS dblink CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_prewarm CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS auto_explain CASCADE;"
+        
+        - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gin CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gist CASCADE;"
-        - "SELECT citus_set_coordinator_host('localhost', 5432);"
+        - "CREATE EXTENSION IF NOT EXISTS pg_trgm CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pgstattuple CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_buffercache CASCADE;"
+        
+        - "SELECT citus_set_coordinator_host('postgres-analytics-rw', 5432);"
+        - "SELECT citus_add_node('postgres-analytics-r', 5432);"
+        
+        - "CREATE TABLESPACE hot_data LOCATION '/var/lib/postgresql/tablespaces/hot_data';"
+        - "CREATE TABLESPACE warm_data LOCATION '/var/lib/postgresql/tablespaces/warm_data';"
+        - "CREATE TABLESPACE cold_data LOCATION '/var/lib/postgresql/tablespaces/cold_data';"
+        
+        - "CREATE TABLE IF NOT EXISTS query_performance_log (logged_at timestamp, query_text text, duration_ms bigint, rows_affected bigint);"
+        - "SELECT cron.schedule('vacuum-analyze', '0 2 * * *', 'VACUUM ANALYZE;');"
+        - "SELECT cron.schedule('update-stats', '0 3 * * *', 'SELECT pg_stat_reset();');"
