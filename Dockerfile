@@ -70,7 +70,7 @@ RUN apt-get update && \
 WORKDIR /tmp
 RUN git clone https://github.com/ossc-db/pg_hint_plan.git && \
     cd pg_hint_plan && \
-    git checkout REL17_1_6_0 && \
+    git checkout REL17_1_7_0 && \
     make USE_PGXS=1 && make USE_PGXS=1 install && \
     cd / && rm -rf /tmp/pg_hint_plan
 
