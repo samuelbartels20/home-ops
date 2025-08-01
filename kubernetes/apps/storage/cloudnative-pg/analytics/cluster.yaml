@@ -129,7 +129,6 @@ spec:
       temp_buffers: "32MB"
       max_prepared_transactions: "100"
       
-      shared_preload_libraries: "citus,timescaledb,pg_stat_statements,pg_hint_plan,pg_cron,pg_prewarm,auto_explain"
       
       auto_explain.log_min_duration: "10s"
       auto_explain.log_analyze: "on"
