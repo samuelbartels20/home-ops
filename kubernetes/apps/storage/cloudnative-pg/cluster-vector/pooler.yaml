@@ -2,10 +2,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: postgres-vector-pgbouncer-rw
+  name: postgres-analytics-pgbouncer
 spec:
   cluster:
-    name: postgres-vector
+    name: postgres-analytics
   instances: 3
   type: rw
   monitoring:
