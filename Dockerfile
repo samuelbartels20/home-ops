@@ -124,4 +124,4 @@ LABEL version="17.2-latest-cnpg"
 EXPOSE 5432
 
 # Use the same entrypoint as the base CloudNative-PG image
-ENTRYPOINT ["/manager"]
+CMD ["postgres"]
