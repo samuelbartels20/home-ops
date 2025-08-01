@@ -62,7 +62,7 @@ RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_releas
     wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/timescaledb.gpg && \
     apt-get update
 
-# Install TimescaleDB (find latest available version)
+
 RUN TIMESCALEDB_PACKAGE=$(apt-cache search timescaledb-2-postgresql-17 | head -n 1 | awk '{print $1}') && \
     if [ -n "$TIMESCALEDB_PACKAGE" ]; then \
         echo "Installing TimescaleDB package: $TIMESCALEDB_PACKAGE" && \
@@ -72,7 +72,7 @@ RUN TIMESCALEDB_PACKAGE=$(apt-cache search timescaledb-2-postgresql-17 | head -n
     fi && \
     rm -rf /var/lib/apt/lists/*
 
-# Install additional extensions (with fallback if not available)
+
 RUN apt-get update && \
     for pkg in postgresql-17-partman postgresql-17-cron postgresql-17-hypopg postgresql-contrib-17; do \
         if apt-cache show $pkg > /dev/null 2>&1; then \
@@ -84,7 +84,7 @@ RUN apt-get update && \
     done && \
     rm -rf /var/lib/apt/lists/*
 
-# Install pg_hint_plan from source - FIXED TAG
+# Install pg_hint_plan from source
 WORKDIR /tmp
 RUN git clone https://github.com/ossc-db/pg_hint_plan.git && \
     cd pg_hint_plan && \
@@ -102,7 +102,7 @@ RUN apt-get remove -y \
     && apt-get autoremove -y \
     && apt-get clean
 
-# Create a script to dynamically configure shared_preload_libraries based on installed extensions
+
 RUN echo '#!/bin/bash' > /usr/local/bin/configure-extensions.sh && \
     echo 'EXTENSIONS=""' >> /usr/local/bin/configure-extensions.sh && \
     echo 'if [ -f /usr/lib/postgresql/17/lib/citus.so ]; then EXTENSIONS="${EXTENSIONS},citus"; fi' >> /usr/local/bin/configure-extensions.sh && \
@@ -118,7 +118,7 @@ RUN echo '#!/bin/bash' > /usr/local/bin/configure-extensions.sh && \
 # Switch back to postgres user
 USER 26
 
-# Set labels following OCI annotation standards and semantic versioning
+
 LABEL maintainer="Samuel Bartels <samuelbartels20@github.com>"
 LABEL description="PostgreSQL 17.2 with CloudNative-PG, Citus, TimescaleDB and analytics extensions"
 LABEL version="${IMAGE_VERSION}"
