@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: postgres-analytics-pgbouncer-rw
+  name: postgres-analytics-pgbouncer
 spec:
   cluster:
     name: postgres-analytics
