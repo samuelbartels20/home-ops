@@ -46,6 +46,7 @@ spec:
       number: 2  
     
     parameters:
+      shared_preload_libraries: "citus, timescaledb, pg_stat_statements, auto_explain, bloom, btree_gin, btree_gist, pg_trgm, pgstattuple, pg_buffercache"
       max_connections: "1000"
       shared_buffers: 256MB  
       effective_cache_size: 512MB  
