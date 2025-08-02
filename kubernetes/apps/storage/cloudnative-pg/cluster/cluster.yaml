@@ -77,4 +77,6 @@ spec:
       owner: postgres
       secret:
         name: cloudnative-pg
+    recovery:
+      source: postgres-v1
 
