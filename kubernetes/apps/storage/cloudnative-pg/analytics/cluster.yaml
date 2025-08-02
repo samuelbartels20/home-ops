@@ -139,11 +139,10 @@ spec:
 
   resources:
     requests:
-      cpu: "1"
-      memory: "1Gi"
+      cpu: "50m"
+      memory: "256Mi"
     limits:
-      cpu: "4"
-      memory: "1Gi"
+      memory: "640Mi"
 
   nodeMaintenanceWindow:
     inProgress: false
