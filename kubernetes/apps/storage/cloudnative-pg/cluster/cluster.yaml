@@ -78,5 +78,5 @@ spec:
       secret:
         name: cloudnative-pg
     recovery:
-      source: postgres-v1
+      source: postgres-v2
 
