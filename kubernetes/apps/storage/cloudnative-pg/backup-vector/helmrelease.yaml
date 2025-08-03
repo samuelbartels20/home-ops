@@ -71,7 +71,7 @@ spec:
             readOnly: true
       nas:
         type: nfs
-        server: 192.168.1.102
+        server: 192.168.8.102
         path: /mnt/homelab/applications/volumes
         globalMounts:
           - path: /backups
