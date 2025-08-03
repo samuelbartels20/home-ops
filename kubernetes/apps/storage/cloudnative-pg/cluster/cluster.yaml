@@ -59,7 +59,7 @@ spec:
           key: minio_secret_access_key
 
   externalClusters:
-    - name: *previousCluster
+    - name: clusterBackup
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.102:9000
