@@ -51,7 +51,7 @@ spec:
       barmanObjectStore:
         destinationPath: s3://pgbackup
         endpointURL: http://192.168.8.102:9000
-        serverName: postgres-v2
+        serverName: postgres-vector-v2
         s3Credentials:
           accessKeyId:
             name: cloudnative-pg
