@@ -12,6 +12,7 @@ data:
     shared_buffers = 128MB
     effective_cache_size = 512MB
     work_mem = 2MB
+    maintenance_work_mem = 64MB
     
     wal_level = replica
     max_wal_size = 1GB
