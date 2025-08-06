@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.4
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #23 from samuelbartels20/renovate/pipx-makejinja-2.x
+- chore(release): 2025.08.06.3 [skip ci]
+- chore(deps): update dependency pipx:makejinja to v2.8.1
+
 ##  v2025.08.06.3
 
 Date-based release for 2025-08-06
