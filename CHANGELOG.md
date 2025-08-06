@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.5
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #22 from samuelbartels20/renovate/flux-operator-0.x
+- chore(release): 2025.08.06.4 [skip ci]
+- chore(deps): update flux-operator docker tag to v0.27.0
+
 ##  v2025.08.06.4
 
 Date-based release for 2025-08-06
