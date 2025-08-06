@@ -7,7 +7,7 @@ data:
   postgresql.conf: |
     listen_addresses = '*'
     port = 5432
-    max_connections = 20
+    max_connections = 1000
     
     shared_buffers = 128MB
     effective_cache_size = 512MB
