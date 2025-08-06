@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.8
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #20 from samuelbartels20/renovate/flux-instance-0.x
+- chore(release): 2025.08.06.7 [skip ci]
+- chore(deps): update flux-instance docker tag to v0.27.0
+
 ##  v2025.08.06.7
 
 Date-based release for 2025-08-06
