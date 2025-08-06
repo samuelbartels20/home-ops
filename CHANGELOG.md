@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.12
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #19 from samuelbartels20/renovate/aqua-cli-cli-2.x
+- chore(release): 2025.08.06.11 [skip ci]
+- chore(deps): update dependency aqua:cli/cli to v2.76.2
+
 ##  v2025.08.06.11
 
 Date-based release for 2025-08-06
