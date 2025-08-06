@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.11
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #26 from samuelbartels20/renovate/coredns-1.x
+- chore(release): 2025.08.06.10 [skip ci]
+- chore(deps): update coredns docker tag to v1.43.1
+
 ##  v2025.08.06.10
 
 Date-based release for 2025-08-06
