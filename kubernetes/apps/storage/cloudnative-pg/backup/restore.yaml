@@ -49,7 +49,7 @@ spec:
           resources:
             requests:
               memory: "128Mi"
-              cpu: "1"
+              cpu: "100m"
             limits:
               memory: "512Mi"
       affinity:
