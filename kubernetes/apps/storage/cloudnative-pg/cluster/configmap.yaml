@@ -18,6 +18,7 @@ data:
     min_wal_size = 256MB
     checkpoint_timeout = 15min
     synchronous_commit = on
+    random_page_cost = 1.1
     
     log_min_duration_statement = 5000
     log_statement = 'ddl'
