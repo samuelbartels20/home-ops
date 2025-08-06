@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.6
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #21 from samuelbartels20/renovate/aqua-go-task-task-3.x
+- chore(release): 2025.08.06.5 [skip ci]
+- chore(deps): update dependency aqua:go-task/task to v3.44.1
+
 ##  v2025.08.06.5
 
 Date-based release for 2025-08-06
