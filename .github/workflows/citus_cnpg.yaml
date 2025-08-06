@@ -47,11 +47,17 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
           type=raw,value=17.2-citus12.1
           type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          maintainer=Samuel Bartels <samuelbartels20@github.com>
+          org.opencontainers.image.description=PostgreSQL 17.2 with CloudNative-PG, Citus, TimescaleDB and analytics extensions
+          org.opencontainers.image.licenses=MIT
+
+    - name: Debug metadata output
+      run: |
+        echo "Tags: ${{ steps.meta.outputs.tags }}"
+        echo "Labels: ${{ steps.meta.outputs.labels }}"
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -62,8 +68,9 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         build-args: |
-          CITUS_VERSION=12.1
-          TIMESCALEDB_VERSION=2.17.2
+          IMAGE_VERSION=${{ steps.meta.outputs.version }}
+          BUILD_DATE=${{ steps.meta.outputs.created }}
+          VCS_REF=${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
