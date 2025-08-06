@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.7
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #18 from samuelbartels20/renovate/github-codeql-action-digest
+- chore(release): 2025.08.06.6 [skip ci]
+- chore(deps): update github/codeql-action digest to 51f7732
+
 ##  v2025.08.06.6
 
 Date-based release for 2025-08-06
