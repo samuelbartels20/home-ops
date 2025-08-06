@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.08.06.9
+
+Date-based release for 2025-08-06
+
+### Changes
+- Merge pull request #17 from samuelbartels20/renovate/aqua-mikefarah-yq-4.x
+- chore(release): 2025.08.06.8 [skip ci]
+- chore(deps): update dependency aqua:mikefarah/yq to v4.47.1
+
 ##  v2025.08.06.8
 
 Date-based release for 2025-08-06
