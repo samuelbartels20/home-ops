@@ -10,4 +10,4 @@ resources:
   - ./cloudnative-pg.yaml
   - ./descheduler.yaml
   - ./reflector.yaml
-
+  - ./kured.yaml
