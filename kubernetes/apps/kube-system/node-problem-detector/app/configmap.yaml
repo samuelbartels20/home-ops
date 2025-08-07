@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-problem-detector-config
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: node-problem-detector
+    app.kubernetes.io/component: observability
+data:
+  check-network.sh: |
+    #!/bin/sh
+    # Check network connectivity using built-in tools
+    # Note: Using sh instead of bash for Alpine compatibility
+    if ! ping -c 1 -W 5 8.8.8.8 > /dev/null 2>&1; then
+      echo "Network problem detected: Cannot reach external network"
+      exit 1
+    fi
+    # Check default gateway reachability using /proc/net/route
+    DEFAULT_GW=$(awk '$2 == "00000000" {printf "%d.%d.%d.%d\n", "0x" substr($3,7,2), "0x" substr($3,5,2), "0x" substr($3,3,2), "0x" substr($3,1,2)}' /proc/net/route)
+    if [ -n "$DEFAULT_GW" ] && ! ping -c 1 -W 5 $DEFAULT_GW > /dev/null 2>&1; then
+      echo "Network problem detected: Cannot reach default gateway"
+      exit 1
+    fi
+    exit 0
+
+  check-system-stats.sh: |
+    #!/bin/sh
+    # Check system resource usage using container's /proc filesystem
+    # Note: This will show container stats, not host stats
+    # CPU usage calculation
+    CPU_IDLE=$(awk '/^cpu / {print $5}' /proc/stat)
+    CPU_TOTAL=$(awk '/^cpu / {print $2+$3+$4+$5+$6+$7+$8}' /proc/stat)
+    CPU_USAGE=$((100 - (CPU_IDLE * 100 / CPU_TOTAL)))
+
+    # Memory usage calculation
+    MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    MEM_AVAILABLE=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+    MEM_USAGE=$(( (MEM_TOTAL - MEM_AVAILABLE) * 100 / MEM_TOTAL ))
+
+    # Root filesystem usage
+    ROOT_USAGE=$(df -k / | awk 'NR==2 {print $5}' | tr -d '%')
+
+    if [ "$CPU_USAGE" -gt 90 ] || [ "$MEM_USAGE" -gt 90 ] || [ "$ROOT_USAGE" -gt 90 ]; then
+      echo "System overload detected: CPU: ${CPU_USAGE}%, Memory: ${MEM_USAGE}%, Disk: ${ROOT_USAGE}%"
+      exit 1
+    fi
+    exit 0
+
+  network-problem.json: |
+    {
+      "plugin": "custom",
+      "pluginConfig": {
+        "invoke_interval": "30s",
+        "timeout": "5s",
+        "max_output_length": 80,
+        "concurrency": 1,
+        "enable_message_change_based_condition_update": false,
+        "skip_initial_status": false
+      },
+      "source": "network-custom-plugin-monitor",
+      "conditions": [
+        {
+          "type": "NetworkProblem",
+          "reason": "NetworkError",
+          "message": "Network connectivity issues detected"
+        }
+      ],
+      "rules": [
+        {
+          "type": "permanent",
+          "condition": "NetworkProblem",
+          "reason": "NetworkError",
+          "path": "/npd-custom/scripts/check-network.sh"
+        }
+      ]
+    }
+
+  system-stats.json: |
+    {
+      "plugin": "custom",
+      "pluginConfig": {
+        "invoke_interval": "60s",
+        "timeout": "10s",
+        "max_output_length": 80,
+        "concurrency": 1,
+        "enable_message_change_based_condition_update": false,
+        "skip_initial_status": false
+      },
+      "source": "system-stats-monitor",
+      "conditions": [
+        {
+          "type": "SystemStatsAnomaly",
+          "reason": "SystemOverload",
+          "message": "System resource usage anomaly detected"
+        }
+      ],
+      "rules": [
+        {
+          "type": "temporary",
+          "condition": "SystemStatsAnomaly",
+          "reason": "SystemOverload",
+          "path": "/npd-custom/scripts/check-system-stats.sh"
+        }
+      ]
+    }

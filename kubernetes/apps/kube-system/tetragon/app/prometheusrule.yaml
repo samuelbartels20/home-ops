@@ -1,0 +1,54 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tetragon-alerts
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: tetragon.rules
+    rules:
+    # Process Execution Alerts
+    - alert: TetragonUnexpectedProcessExecution
+      expr: |
+        rate(tetragon_process_exec_total{binary!~"/bin/.*|/sbin/.*|/usr/bin/.*|/usr/sbin/.*|/usr/local/bin/.*"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Unexpected process execution detected"
+        description: "Process {{ $labels.binary }} was executed outside of standard system paths"
+
+    # Network Connection Alerts
+    - alert: TetragonSuspiciousNetworkConnection
+      expr: |
+        rate(tetragon_tcp_connect_total{dst_ip!~"127.0.0.0/8|10.0.0.0/8|172.16.0.0/12|192.168.0.0/16"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Suspicious network connection detected"
+        description: "Connection attempt to {{ $labels.dst_ip }} detected from pod {{ $labels.pod_name }}"
+
+    # Sensitive File Access Alerts
+    - alert: TetragonSensitiveFileAccess
+      expr: |
+        rate(tetragon_file_open_total{path=~"/etc/shadow|/etc/passwd|/etc/sudoers|/etc/ssl/private|/root/.ssh|/.ssh"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Sensitive file access detected"
+        description: "Access to {{ $labels.path }} detected from pod {{ $labels.pod_name }}"
+
+    # Privilege Escalation Alerts
+    - alert: TetragonPrivilegeEscalation
+      expr: |
+        rate(tetragon_process_capabilities_total{capability=~"CAP_SYS_ADMIN|CAP_SETUID|CAP_SETGID"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Privilege escalation detected"
+        description: "Process {{ $labels.binary }} in pod {{ $labels.pod_name }} gained elevated capabilities"

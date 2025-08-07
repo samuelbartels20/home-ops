@@ -1,0 +1,71 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vpa
+  namespace: kube-system
+spec:
+  interval: 1m
+  chart:
+    spec:
+      chart: vpa
+      version: 4.7.2
+      sourceRef:
+        kind: HelmRepository
+        name: fairwinds
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  dependsOn:
+    - name: metrics-server
+      namespace: kube-system
+  values:
+    recommender:
+      enabled: true
+      image:
+        repository: registry.k8s.io/autoscaling/vpa-recommender
+        tag: 1.4.1@sha256:40b6d76e8526806c4f3bc33e725c015ddd7fa339bedf55986a7bed93947c865d
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    updater:
+      enabled: true
+      image:
+        repository: registry.k8s.io/autoscaling/vpa-updater
+        tag: 1.4.1
+      evictionTolerance: 0.5
+      resources:
+        requests:
+          cpu: 50m
+          memory: 100Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+    admissionController:
+      enabled: true
+      image:
+        repository: registry.k8s.io/autoscaling/vpa-admission-controller
+        tag: 1.4.1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+        limits:
+          cpu: 300m
+          memory: 512Mi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+
+    metrics-server:
+      enabled: false

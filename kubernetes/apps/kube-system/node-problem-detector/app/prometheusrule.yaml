@@ -1,0 +1,64 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: node-problem-detector-alerts
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: node-problem-detector
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus-stack-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: node-problem-detector
+      rules:
+        - alert: NodeProblemDetectorDown
+          expr: |
+            absent(up{job="node-problem-detector"} == 1)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node Problem Detector is down"
+            description: "Node Problem Detector has been down for more than 15 minutes."
+
+        - alert: KernelDeadlockDetected
+          expr: |
+            node_problem_detector_kernel_deadlock_counter > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kernel deadlock detected on {{ $labels.node }}"
+            description: "A kernel deadlock has been detected on node {{ $labels.node }}."
+
+        - alert: FilesystemReadOnly
+          expr: |
+            node_problem_detector_filesystem_readonly_counter > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Filesystem is read-only on {{ $labels.node }}"
+            description: "The filesystem has become read-only on node {{ $labels.node }}."
+
+        - alert: NetworkProblemDetected
+          expr: |
+            node_problem_detector_network_problem_counter > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Network problems detected on {{ $labels.node }}"
+            description: "Network connectivity issues have been detected on node {{ $labels.node }}."
+
+        - alert: SystemResourceOverload
+          expr: |
+            node_problem_detector_system_stats_anomaly_counter > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "System resource overload on {{ $labels.node }}"
+            description: "System resources (CPU/Memory/IO) are showing anomalous behavior on node {{ $labels.node }}."

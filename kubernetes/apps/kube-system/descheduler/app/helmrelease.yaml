@@ -1,0 +1,207 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: descheduler
+  namespace: kube-system
+spec:
+  interval: 5m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 0.33.0
+  url: oci://ghcr.io/home-operations/charts-mirror/descheduler
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2beta2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: descheduler
+  namespace: kube-system
+spec:
+  interval: 5m
+  chartRef:
+    kind: OCIRepository
+    name: descheduler
+  install:
+    timeout: 10m
+    replace: true
+    crds: CreateReplace
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+    crds: CreateReplace
+  test:
+    enable: true
+  rollback:
+    recreate: true
+    force: true
+    cleanupOnFail: true
+  uninstall:
+    keepHistory: false
+  driftDetection:
+    mode: enabled
+  maxHistory: 3
+  values:
+    # Runtime configuration
+    kind: Deployment
+    replicas: 1
+
+    # Resource configuration
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    # Security context
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    podSecurityContext:
+      fsGroup: 1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Pod disruption budget
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    # Node scheduling
+    nodeSelector: {}
+
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - descheduler
+              topologyKey: kubernetes.io/hostname
+
+    # Service and monitoring (disabled until Prometheus Operator is ready)
+    service:
+      enabled: true
+    serviceMonitor:
+      enabled: false
+
+    # Priority class
+    priorityClassName: system-cluster-critical
+
+    # Leader election
+    leaderElection:
+      enabled: true
+      leaseDuration: 30s
+      renewDeadline: 15s
+      retryPeriod: 5s
+      resourceLock: "leases"
+      resourceName: "descheduler"
+      resourceNamespace: "kube-system"
+
+    # Descheduling interval
+    deschedulingInterval: 10m
+
+    # Comprehensive descheduling policy
+    deschedulerPolicy:
+      strategies:
+        # Remove pods with too many restarts
+        RemovePodsHavingTooManyRestarts:
+          enabled: true
+          params:
+            podsHavingTooManyRestarts:
+              podRestartThreshold: 5
+              includingInitContainers: true
+
+        # Remove pods violating topology spread constraints
+        RemovePodsViolatingTopologySpreadConstraint:
+          enabled: true
+          params:
+            includeSoftConstraints: false
+
+        # Remove pods violating node affinity
+        RemovePodsViolatingNodeAffinity:
+          enabled: true
+          params:
+            nodeAffinityType:
+              - requiredDuringSchedulingIgnoredDuringExecution
+
+        # Remove pods violating inter-pod anti-affinity
+        RemovePodsViolatingInterPodAntiAffinity:
+          enabled: true
+          params:
+            nodeFit: true
+
+        # Low node utilization strategy
+        LowNodeUtilization:
+          enabled: true
+          params:
+            nodeResourceUtilizationThresholds:
+              thresholds:
+                cpu: 20
+                memory: 20
+                pods: 20
+              targetThresholds:
+                cpu: 50
+                memory: 50
+                pods: 50
+              useDeviationThresholds: false
+
+        # Remove failed pods
+        RemoveFailedPods:
+          enabled: true
+          params:
+            failedPods:
+              includingInitContainers: true
+              excludeOwnerKinds:
+                - Job
+              minPodLifetimeSeconds: 3600  # 1 hour
+
+        # Remove duplicate pods
+        RemoveDuplicates:
+          enabled: true
+          params:
+            excludeOwnerKinds:
+              - ReplicaSet
+              - Job
+
+    # Namespace exclusions
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - flux-system

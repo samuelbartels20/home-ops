@@ -1,0 +1,162 @@
+
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kured
+  namespace: kube-system
+spec:
+  interval: 1h
+  targetNamespace: kube-system
+  chart:
+    spec:
+      chart: kured
+      version: 5.6.2
+      sourceRef:
+        kind: HelmRepository
+        name: kured
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: maintenance-window.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: timing.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: safety.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: sentinel.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: notification-templates.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: metrics.yaml
+    - kind: ConfigMap
+      name: kured-config
+      valuesKey: commands.yaml
+  values:
+    # Image configuration
+    image:
+      repository: ghcr.io/kubereboot/kured
+      tag: 1.15.0
+      pullPolicy: IfNotPresent
+
+    # Security context - hardened for production
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+      fsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: true
+      capabilities:
+        add:
+          - SYS_BOOT
+        drop:
+          - ALL
+      privileged: true
+      readOnlyRootFilesystem: true
+      runAsNonRoot: false
+      runAsUser: 0
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Resource configuration for production workload
+    resources:
+      limits:
+        memory: 128Mi
+        cpu: 100m
+      requests:
+        memory: 64Mi
+        cpu: 50m
+
+    # Node selection and tolerations for all nodes
+    nodeSelector:
+      kubernetes.io/os: linux
+
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+
+    # High availability and performance
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: DoesNotExist
+
+    # Priority for system-critical workload
+    priorityClassName: "system-node-critical"
+
+            # Update strategy - using chart defaults
+    # updateStrategy: "RollingUpdate"
+
+    # Rolling update configuration - using chart defaults
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
+    # RBAC and Service Account
+    rbac:
+      create: true
+
+    serviceAccount:
+      create: true
+      annotations:
+        meta.helm.sh/release-name: kured
+        meta.helm.sh/release-namespace: kube-system
+      name: ""
+
+    # Disable built-in service since we have a separate one
+    service:
+      create: false
+
+    # Disable built-in ServiceMonitor since we have a separate one
+    serviceMonitor:
+      enabled: false
+
+    # Pod disruption budget - disabled for DaemonSet
+    podDisruptionBudget:
+      enabled: false
+
+    # Environment variables from secrets
+    envFrom:
+      - secretRef:
+          name: kured-secret
+          optional: true
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+      config.linkerd.io/proxy-cpu-limit: "50m"
+      config.linkerd.io/proxy-memory-limit: "64Mi"
+
+    # Extra volumes and volume mounts
+    extraVolumes: []
+    extraVolumeMounts: []
+
+    # Pod security policy (deprecated)
+    podSecurityPolicy:
+      create: false

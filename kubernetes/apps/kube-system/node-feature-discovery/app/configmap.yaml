@@ -1,0 +1,169 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nfd-custom-rules
+  namespace: kube-system
+data:
+  # Custom NodeFeatureRule for GPU detection
+  gpu-detection.yaml: |
+    apiVersion: nfd.k8s-sigs.io/v1alpha1
+    kind: NodeFeatureRule
+    metadata:
+      name: gpu-detection
+      namespace: kube-system
+    spec:
+      rules:
+        - name: "nvidia-gpu"
+          labels:
+            "gpu.nvidia.com/present": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                vendor: {op: In, value: ["10de"]}
+                class: {op: In, value: ["0300", "0302"]}
+
+        - name: "amd-gpu"
+          labels:
+            "gpu.amd.com/present": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                vendor: {op: In, value: ["1002"]}
+                class: {op: In, value: ["0300", "0380"]}
+
+  # Custom NodeFeatureRule for storage capabilities
+  storage-detection.yaml: |
+    apiVersion: nfd.k8s-sigs.io/v1alpha1
+    kind: NodeFeatureRule
+    metadata:
+      name: storage-detection
+      namespace: kube-system
+    spec:
+      rules:
+        - name: "nvme-storage"
+          labels:
+            "storage.nvme.com/present": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                class: {op: In, value: ["0108"]}
+
+        - name: "high-iops-storage"
+          labels:
+            "storage.performance.com/high-iops": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                class: {op: In, value: ["0108"]}
+            - feature: custom.storage_benchmarks
+              matchExpressions:
+                iops: {op: Gt, value: ["10000"]}
+
+  # Custom NodeFeatureRule for networking capabilities
+  network-detection.yaml: |
+    apiVersion: nfd.k8s-sigs.io/v1alpha1
+    kind: NodeFeatureRule
+    metadata:
+      name: network-detection
+      namespace: kube-system
+    spec:
+      rules:
+        - name: "high-speed-network"
+          labels:
+            "network.speed.com/10gbe": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                vendor: {op: In, value: ["8086", "15b3", "1924"]} # Intel, Mellanox, Solarflare
+                class: {op: In, value: ["0200"]}
+
+        - name: "sriov-capable"
+          labels:
+            "network.sriov.com/capable": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                vendor: {op: In, value: ["8086", "15b3"]}
+                class: {op: In, value: ["0200"]}
+            - feature: kernel.config
+              matchExpressions:
+                PCI_IOV: {op: In, value: ["y"]}
+
+  # Custom NodeFeatureRule for CPU features
+  cpu-features.yaml: |
+    apiVersion: nfd.k8s-sigs.io/v1alpha1
+    kind: NodeFeatureRule
+    metadata:
+      name: cpu-features
+      namespace: kube-system
+    spec:
+      rules:
+        - name: "cpu-encryption-acceleration"
+          labels:
+            "cpu.features.com/crypto-accel": "true"
+          matchFeatures:
+            - feature: cpu.cpuid
+              matchExpressions:
+                AES: {op: In, value: ["true"]}
+                AVX2: {op: In, value: ["true"]}
+
+        - name: "cpu-compute-optimized"
+          labels:
+            "cpu.performance.com/compute-optimized": "true"
+          matchFeatures:
+            - feature: cpu.cpuid
+              matchExpressions:
+                AVX512F: {op: In, value: ["true"]}
+                AVX512DQ: {op: In, value: ["true"]}
+
+        - name: "cpu-memory-optimized"
+          labels:
+            "cpu.performance.com/memory-optimized": "true"
+          matchFeatures:
+            - feature: cpu.topology
+              matchExpressions:
+                memory_mb: {op: Gt, value: ["32768"]} # > 32GB RAM
+
+  # Custom NodeFeatureRule for workload-specific optimizations
+  workload-optimization.yaml: |
+    apiVersion: nfd.k8s-sigs.io/v1alpha1
+    kind: NodeFeatureRule
+    metadata:
+      name: workload-optimization
+      namespace: kube-system
+    spec:
+      rules:
+        - name: "ai-ml-optimized"
+          labels:
+            "workload.ai.com/optimized": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                vendor: {op: In, value: ["10de"]} # NVIDIA
+                class: {op: In, value: ["0300", "0302"]}
+            - feature: cpu.cpuid
+              matchExpressions:
+                AVX512F: {op: In, value: ["true"]}
+
+        - name: "database-optimized"
+          labels:
+            "workload.database.com/optimized": "true"
+          matchFeatures:
+            - feature: pci.device
+              matchExpressions:
+                class: {op: In, value: ["0108"]} # NVMe
+            - feature: cpu.topology
+              matchExpressions:
+                memory_mb: {op: Gt, value: ["16384"]} # > 16GB RAM
+
+        - name: "edge-computing"
+          labels:
+            "workload.edge.com/suitable": "true"
+          matchFeatures:
+            - feature: cpu.model
+              matchExpressions:
+                family: {op: In, value: ["ARM", "Intel Atom"]}
+            - feature: system.dmi
+              matchExpressions:
+                product_name: {op: MatchRegexp, value: [".*Mini.*|.*Edge.*|.*IoT.*"]}

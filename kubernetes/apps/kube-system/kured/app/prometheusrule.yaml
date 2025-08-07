@@ -1,0 +1,64 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kured-alerts
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: kured
+    app.kubernetes.io/component: alerting
+spec:
+  groups:
+    - name: kured.rules
+      interval: 30s
+      rules:
+        - alert: KuredRebootRequired
+          expr: kured_reboot_required > 0
+          for: 24h
+          labels:
+            severity: warning
+            component: kured
+          annotations:
+            summary: "Node {{ $labels.node }} requires reboot for {{ $value }}h"
+            description: "Node {{ $labels.node }} has been requiring a reboot for more than 24 hours. Check if maintenance window is properly configured."
+            runbook_url: "https://kured.dev/docs/troubleshooting/"
+
+        - alert: KuredRebootScheduled
+          expr: kured_reboot_scheduled > 0
+          for: 1m
+          labels:
+            severity: info
+            component: kured
+          annotations:
+            summary: "Node {{ $labels.node }} is scheduled for reboot"
+            description: "Node {{ $labels.node }} is scheduled for reboot during the maintenance window."
+
+        - alert: KuredRebootDurationHigh
+          expr: kured_reboot_duration_seconds > 600
+          for: 1m
+          labels:
+            severity: warning
+            component: kured
+          annotations:
+            summary: "Node {{ $labels.node }} reboot took too long"
+            description: "Node {{ $labels.node }} reboot took {{ $value }} seconds, which is longer than expected."
+
+        - alert: KuredPodNotReady
+          expr: kube_pod_status_ready{namespace="kube-system", pod=~"kured-.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: kured
+          annotations:
+            summary: "Kured pod {{ $labels.pod }} is not ready"
+            description: "Kured pod {{ $labels.pod }} has been not ready for more than 5 minutes. Node reboots may not function properly."
+
+        - alert: KuredDaemonSetMissingPods
+          expr: kube_daemonset_status_number_misscheduled{namespace="kube-system", daemonset="kured"} > 0 or kube_daemonset_status_desired_number_scheduled{namespace="kube-system", daemonset="kured"} - kube_daemonset_status_current_number_scheduled{namespace="kube-system", daemonset="kured"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: kured
+          annotations:
+            summary: "Kured DaemonSet has missing pods"
+            description: "Kured DaemonSet has {{ $value }} missing pods. Some nodes may not have kured running."

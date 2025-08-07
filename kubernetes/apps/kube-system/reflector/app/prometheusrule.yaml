@@ -1,0 +1,51 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: reflector-alerts
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: reflector.rules
+      rules:
+        - alert: ReflectorPodNotReady
+          expr: |
+            kube_pod_container_status_ready{namespace="kube-system", pod=~"reflector.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Reflector pod not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has not been ready for 5 minutes"
+
+        - alert: ReflectorHighMemory
+          expr: |
+            container_memory_usage_bytes{namespace="kube-system", pod=~"reflector.*"} > 200Mi
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage in Reflector pod"
+            description: "Pod {{ $labels.pod }} memory usage is above 200Mi for 15 minutes"
+
+        - alert: ReflectorHighCPU
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="kube-system", pod=~"reflector.*"}[5m]) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage in Reflector pod"
+            description: "Pod {{ $labels.pod }} CPU usage is above 80% for 15 minutes"
+
+        - alert: ReflectorTooManyRestarts
+          expr: |
+            kube_pod_container_status_restarts_total{namespace="kube-system", pod=~"reflector.*"} > 5
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many restarts for Reflector pod"
+            description: "Pod {{ $labels.pod }} has restarted more than 5 times in 15 minutes"

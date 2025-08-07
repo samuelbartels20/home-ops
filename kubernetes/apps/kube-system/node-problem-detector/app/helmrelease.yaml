@@ -1,0 +1,260 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: node-problem-detector
+  namespace: kube-system
+spec:
+  interval: 30m
+  timeout: 15m
+  chart:
+    spec:
+      chart: node-problem-detector
+      version: "2.3.3"
+      sourceRef:
+        kind: HelmRepository
+        name: deliveryhero
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    crds: CreateReplace
+    timeout: 10m
+    remediation:
+      retries: 5
+      remediateLastFailure: true
+  rollback:
+    timeout: 10m
+    cleanupOnFail: true
+    recreate: true
+  uninstall:
+    keepHistory: false
+    timeout: 10m
+  values:
+    image:
+      repository: registry.k8s.io/node-problem-detector/node-problem-detector
+      tag: v0.8.12
+      pullPolicy: IfNotPresent
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 80Mi
+      limits:
+        cpu: 100m
+        memory: 200Mi
+
+    # Enable core monitors for production
+    settings:
+      log_monitors:
+        - /config/kernel-monitor.json
+        - /config/docker-monitor.json
+        - /config/systemd-monitor.json
+      custom_plugin_monitors:
+        - /npd-custom/configs/network-problem.json
+        - /npd-custom/configs/system-stats.json
+
+    metrics:
+      serviceMonitor:
+        enabled: false
+        interval: 30s
+        scrapeTimeout: 10s
+        labels:
+          release: kube-prometheus-stack
+
+    priorityClassName: system-cluster-critical
+
+    tolerations:
+      - operator: "Exists"
+        effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
+
+    securityContext:
+      privileged: true
+      runAsUser: 0
+
+    # Health checks for better reliability
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+      successThreshold: 1
+
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+      successThreshold: 1
+
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+    extraVolumeMounts:
+      - name: npd-custom-configs
+        mountPath: /npd-custom/configs
+      - name: npd-custom-scripts
+        mountPath: /npd-custom/scripts
+      - name: sys
+        mountPath: /sys
+        readOnly: true
+
+    extraVolumes:
+      - name: npd-custom-configs
+        configMap:
+          name: node-problem-detector-config
+          defaultMode: 0644
+          items:
+            - key: network-problem.json
+              path: network-problem.json
+            - key: system-stats.json
+              path: system-stats.json
+      - name: npd-custom-scripts
+        configMap:
+          name: node-problem-detector-config
+          defaultMode: 0755
+          items:
+            - key: check-network.sh
+              path: check-network.sh
+            - key: check-system-stats.sh
+              path: check-system-stats.sh
+      - name: sys
+        hostPath:
+          path: /sys
+
+    # Pod disruption budget for high availability
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    # Node affinity and anti-affinity for better pod distribution
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/os
+                  operator: In
+                  values:
+                    - linux
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - node-problem-detector
+              topologyKey: kubernetes.io/hostname
+
+    # Strategy for controlled rollout
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 0
+
+    # Custom plugin monitor configurations
+    customPluginMonitors:
+      network-problem.json: |
+        {
+          "plugin": "custom",
+          "pluginConfig": {
+            "invoke_interval": "30s",
+            "timeout": "5s",
+            "max_output_length": 80,
+            "concurrency": 1,
+            "enable_message_change_based_condition_update": false,
+            "skip_initial_status": false
+          },
+          "source": "network-custom-plugin-monitor",
+          "conditions": [
+            {
+              "type": "NetworkProblem",
+              "reason": "NetworkError",
+              "message": "Network connectivity issues detected"
+            }
+          ],
+          "rules": [
+            {
+              "type": "permanent",
+              "condition": "NetworkProblem",
+              "reason": "NetworkError",
+              "path": "/npd-custom/scripts/check-network.sh"
+            }
+          ]
+        }
+      system-stats.json: |
+        {
+          "plugin": "custom",
+          "pluginConfig": {
+            "invoke_interval": "60s",
+            "timeout": "10s",
+            "max_output_length": 80,
+            "concurrency": 1,
+            "enable_message_change_based_condition_update": false,
+            "skip_initial_status": false
+          },
+          "source": "system-stats-monitor",
+          "conditions": [
+            {
+              "type": "SystemStatsAnomaly",
+              "reason": "SystemOverload",
+              "message": "System resource usage anomaly detected"
+            }
+          ],
+          "rules": [
+            {
+              "type": "temporary",
+              "condition": "SystemStatsAnomaly",
+              "reason": "SystemOverload",
+              "path": "/npd-custom/scripts/check-system-stats.sh"
+            }
+          ]
+        }
+
+    # Core problem matchers
+    customProblemMatchers:
+      kernel-monitor.json: |
+        {
+          "plugin": "journald",
+          "logPath": "/var/log/journal",
+          "lookback": "5m",
+          "bufferSize": 50,
+          "source": "kernel-monitor",
+          "conditions": [
+            {
+              "type": "KernelDeadlock",
+              "reason": "KernelHasDeadlock",
+              "message": "Kernel has deadlock"
+            },
+            {
+              "type": "ReadonlyFilesystem",
+              "reason": "FilesystemIsReadOnly",
+              "message": "Filesystem is read-only"
+            }
+          ],
+          "rules": [
+            {
+              "type": "permanent",
+              "condition": "KernelDeadlock",
+              "pattern": "task hung"
+            },
+            {
+              "type": "permanent",
+              "condition": "ReadonlyFilesystem",
+              "pattern": "Remounting filesystem read-only"
+            }
+          ]
+        }

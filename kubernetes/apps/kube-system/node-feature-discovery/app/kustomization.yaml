@@ -2,11 +2,9 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: kube-system
 resources:
-  - ./external-dns.yaml
-  - ./external-secrets.yaml
-  - ./bjw-s.yaml
-  - ./openebs.yaml
-  - ./cloudnative-pg.yaml
-  - ./descheduler.yaml
-
+  - ./helmrelease.yaml
+  - ./networkpolicy.yaml
+  - ./configmap.yaml
+  # - ./podmonitor.yaml

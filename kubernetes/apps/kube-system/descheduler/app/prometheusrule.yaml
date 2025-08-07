@@ -1,0 +1,81 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: descheduler-alerts
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: descheduler.rules
+      rules:
+        - alert: DeschedulerPodNotReady
+          expr: |
+            kube_pod_container_status_ready{namespace="kube-system", pod=~"descheduler.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Descheduler pod not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has not been ready for 5 minutes"
+
+        - alert: DeschedulerHighMemory
+          expr: |
+            container_memory_usage_bytes{namespace="kube-system", pod=~"descheduler.*"} > 200Mi
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage in Descheduler pod"
+            description: "Pod {{ $labels.pod }} memory usage is above 200Mi for 15 minutes"
+
+        - alert: DeschedulerHighCPU
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="kube-system", pod=~"descheduler.*"}[5m]) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage in Descheduler pod"
+            description: "Pod {{ $labels.pod }} CPU usage is above 80% for 15 minutes"
+
+        - alert: DeschedulerTooManyRestarts
+          expr: |
+            kube_pod_container_status_restarts_total{namespace="kube-system", pod=~"descheduler.*"} > 5
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many restarts for Descheduler pod"
+            description: "Pod {{ $labels.pod }} has restarted more than 5 times"
+
+        - alert: DeschedulerDown
+          expr: |
+            up{job="descheduler"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Descheduler is down"
+            description: "Descheduler has been down for more than 5 minutes"
+
+        - alert: DeschedulerNoPodsEvicted
+          expr: |
+            increase(descheduler_pods_evicted_total[1h]) == 0
+          for: 6h
+          labels:
+            severity: info
+          annotations:
+            summary: "Descheduler has not evicted any pods recently"
+            description: "Descheduler has not evicted any pods in the last 6 hours"
+
+        - alert: DeschedulerHighEvictionRate
+          expr: |
+            rate(descheduler_pods_evicted_total[5m]) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High pod eviction rate"
+            description: "Descheduler is evicting pods at a rate of {{ $value }} per second for 10 minutes"

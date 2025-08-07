@@ -1,0 +1,79 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: security-monitoring
+spec:
+  # Process Execution Monitoring
+  kprobes:
+  - call: "security_bprm_check"
+    syscall: false
+    args:
+    - index: 0
+      type: "string"
+    selectors:
+    - matchArgs:
+      - index: 0
+        operator: "NotPrefix"
+        values:
+        - "/bin/"
+        - "/sbin/"
+        - "/usr/bin/"
+        - "/usr/sbin/"
+        - "/usr/local/bin/"
+    - matchBinaries:
+      - operator: "NotPrefix"
+        values:
+        - "/bin/"
+        - "/sbin/"
+        - "/usr/bin/"
+        - "/usr/sbin/"
+        - "/usr/local/bin/"
+
+  # Network Connection Monitoring
+  - call: "tcp_connect"
+    syscall: false
+    args:
+    - index: 0
+      type: "sockaddr"
+    selectors:
+    - matchArgs:
+      - index: 0
+        operator: "NotSAddr"
+        values:
+        - "127.0.0.0/8"
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+
+  # File Access Monitoring
+  - call: "security_file_open"
+    syscall: false
+    args:
+    - index: 0
+      type: "string"
+    selectors:
+    - matchArgs:
+      - index: 0
+        operator: "Prefix"
+        values:
+        - "/etc/shadow"
+        - "/etc/passwd"
+        - "/etc/sudoers"
+        - "/etc/ssl/private"
+        - "/root/.ssh"
+        - "/.ssh"
+
+  # Privilege Escalation Monitoring
+  - call: "commit_creds"
+    syscall: false
+    args:
+    - index: 0
+      type: "cred"
+    selectors:
+    - matchCapabilities:
+      - type: "Effective"
+        operator: "In"
+        values:
+        - "CAP_SYS_ADMIN"
+        - "CAP_SETUID"
+        - "CAP_SETGID"

@@ -1,0 +1,81 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubelet-csr-approver-alerts
+  namespace: kube-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: kubelet-csr-approver.rules
+      rules:
+        - alert: KubeletCSRApproverPodNotReady
+          expr: |
+            kube_pod_container_status_ready{namespace="kube-system", pod=~"kubelet-csr-approver.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kubelet CSR Approver pod not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has not been ready for 5 minutes"
+
+        - alert: KubeletCSRApproverHighCSRRejectionRate
+          expr: |
+            rate(kubelet_csr_approver_csr_rejected_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CSR rejection rate"
+            description: "Kubelet CSR Approver is rejecting CSRs at a rate of {{ $value }} per second"
+
+        - alert: KubeletCSRApproverNoCSRsProcessed
+          expr: |
+            rate(kubelet_csr_approver_csr_approved_total[10m]) == 0 and on() kube_node_info > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "No CSRs processed by Kubelet CSR Approver"
+            description: "Kubelet CSR Approver has not processed any CSRs in the last 15 minutes, but nodes are present"
+
+        - alert: KubeletCSRApproverHighMemory
+          expr: |
+            container_memory_usage_bytes{namespace="kube-system", pod=~"kubelet-csr-approver.*"} > 100Mi
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage in Kubelet CSR Approver pod"
+            description: "Pod {{ $labels.pod }} memory usage is above 100Mi for 15 minutes"
+
+        - alert: KubeletCSRApproverHighCPU
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="kube-system", pod=~"kubelet-csr-approver.*"}[5m]) * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage in Kubelet CSR Approver pod"
+            description: "Pod {{ $labels.pod }} CPU usage is above 80% for 15 minutes"
+
+        - alert: KubeletCSRApproverTooManyRestarts
+          expr: |
+            kube_pod_container_status_restarts_total{namespace="kube-system", pod=~"kubelet-csr-approver.*"} > 5
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many restarts for Kubelet CSR Approver pod"
+            description: "Pod {{ $labels.pod }} has restarted more than 5 times"
+
+        - alert: KubeletCSRApproverDown
+          expr: |
+            up{job="kubelet-csr-approver"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kubelet CSR Approver is down"
+            description: "Kubelet CSR Approver has been down for more than 5 minutes"

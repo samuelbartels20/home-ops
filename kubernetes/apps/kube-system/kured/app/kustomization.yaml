@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kube-system
+resources:
+  - ./helmrelease.yaml
+  - ./configmap.yaml
+  - ./externalsecret.yaml
+  - ./service.yaml
+  # - ./servicemonitor.yaml
+  # - ./prometheusrule.yaml
+  - ./network-policy.yaml
+
+commonLabels:
+  app.kubernetes.io/name: kured
+  app.kubernetes.io/part-of: kube-system
+  app.kubernetes.io/managed-by: flux
+  app.kubernetes.io/component: node-reboot-daemon

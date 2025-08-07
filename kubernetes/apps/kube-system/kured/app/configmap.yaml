@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kured-config
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: kured
+    app.kubernetes.io/component: configuration
+data:
+  # Maintenance window configuration
+  maintenance-window.yaml: |
+    startTime: "02:00"
+    endTime: "06:00"
+    timeZone: "UTC"
+
+  # Timing configuration
+  timing.yaml: |
+    rebootDelay: "5m"
+    drainTimeout: "10m"
+    drainGracePeriod: 30
+    lockTtl: "24h"
+    lockReleaseDelay: "30m"
+
+  # Safety configuration
+  safety.yaml: |
+    concurrency: 1
+    skipWaitForDeleteTimeoutSeconds: 0
+
+  # Sentinel configuration
+  sentinel.yaml: |
+    rebootSentinel: "/var/run/reboot-required"
+    rebootSentinelCommand: ""
+
+  # Notification templates
+  notification-templates.yaml: |
+    messageTemplateDrain: "Draining node %s for maintenance reboot"
+    messageTemplateReboot: "Rebooting node %s after maintenance window"
+
+  # Metrics configuration
+  metrics.yaml: |
+    metricsHost: "0.0.0.0"
+    metricsPort: 8080
+
+  # Command configuration
+  commands.yaml: |
+    rebootCommand: "/bin/systemctl reboot"

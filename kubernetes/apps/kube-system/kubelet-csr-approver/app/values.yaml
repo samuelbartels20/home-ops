@@ -1,0 +1,51 @@
+---
+# Basic production configuration for kubelet-csr-approver
+
+# Replica configuration for high availability
+replicaCount: 2
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 64Mi
+
+# Tolerations for control plane nodes
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+
+# Anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - kubelet-csr-approver
+          topologyKey: kubernetes.io/hostname
+
+# Provider regex for Talos nodes
+providerRegex: ^talos-\d$
+
+# CSR approval configuration
+maxExpirationSeconds: "31536000"  # 1 year (must be a string)
+bypassDnsResolution: false
+ignoreDuplicateCSRError: false
+
+# Metrics - completely disabled
+metrics:
+  enable: false
+  serviceMonitor:
+    enabled: false

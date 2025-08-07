@@ -1,0 +1,77 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-feature-discovery
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: node-feature-discovery
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress rules
+  ingress:
+    # Allow metrics scraping from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow NFD worker to connect to NFD master
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: node-feature-discovery
+              app.kubernetes.io/component: worker
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow health checks from kubelet
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  # Egress rules
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow connection to Kubernetes API server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+
+    # Allow NFD worker to connect to NFD master
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: node-feature-discovery
+              app.kubernetes.io/component: master
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow topology updater to connect to kubelet
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 10250

@@ -1,0 +1,368 @@
+
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: node-feature-discovery
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: node-feature-discovery
+      version: 0.17.3
+      sourceRef:
+        kind: HelmRepository
+        name: node-feature-discovery
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    # Image configuration
+    image:
+      repository: registry.k8s.io/nfd/node-feature-discovery
+      tag: v0.17.3
+      pullPolicy: IfNotPresent
+
+    # Feature gates for advanced functionality
+    featureGates:
+      NodeFeatureGroupAPI: true
+      DisableAutoPrefix: false
+
+    # Priority class for critical system workloads
+    priorityClassName: system-node-critical
+
+    # Prometheus monitoring
+    prometheus:
+      enable: true
+      labels:
+        app.kubernetes.io/component: metrics
+      scrapeInterval: 10s
+
+    # NFD Master configuration - handles labeling
+    master:
+      enable: true
+      replicaCount: 1
+      hostNetwork: false
+      port: 8080
+
+      # Resource management for production
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+
+      # Pod disruption budget for high availability
+      podDisruptionBudget:
+        enable: true
+        minAvailable: 1
+
+      # Scheduling preferences
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Health checks
+      livenessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 10
+
+      # Configuration for feature discovery
+      config:
+        extraLabelNs:
+          - "custom.feature.node.kubernetes.io"
+        enableTaints: false
+        nfdApiParallelism: 10
+        resyncPeriod: "1h"
+
+    # NFD Worker configuration - runs on all nodes
+    worker:
+      enable: true
+      hostNetwork: false
+      port: 8080
+
+      # Resource management
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: false # Needs root access for hardware detection
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: true # Required for hardware access
+        capabilities:
+          add:
+            - SYS_ADMIN # Required for some hardware detection
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        privileged: false
+
+      # Node selection and tolerations
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      tolerations:
+        - operator: Exists # Run on all nodes including tainted ones
+
+      # Update strategy for rolling updates
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 25%
+
+      # Health checks
+      livenessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 10
+
+      # Worker configuration for feature sources
+      config:
+        core:
+          sleepInterval: "60s"
+          labelWhiteList: ".*"
+        sources:
+          cpu:
+            cpuid:
+              attributeBlacklist:
+                - "BMI1"
+                - "BMI2"
+                - "CLMUL"
+                - "CMOV"
+                - "CX16"
+                - "ERMS"
+                - "F16C"
+                - "HTT"
+                - "LZCNT"
+                - "MMX"
+                - "MMXEXT"
+                - "NX"
+                - "POPCNT"
+                - "RDRAND"
+                - "RDSEED"
+                - "RDTSCP"
+                - "SGX"
+                - "SSE"
+                - "SSE2"
+                - "SSE3"
+                - "SSE4"
+                - "SSE42"
+                - "SSSE3"
+          kernel:
+            kconfigFile: "/proc/config.gz"
+            configOpts:
+              - "NO_HZ"
+              - "NO_HZ_IDLE"
+              - "NO_HZ_FULL"
+              - "PREEMPT"
+          pci:
+            deviceClassWhitelist:
+              - "0200" # Network controller
+              - "0300" # VGA compatible controller
+              - "0c03" # USB controller
+          system:
+            osRelease:
+              - "ID"
+              - "VERSION_ID"
+              - "VERSION_CODENAME"
+          custom: []
+
+        # Topology Updater for NUMA topology awareness
+    # Disabled for Talos Linux compatibility - read-only filesystem restrictions
+    topologyUpdater:
+      enable: false
+      hostNetwork: false
+      createCRDs: true
+
+      # Resource management
+      resources:
+        requests:
+          cpu: 50m
+          memory: 40Mi
+        limits:
+          cpu: 100m
+          memory: 80Mi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: false # Needs access to kubelet
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: true
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+
+      # Configuration - Talos Linux paths
+      updateInterval: "60s"
+      watchNamespace: "*"
+      kubeletConfigPath: "/var/lib/kubelet/config.yaml"
+      kubeletPodResourcesSockPath: "/var/lib/kubelet/pod-resources/kubelet.sock"
+      kubeletStateDir: "/var/lib/kubelet"
+      podSetFingerprint: true
+
+      # Scheduling
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      tolerations:
+        - operator: Exists
+
+      # Health checks
+      livenessProbe:
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      readinessProbe:
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 10
+
+    # Garbage Collector for cleanup of stale resources
+    gc:
+      enable: true
+      hostNetwork: false
+      interval: "1h"
+
+      # Resource management
+      resources:
+        requests:
+          cpu: 10m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+
+      # Pod disruption budget
+      podDisruptionBudget:
+        enable: true
+        minAvailable: 1
+
+      # Scheduling
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+    # Service account configuration
+    serviceAccount:
+      create: true
+      annotations:
+        app.kubernetes.io/managed-by: "Helm"
+
+    # RBAC configuration
+    rbac:
+      create: true
+
+    # General settings
+    nameOverride: ""
+    fullnameOverride: ""
+
+    # Image pull secrets if needed
+    imagePullSecrets: []
+
+    # Post-delete cleanup
+    postDeleteCleanup: true

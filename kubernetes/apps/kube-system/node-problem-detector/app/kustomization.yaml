@@ -1,0 +1,25 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kube-system
+
+resources:
+  - ./helmrelease.yaml
+  - ./configmap.yaml
+  # - ./prometheusrule.yaml
+  - ./networkpolicy.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: node-problem-detector
+      app.kubernetes.io/instance: node-problem-detector
+      app.kubernetes.io/component: observability
+      app.kubernetes.io/part-of: kube-system
+    includeSelectors: true
+
+commonLabels:
+  app.kubernetes.io/name: node-problem-detector
+  app.kubernetes.io/part-of: kube-system
+  production-grade: "true"
+
