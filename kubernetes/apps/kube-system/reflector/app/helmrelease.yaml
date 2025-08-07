@@ -13,7 +13,7 @@ spec:
       version: 9.1.16
       sourceRef:
         kind: HelmRepository
-        name: emberstack-charts
+        name: emberstack
         namespace: flux-system
       interval: 10m
   install:
