@@ -9,4 +9,5 @@ resources:
   - ./openebs.yaml
   - ./cloudnative-pg.yaml
   - ./descheduler.yaml
+  - ./reflector.yaml
 

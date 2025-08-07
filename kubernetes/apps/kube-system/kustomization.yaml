@@ -12,4 +12,5 @@ resources:
   - ./reloader/ks.yaml
   - ./spegel/ks.yaml
   - ./descheduler/ks.yaml
+  - ./reflector/ks.yaml
 
