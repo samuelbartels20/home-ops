@@ -145,7 +145,7 @@ spec:
     # Environment variables from secrets
     envFrom:
       - secretRef:
-          name: kured-secret
+          name: kured
           optional: true
 
     podAnnotations:
