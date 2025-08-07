@@ -8,8 +8,8 @@ resources:
   - ./configmap.yaml
   - ./externalsecret.yaml
   - ./service.yaml
-  # - ./servicemonitor.yaml
-  # - ./prometheusrule.yaml
+  - ./servicemonitor.yaml
+  - ./prometheusrule.yaml
   - ./network-policy.yaml
 
 commonLabels:
