@@ -21,17 +21,17 @@ spec:
       method: any
       number: 1
     parameters:
-      max_connections: "400"
+      max_connections: "100"
       shared_buffers: 256MB
   nodeMaintenanceWindow:
     inProgress: false
     reusePVC: true
   resources:
     requests:
-      cpu: 50m
-      memory: 256Mi
+      cpu: 100m
+      memory: 512Mi
     limits:
-      memory: 640Mi
+      memory: 1024Mi
   monitoring:
     enablePodMonitor: true
     # Ref: https://github.com/cloudnative-pg/cloudnative-pg/issues/2501
