@@ -1,8 +1,7 @@
----
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: &name pg-postgres-restore
+  name: pg-postgres-restore
   namespace: storage
 spec:
   ttlSecondsAfterFinished: 86400
@@ -23,26 +22,55 @@ spec:
 
       containers:
         - name: postgres
-          # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
           image: ghcr.io/cloudnative-pg/postgresql:17.2
-          command: ["/bin/sh"]
+          command: ["/bin/bash", "-lc"]
           args:
-            - "-c"
-            - "gunzip < /backup/postgres-cluster.dump.gz | psql -U $PGUSER -f -"
+            - |
+              set -euo pipefail
+              DUMP="/backup/postgres-cluster.dump.gz"
+              DB="${PGDATABASE:-postgres}"
+              if [ ! -f "$DUMP" ]; then
+                echo "Dump not found: $DUMP" >&2
+                exit 1
+              fi
+              # Choose decompressor
+              if gzip -t "$DUMP" >/dev/null 2>&1; then
+                DECOMP="zcat"
+              else
+                DECOMP="cat"
+              fi
+              # Detect custom-format dump (starts with PGDMP)
+              MAGIC="$($DECOMP "$DUMP" | head -c 5 || true)"
+              if [ "$MAGIC" = "PGDMP" ]; then
+                echo "Detected custom-format dump -> using pg_restore --clean --if-exists"
+                $DECOMP "$DUMP" \
+                  | pg_restore \
+                      --clean --if-exists \
+                      --no-owner --no-privileges \
+                      -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$DB"
+              else
+                echo "Detected plain SQL -> using psql -v ON_ERROR_STOP=1"
+                $DECOMP "$DUMP" \
+                  | psql -v ON_ERROR_STOP=1 \
+                      -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$DB" -f -
+              fi
           env:
             - name: PGHOST
-              value: 192.168.8.101
+              value: "192.168.8.101"
             - name: PGPORT
               value: "5432"
             - name: PGUSER
-              value: postgres
+              value: "postgres"
+            # Optional: set a target database explicitly (defaults to 'postgres' if unset)
+            # - name: PGDATABASE
+            #   value: "your_db_name"
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
                   name: cloudnative-pg
                   key: password
             - name: TZ
-              value: ${TIMEZONE:=Etc/UTC}
+              value: "Etc/UTC"
           volumeMounts:
             - name: backup
               mountPath: /backup
