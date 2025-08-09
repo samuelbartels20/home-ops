@@ -129,6 +129,3 @@ LABEL extensions.pg_hint_plan="REL17_1_7_0"
 LABEL extensions.additional="partman,cron,hypopg,contrib"
 
 EXPOSE 5432
-
-# IMPORTANT: keep CNPG entrypoint
-ENTRYPOINT ["/manager"]

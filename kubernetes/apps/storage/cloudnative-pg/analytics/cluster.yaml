@@ -181,6 +181,7 @@ spec:
       owner: analytics
       secret:
         name: postgres-analytics
+
       postInitApplicationSQL:
         - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
