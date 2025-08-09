@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.08.09.50
+
+Date-based release for 2025-08-09
+
+### Changes
+- feat(pgbouncer) deployed pgbouncer
+- chore(release): 2025.08.09.49 [skip ci]
+
 ##  v2025.08.09.49
 
 Date-based release for 2025-08-09
