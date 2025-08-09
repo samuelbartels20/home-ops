@@ -46,7 +46,6 @@ spec:
       number: 2  
     
     parameters:
-      shared_preload_libraries: "citus, timescaledb, pg_stat_statements, pg_hint_plan, pg_cron, hypopg, postgres_fdw, dblink, pg_prewarm, auto_explain"
       max_connections: "1000"
       shared_buffers: 256MB  
       effective_cache_size: 512MB  
