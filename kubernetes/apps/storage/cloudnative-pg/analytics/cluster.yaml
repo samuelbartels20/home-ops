@@ -50,7 +50,6 @@ spec:
       - hypopg
       - postgres_fdw
       - citus_columnar
-      - auto_explain
       - dblink
       - pg_prewarm
       - bloom
@@ -121,7 +120,6 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS postgres_fdw CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS dblink CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_prewarm CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS auto_explain CASCADE;"
         
         - "CREATE EXTENSION IF NOT EXISTS citus_columnar CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
