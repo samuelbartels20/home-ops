@@ -196,7 +196,7 @@ spec:
       secret:
         name: postgres-analytics
       
-      postInitApplicationSQL:
+      postInitSQL:
         - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
