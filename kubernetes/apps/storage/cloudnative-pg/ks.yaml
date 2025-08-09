@@ -178,7 +178,7 @@ spec:
 #       app.kubernetes.io/component: analytics
 #       app.kubernetes.io/part-of: postgresql
 #   path: ./kubernetes/apps/storage/cloudnative-pg/analytics
-#   prune: true
+#   prune: true 
 #   sourceRef:
 #     kind: GitRepository
 #     name: flux-system
