@@ -56,7 +56,6 @@ spec:
       - pg_trgm
       - pgstattuple
       - pg_buffercache
-      - pg_partman
       - pg_partman_bgw
       - pg_partman_bloat_estimation
       - pg_partman_bloat_estimation_bgw
