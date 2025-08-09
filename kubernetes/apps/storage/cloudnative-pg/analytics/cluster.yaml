@@ -41,25 +41,25 @@ spec:
   enableSuperuserAccess: true
   
   postgresql:
-    shared_preload_libraries:
-      - citus
-      - timescaledb
-      - pg_stat_statements
-      - pg_hint_plan
-      - pg_cron
-      - hypopg
-      - postgres_fdw
-      - citus_columnar
-      - auto_explain
-      - pg_partman
-      - dblink
-      - pg_prewarm
-      - bloom
-      - btree_gin
-      - btree_gist
-      - pg_trgm
-      - pgstattuple
-      - pg_buffercache
+    # shared_preload_libraries:
+    #   - citus
+    #   - timescaledb
+    #   - pg_stat_statements
+    #   - pg_hint_plan
+    #   - pg_cron
+    #   - hypopg
+    #   - postgres_fdw
+    #   - citus_columnar
+    #   - auto_explain
+    #   - pg_partman
+    #   - dblink
+    #   - pg_prewarm
+    #   - bloom
+    #   - btree_gin
+    #   - btree_gist
+    #   - pg_trgm
+    #   - pgstattuple
+    #   - pg_buffercache
     synchronous:
       method: any
       number: 2  
@@ -105,41 +105,41 @@ spec:
           name: cloudnative-pg
           key: minio_secret_access_key
 
-  bootstrap:
-    initdb:
-      database: analytics
-      owner: analytics
-      secret:
-        name: postgres-analytics
+  # bootstrap:
+  #   initdb:
+  #     database: analytics
+  #     owner: analytics
+  #     secret:
+  #       name: postgres-analytics
       
-      postInitSQL:
-        - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_hint_plan CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_cron CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS hypopg CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS postgres_fdw CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS dblink CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_prewarm CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS auto_explain CASCADE;"
+  #     postInitSQL:
+  #       - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_hint_plan CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_cron CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS hypopg CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS postgres_fdw CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS dblink CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_prewarm CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS auto_explain CASCADE;"
         
-        - "CREATE EXTENSION IF NOT EXISTS citus_columnar CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS btree_gin CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS btree_gist CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_trgm CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pgstattuple CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_buffercache CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS citus_columnar CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS btree_gin CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS btree_gist CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_trgm CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pgstattuple CASCADE;"
+  #       - "CREATE EXTENSION IF NOT EXISTS pg_buffercache CASCADE;"
         
-        - "SELECT citus_set_coordinator_host('postgres-analytics-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-r', 5432);"
+  #       - "SELECT citus_set_coordinator_host('postgres-analytics-rw', 5432);"
+  #       - "SELECT citus_add_node('postgres-analytics-r', 5432);"
         
-        - "CREATE TABLESPACE hot_data LOCATION '/var/lib/postgresql/tablespaces/hot_data';"
-        - "CREATE TABLESPACE warm_data LOCATION '/var/lib/postgresql/tablespaces/warm_data';"
-        - "CREATE TABLESPACE cold_data LOCATION '/var/lib/postgresql/tablespaces/cold_data';"
+  #       - "CREATE TABLESPACE hot_data LOCATION '/var/lib/postgresql/tablespaces/hot_data';"
+  #       - "CREATE TABLESPACE warm_data LOCATION '/var/lib/postgresql/tablespaces/warm_data';"
+  #       - "CREATE TABLESPACE cold_data LOCATION '/var/lib/postgresql/tablespaces/cold_data';"
         
-        - "CREATE TABLE IF NOT EXISTS query_performance_log (logged_at timestamp, query_text text, duration_ms bigint, rows_affected bigint);"
-        - "SELECT cron.schedule('vacuum-analyze', '0 2 * * *', 'VACUUM ANALYZE;');"
-        - "SELECT cron.schedule('update-stats', '0 3 * * *', 'SELECT pg_stat_reset();');"
+  #       - "CREATE TABLE IF NOT EXISTS query_performance_log (logged_at timestamp, query_text text, duration_ms bigint, rows_affected bigint);"
+  #       - "SELECT cron.schedule('vacuum-analyze', '0 2 * * *', 'VACUUM ANALYZE;');"
+  #       - "SELECT cron.schedule('update-stats', '0 3 * * *', 'SELECT pg_stat_reset();');"
