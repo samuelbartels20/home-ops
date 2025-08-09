@@ -51,7 +51,8 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     else \
       echo "Skipping Citus installation for architecture: $TARGETARCH"; \
     fi
-
+RUN echo "shared_preload_libraries='citus'" >> /usr/share/postgresql/postgresql.conf.sample
+COPY 001-create-citus-extension.sql /docker-entrypoint-initdb.d/
 # TimescaleDB
 RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ $(lsb_release -c -s) main" > /etc/apt/sources.list.d/timescaledb.list && \
     wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/timescaledb.gpg && \
