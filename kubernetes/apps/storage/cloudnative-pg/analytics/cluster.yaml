@@ -118,14 +118,7 @@ spec:
       lock_timeout: "5min"
       idle_in_transaction_session_timeout: "30min"
       
-      citus.multi_shard_commit_protocol: "2pc"
-      citus.enable_repartition_joins: "on"
-      citus.enable_binary_protocol: "on"
-      citus.max_adaptive_executor_pool_size: "16"
-      citus.executor_slow_start_interval: "10ms"
-      citus.max_intermediate_result_size: "1GB"
-      citus.max_cached_conns_per_worker: "10"
-      citus.remote_task_check_interval: "10ms"
+      
       
       timescaledb.max_background_workers: "16"
       timescaledb.telemetry_level: "off"
