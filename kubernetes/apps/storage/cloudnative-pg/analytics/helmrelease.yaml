@@ -47,8 +47,8 @@ spec:
         containers:
           main:
             image:
-              repository: postgres
-              tag: "17.2"
+              repository: ghcr.io/samuelbartels20/postgres-cnpg-citus
+              tag: "17.2-citus12.1"
               pullPolicy: IfNotPresent
 
             command: ["/bin/bash", "-c"]

@@ -3,13 +3,13 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-backup
+  name: postgres-analytics-backup
 spec:
   schedule: "@daily"
   immediate: true
   backupOwnerReference: self
   cluster:
-    name: postgres
+    name: postgres-analytics
   method: barmanObjectStore
   target: primary
 
@@ -17,7 +17,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-daily-backup
+  name: postgres-analytics-daily-backup
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -37,7 +37,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres
+    name: postgres-analytics
   method: barmanObjectStore
   target: primary
 
@@ -46,7 +46,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-weekly-backup
+  name: postgres-analytics-weekly-backup
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -66,7 +66,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres
+    name: postgres-analytics
   method: barmanObjectStore
   target: prefer-standby
 
@@ -76,7 +76,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-monthly-backup
+  name: postgres-analytics-monthly-backup
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -97,6 +97,6 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres
+    name: postgres-analytics
   method: barmanObjectStore
   target: prefer-standby

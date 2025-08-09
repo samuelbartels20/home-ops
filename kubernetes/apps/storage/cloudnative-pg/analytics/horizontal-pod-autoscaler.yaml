@@ -7,7 +7,7 @@ spec:
   scaleTargetRef:
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
-    name: postgres
+    name: postgres-analytics
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -30,7 +30,7 @@ spec:
       describedObject:
         apiVersion: postgresql.cnpg.io/v1
         kind: Cluster
-        name: postgres
+        name: postgres-analytics
       target:
         type: AverageValue
         averageValue: "100"

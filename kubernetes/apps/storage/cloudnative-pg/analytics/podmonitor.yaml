@@ -13,11 +13,11 @@ metadata:
     environment: production
   annotations:
     prometheus.io/scrape: "true"
-    monitoring.cnpg.io/cluster: "postgres"
+    monitoring.cnpg.io/cluster: "postgres-analytics"
 spec:
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: postgres-analytics
   podMetricsEndpoints:
     - port: metrics
       interval: 30s
