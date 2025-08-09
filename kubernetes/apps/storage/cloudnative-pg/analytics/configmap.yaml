@@ -35,7 +35,7 @@ data:
       END IF;
     END
     $$;
-    
+
   postgresql.conf: |
     # Network Configuration
     listen_addresses = '*'
@@ -57,7 +57,7 @@ data:
     log_statement = 'ddl'
 
     # Extensions and Monitoring
-    shared_preload_libraries = 'pg_stat_statements'
+    shared_preload_libraries = 'pg_stat_statements,citus,timescaledb'
     pg_stat_statements.max = 1000
     pg_stat_statements.track = top
     pg_stat_statements.save = on
