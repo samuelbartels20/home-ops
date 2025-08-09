@@ -198,7 +198,6 @@ spec:
       
       postInitApplicationSQL:
         - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
@@ -210,7 +209,7 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS pg_prewarm CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS auto_explain CASCADE;"
         
-        - "CREATE EXTENSION IF NOT EXISTS columnar CASCADE;"
+        - "CREATE EXTENSION IF NOT EXISTS citus_columnar CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS bloom CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gin CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS btree_gist CASCADE;"
