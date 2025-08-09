@@ -50,6 +50,7 @@ spec:
       - hypopg
       - postgres_fdw
       - citus_columnar
+      - auto_explain
     synchronous:
       method: any
       number: 2  
