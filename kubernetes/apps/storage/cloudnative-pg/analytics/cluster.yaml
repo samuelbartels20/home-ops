@@ -50,19 +50,6 @@ spec:
       - hypopg
       - postgres_fdw
       - citus_columnar
-      - bloom
-      - btree_gin
-      - btree_gist
-      - pg_trgm
-      - pgstattuple
-      - pg_buffercache
-      - pg_partman_bgw
-      - pg_partman_bloat_estimation
-      - pg_partman_bloat_estimation_bgw
-      - pg_partman_bgw
-      - pg_partman_bloat_estimation
-      - pg_partman_bloat_estimation_bgw
-      - auto_explain
     synchronous:
       method: any
       number: 2  
@@ -70,87 +57,6 @@ spec:
     parameters:
       max_connections: "1000"
       shared_buffers: 256MB  
-      effective_cache_size: 512MB  
-      work_mem: 256MB  
-      maintenance_work_mem: 256MB  
-      autovacuum_work_mem: 512MB
-      
-      random_page_cost: "1.0"  
-      seq_page_cost: "1.0"
-      cpu_tuple_cost: "0.01"
-      cpu_index_tuple_cost: "0.005"
-      cpu_operator_cost: "0.0025"
-      
-      max_worker_processes: "32"
-      max_parallel_workers: "32"
-      max_parallel_workers_per_gather: "16"
-      max_parallel_maintenance_workers: "16"
-      parallel_tuple_cost: "0.1"
-      parallel_setup_cost: "1000.0"
-      min_parallel_table_scan_size: "8MB"
-      min_parallel_index_scan_size: "512kB"
-      
-      effective_io_concurrency: "200"  
-      maintenance_io_concurrency: "200"
-      
-      wal_buffers: "64MB"
-      wal_writer_delay: "200ms"
-      wal_writer_flush_after: "1MB"
-      commit_delay: "0"
-      commit_siblings: "5"
-      
-      checkpoint_completion_target: "0.9"
-      checkpoint_timeout: "15min"
-      max_wal_size: "16GB"
-      min_wal_size: "2GB"
-      checkpoint_flush_after: "256kB"
-      
-      autovacuum_max_workers: "8"
-      autovacuum_naptime: "15s"
-      autovacuum_vacuum_threshold: "1000"
-      autovacuum_vacuum_scale_factor: "0.05"  
-      autovacuum_analyze_threshold: "1000"
-      autovacuum_analyze_scale_factor: "0.025"  
-      autovacuum_vacuum_cost_delay: "2ms"
-      autovacuum_vacuum_cost_limit: "2000"
-
-      statement_timeout: "6h"  
-      lock_timeout: "5min"
-      idle_in_transaction_session_timeout: "30min"
-      
-      
-      
-      timescaledb.max_background_workers: "16"
-      timescaledb.telemetry_level: "off"
-      timescaledb.restoring: "off"
-      
-      jit: "on"
-      jit_above_cost: "100000"
-      jit_inline_above_cost: "500000"
-      jit_optimize_above_cost: "500000"
-      
-      track_io_timing: "on"
-      track_functions: "all"
-      track_activities: "on"
-      track_counts: "on"
-      log_min_duration_statement: "5000"  
-      log_checkpoints: "on"
-      log_connections: "on"
-      log_disconnections: "on"
-      log_lock_waits: "on"
-      log_autovacuum_min_duration: "0"
-      log_temp_files: "100MB"
-      
-      temp_buffers: "32MB"
-      max_prepared_transactions: "100"
-      
-      
-      auto_explain.log_min_duration: "10s"
-      auto_explain.log_analyze: "on"
-      auto_explain.log_buffers: "on"
-      auto_explain.log_timing: "on"
-      auto_explain.log_triggers: "on"
-      auto_explain.log_verbose: "on"
 
   resources:
     requests:
