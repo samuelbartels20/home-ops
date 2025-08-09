@@ -5,7 +5,7 @@ metadata:
   name: postgres-lb
   annotations:
     external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
-    lbipam.cilium.io/ips: 192.168.8.101
+    lbipam.cilium.io/ips: 192.168.8.106
 spec:
   type: LoadBalancer
   ports:
@@ -14,7 +14,7 @@ spec:
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres
+    cnpg.io/cluster: postgres-analytics
     role: primary
 ---
 apiVersion: v1
