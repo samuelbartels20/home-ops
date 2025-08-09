@@ -16,28 +16,3 @@ spec:
   selector:
     cnpg.io/cluster: postgres-analytics
     role: primary
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres-analytics-lb
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: postgres-analytics
-    app.kubernetes.io/component: service
-    app.kubernetes.io/part-of: postgresql
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "9187"
-    prometheus.io/path: "/metrics"
-spec:
-  type: ClusterIP
-  ports:
-    - name: postgres
-      port: 5432
-      targetPort: 5432
-      protocol: TCP
-  selector:
-    cnpg.io/cluster: postgres-analytics
-    role: primary
-    
