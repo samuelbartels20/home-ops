@@ -49,6 +49,13 @@ spec:
       - pg_cron
       - hypopg
       - postgres_fdw
+      - citus_columnar
+      - bloom
+      - btree_gin
+      - btree_gist
+      - pg_trgm
+      - pgstattuple
+      - pg_buffercache
     synchronous:
       method: any
       number: 2  
