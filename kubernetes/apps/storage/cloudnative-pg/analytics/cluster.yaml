@@ -51,7 +51,6 @@ spec:
       - postgres_fdw
       - citus_columnar
       - auto_explain
-      - pg_partman
       - dblink
       - pg_prewarm
       - bloom
@@ -115,7 +114,6 @@ spec:
       postInitSQL:
         - "CREATE EXTENSION IF NOT EXISTS citus CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
-        - "CREATE EXTENSION IF NOT EXISTS pg_partman CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_hint_plan CASCADE;"
         - "CREATE EXTENSION IF NOT EXISTS pg_cron CASCADE;"
