@@ -46,7 +46,6 @@ spec:
       number: 2  
     
     parameters:
-      shared_preload_libraries: "pg_stat_statements"
       max_connections: "1000"
       shared_buffers: 256MB  
       effective_cache_size: 512MB  
