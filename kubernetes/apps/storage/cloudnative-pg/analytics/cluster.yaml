@@ -51,6 +51,15 @@ spec:
       - postgres_fdw
       - citus_columnar
       - auto_explain
+      - pg_partman
+      - dblink
+      - pg_prewarm
+      - bloom
+      - btree_gin
+      - btree_gist
+      - pg_trgm
+      - pgstattuple
+      - pg_buffercache
     synchronous:
       method: any
       number: 2  
