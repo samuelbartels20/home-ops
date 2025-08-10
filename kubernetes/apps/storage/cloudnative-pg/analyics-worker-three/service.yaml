@@ -8,7 +8,7 @@ metadata:
     citus-cluster: cloudnative-pg-analytics-worker-three
   annotations:
     external-dns.alpha.kubernetes.io/hostname: cloudnative-pg-analytics-worker-three.samcloud.online
-    lbipam.cilium.io/ips: 192.168.8.109
+    lbipam.cilium.io/ips: 192.168.8.110
 spec:
   type: LoadBalancer
   ports:
