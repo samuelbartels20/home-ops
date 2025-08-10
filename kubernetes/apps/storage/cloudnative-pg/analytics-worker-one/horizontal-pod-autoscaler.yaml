@@ -3,6 +3,8 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: cloudnative-pg-analytics-worker-one-hpa
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-one
 spec:
   scaleTargetRef:
     apiVersion: postgresql.cnpg.io/v1
