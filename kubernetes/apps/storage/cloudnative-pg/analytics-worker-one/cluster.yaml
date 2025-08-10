@@ -19,13 +19,7 @@ spec:
     storageClass: openebs-hostpath
   superuserSecret:
     name: cloudnative-pg-analytics-worker-one
-  topologySpreadConstraints:
-    - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
-      labelSelector:
-        matchLabels:
-          cnpg.io/cluster: cloudnative-pg-analytics-worker-one
+  topologySpreadConstraints: []
   affinity:
     enablePodAntiAffinity: true
     podAntiAffinityType: required
