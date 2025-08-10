@@ -62,7 +62,7 @@ spec:
             env:
               POSTGRES_HOST: "postgres-analytics-engine-rw.storage.svc.cluster.local"
               POSTGRES_PORT: "5432"
-              POSTGRES_DB: "analytics"
+              POSTGRES_DB: "postgres-analytics"
 
             envFrom:
               - secretRef:
