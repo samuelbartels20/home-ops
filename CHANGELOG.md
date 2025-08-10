@@ -1,5 +1,23 @@
 # Changelog
 
+##  v2025.08.10.62
+
+Date-based release for 2025-08-10
+
+### Changes
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- feat(pgbouncer) deployed pgbouncer
+- chore(release): 2025.08.10.61 [skip ci]
+
 ##  v2025.08.10.61
 
 Date-based release for 2025-08-10
