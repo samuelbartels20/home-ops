@@ -9,6 +9,7 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
+    citus-cluster: cloudnative-pg-analytics-coordinator
     backup-type: daily
 spec:
   schedule: "@daily"
@@ -29,6 +30,7 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
+    citus-cluster: cloudnative-pg-analytics-coordinator
     backup-type: daily
     retention: long-term
     environment: production
@@ -58,6 +60,7 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
+    citus-cluster: cloudnative-pg-analytics-coordinator
     backup-type: weekly
     retention: archive
     environment: production
@@ -88,6 +91,7 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
+    citus-cluster: cloudnative-pg-analytics-coordinator
     backup-type: monthly
     retention: compliance
     environment: production
