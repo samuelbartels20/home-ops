@@ -6,7 +6,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    citus-cluster: cloudnative-pg-analytics-coordinator
+    cnpg.io/cluster: cloudnative-pg-analytics-coordinator
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
@@ -26,7 +26,7 @@ spec:
       whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
-          citus-cluster: cloudnative-pg-analytics-coordinator
+          cnpg.io/cluster: cloudnative-pg-analytics-coordinator
   affinity:
     enablePodAntiAffinity: true
     podAntiAffinityType: required
