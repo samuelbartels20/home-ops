@@ -2,7 +2,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: cloudnative-pg-analytics-worker-one
+  name: cloudnative-pg-analytics-worker-one-cluster
   namespace: storage
 spec:
   minAvailable: 2
@@ -13,7 +13,7 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: cloudnative-pg-analytics-worker-one
+  name: cloudnative-pg-analytics-worker-one-primary
   namespace: storage
 spec:
   minAvailable: 1
