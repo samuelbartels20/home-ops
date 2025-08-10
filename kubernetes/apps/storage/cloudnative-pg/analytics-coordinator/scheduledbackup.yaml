@@ -4,6 +4,12 @@ apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: cloudnative-pg-analytics-coordinator
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    backup-type: daily
 spec:
   schedule: "@daily"
   immediate: true
@@ -20,7 +26,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: postgresql
     backup-type: daily
@@ -49,7 +55,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: postgresql
     backup-type: weekly
@@ -79,7 +85,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: postgresql
     backup-type: monthly

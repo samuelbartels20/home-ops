@@ -2,17 +2,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: postgres-analytics-coordinator.samcloud.online
+    external-dns.alpha.kubernetes.io/hostname: cloudnative-pg-analytics-coordinator.samcloud.online
     lbipam.cilium.io/ips: 192.168.8.106
 spec:
   type: LoadBalancer
   ports:
-    - name: postgres
+    - name: cloudnative-pg-analytics-coordinator
       port: 5432
       protocol: TCP
       targetPort: 5432
   selector:
-    cnpg.io/cluster: postgres-analytics-coordinator
+    cnpg.io/cluster: cloudnative-pg-analytics-coordinator
     role: primary
