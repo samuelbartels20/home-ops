@@ -3,13 +3,14 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: cloudnative-pg-analytics-rules
+  name: cloudnative-pg-analytics-worker-four
   labels:
     prometheus: k8s
     role: alert-rules
+    citus-cluster: cloudnative-pg-analytics-worker-four
 spec:
   groups:
-    - name: cloudnative-pg-analytics.rules
+    - name: cloudnative-pg-analytics-worker-four.rules
       rules:
         - alert: LongRunningTransaction
           annotations:

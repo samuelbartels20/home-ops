@@ -3,7 +3,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: postgres-analytics-instances
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -13,11 +13,11 @@ metadata:
     environment: production
   annotations:
     prometheus.io/scrape: "true"
-    monitoring.cnpg.io/cluster: "postgres-analytics"
+    monitoring.cnpg.io/cluster: "cloudnative-pg-analytics-worker-four"
 spec:
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-four
       
   endpoints:
     - port: metrics

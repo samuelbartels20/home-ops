@@ -2,22 +2,22 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-analytics-pdb
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
 spec:
   minAvailable: 2
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-three
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-analytics-primary-pdb
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       cnpg.io/instanceRole: primary 

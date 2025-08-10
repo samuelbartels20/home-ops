@@ -2,9 +2,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-policy
     app.kubernetes.io/part-of: postgresql
@@ -67,7 +68,7 @@ spec:
         - labelSelector:
             matchLabels:
               app.kubernetes.io/name: postgresql
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
           topologyKey: kubernetes.io/hostname
 
   tolerations:
@@ -359,7 +360,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-three
   policyTypes:
     - Ingress
     - Egress
@@ -389,7 +390,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -405,7 +406,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432

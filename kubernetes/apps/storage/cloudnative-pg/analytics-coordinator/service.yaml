@@ -4,7 +4,7 @@ kind: Service
 metadata:
   name: postgres-analytics-coordinator
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
+    external-dns.alpha.kubernetes.io/hostname: postgres-analytics-coordinator.samcloud.online
     lbipam.cilium.io/ips: 192.168.8.106
 spec:
   type: LoadBalancer

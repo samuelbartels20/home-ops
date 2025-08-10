@@ -3,9 +3,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-analytics-config
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: config
     app.kubernetes.io/part-of: postgresql

@@ -2,10 +2,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: postgres-analytics-pgbouncer
+  name: cloudnative-pg-analytics-worker-three 
 spec:
   cluster:
-    name: postgres-analytics-coordinator
+    name: cloudnative-pg-analytics-worker-three
   instances: 3
   type: rw
   monitoring:

@@ -93,10 +93,10 @@ spec:
             key: minio_secret_access_key
   bootstrap:
     initdb:
-      database: postgres-analytics
+      database: cloudnative-pg-analytics-worker-four
       owner: postgres
       secret:
-        name: postgres-analytics
+        name: cloudnative-pg-analytics-worker-four
       postInitSQL:
         # Required extensions
         - "CREATE EXTENSION IF NOT EXISTS citus;"

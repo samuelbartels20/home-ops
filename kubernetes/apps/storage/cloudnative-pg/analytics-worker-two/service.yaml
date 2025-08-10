@@ -4,8 +4,8 @@ kind: Service
 metadata:
   name: cloudnative-pg-analytics-worker-two
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: postgres.samcloud.online
-    lbipam.cilium.io/ips: 192.168.8.106
+    external-dns.alpha.kubernetes.io/hostname: cloudnative-pg-analytics-worker-two.samcloud.online
+    lbipam.cilium.io/ips: 192.168.8.108
 spec:
   type: LoadBalancer
   ports:

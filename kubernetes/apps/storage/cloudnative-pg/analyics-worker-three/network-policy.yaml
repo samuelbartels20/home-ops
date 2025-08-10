@@ -5,6 +5,7 @@ metadata:
   name: postgres-network-policy
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: network-security
     app.kubernetes.io/part-of: postgresql
@@ -16,7 +17,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-three
   policyTypes:
     - Ingress
     - Egress
@@ -49,7 +50,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -94,7 +95,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -121,6 +122,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
+      citus-cluster: cloudnative-pg-analytics-worker-three
       app.kubernetes.io/name: cloudnative-pg
   policyTypes:
     - Ingress
@@ -166,7 +168,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -217,7 +219,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -276,7 +278,7 @@ spec:
               name: storage
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432
@@ -299,7 +301,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/pooler: postgres
+      cnpg.io/pooler: cloudnative-pg-analytics-worker-three
   policyTypes:
     - Ingress
     - Egress
@@ -333,7 +335,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-three
       ports:
         - protocol: TCP
           port: 5432

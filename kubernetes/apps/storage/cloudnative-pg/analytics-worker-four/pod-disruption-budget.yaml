@@ -2,22 +2,26 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-analytics-pdb
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-four
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
 spec:
   minAvailable: 2
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-four
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: postgres-analytics-primary-pdb
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-four
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-four
       cnpg.io/instanceRole: primary 

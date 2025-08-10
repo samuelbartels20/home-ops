@@ -6,6 +6,7 @@ metadata:
   name: cloudnative-pg-operator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: monitoring
     app.kubernetes.io/part-of: postgresql
@@ -40,7 +41,7 @@ spec:
           regex: 'cnpg_.*|controller_runtime_.*|workqueue_.*'
           action: keep
         - targetLabel: cluster
-          replacement: postgres-analytics
+          replacement: cloudnative-pg-analytics-worker-three
   namespaceSelector:
     matchNames:
       - storage

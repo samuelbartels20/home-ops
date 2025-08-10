@@ -6,18 +6,20 @@ metadata:
   name: cloudnative-pg-operator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: monitoring
     app.kubernetes.io/part-of: postgresql
     monitoring: prometheus
     environment: production
+    tier: analytics
   annotations:
     prometheus.io/scrape: "true"
     monitoring.cnpg.io/operator: "true"
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
   endpoints:
     - port: metrics
       interval: 30s
@@ -40,7 +42,7 @@ spec:
           regex: 'cnpg_.*|controller_runtime_.*|workqueue_.*'
           action: keep
         - targetLabel: cluster
-          replacement: postgres-analytics
+          replacement: cloudnative-pg-analytics-worker-four
   namespaceSelector:
     matchNames:
       - storage
