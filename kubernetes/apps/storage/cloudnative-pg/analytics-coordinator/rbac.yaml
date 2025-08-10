@@ -1,13 +1,4 @@
 ---
-# ServiceAccount for PostgreSQL cluster operations
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-
----
-# ServiceAccount for PostgreSQL instance operations
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -22,494 +13,176 @@ metadata:
 automountServiceAccountToken: true
 
 ---
-# Role for PostgreSQL cluster management
+# Role: Instance (namespaced)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-rules:
-  # Pod management
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "pods/exec"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Service management
-  - apiGroups: [""]
-    resources: ["services", "endpoints"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # ConfigMap and Secret management
-  - apiGroups: [""]
-    resources: ["configmaps", "secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # PersistentVolumeClaim management
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Events
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-
-  # Jobs for backup/restore operations
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # CronJobs for scheduled operations
-  - apiGroups: ["batch"]
-    resources: ["cronjobs"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # StatefulSet management
-  - apiGroups: ["apps"]
-    resources: ["statefulsets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Deployment management
-  - apiGroups: ["apps"]
-    resources: ["deployments"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # ReplicaSet management
-  - apiGroups: ["apps"]
-    resources: ["replicasets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Monitoring resources
-  - apiGroups: ["monitoring.coreos.com"]
-    resources: ["servicemonitors", "prometheusrules", "podmonitors"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Network policies
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["networkpolicies"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Ingress management
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # HorizontalPodAutoscaler
-  - apiGroups: ["autoscaling"]
-    resources: ["horizontalpodautoscalers"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # PodDisruptionBudget
-  - apiGroups: ["policy"]
-    resources: ["poddisruptionbudgets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
----
-# ClusterRole for cross-namespace operations
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-rules:
-  # Node access for monitoring
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
-
-  # Namespace access
-  - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get", "list", "watch"]
-
-  # PersistentVolume access
-  - apiGroups: [""]
-    resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # StorageClass access
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
-
-  # PriorityClass access
-  - apiGroups: ["scheduling.k8s.io"]
-    resources: ["priorityclasses"]
-    verbs: ["get", "list", "watch"]
-
-  # Custom Resource Definitions
-  - apiGroups: ["apiextensions.k8s.io"]
-    resources: ["customresourcedefinitions"]
-    verbs: ["get", "list", "watch"]
-
-  # CloudNativePG CRDs
-  - apiGroups: ["postgresql.cnpg.io"]
-    resources: ["clusters", "backups", "scheduledbackups", "poolers"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
----
-# RoleBinding for namespace-scoped permissions
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-subjects:
-  - kind: ServiceAccount
-    name: cloudnative-pg-analytics-coordinator
-    namespace: storage
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: cloudnative-pg-analytics-coordinator
-
----
-# ClusterRoleBinding for cluster-scoped permissions
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-subjects:
-  - kind: ServiceAccount
-    name: cloudnative-pg-analytics-coordinator
-    namespace: storage
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cloudnative-pg-analytics-coordinator
-
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-  annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
-automountServiceAccountToken: true
-
----
-# ClusterRole for CloudNative PostgreSQL Operator
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-rules:
-  # Core Kubernetes API permissions
-  - apiGroups: [""]
-    resources: ["configmaps", "secrets", "services", "persistentvolumeclaims", "pods", "events"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  - apiGroups: [""]
-    resources: ["pods/exec", "pods/log"]
-    verbs: ["create", "get", "list", "watch"]
-
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
-
-  # Apps API permissions
-  - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # Policy API permissions
-  - apiGroups: ["policy"]
-    resources: ["poddisruptionbudgets"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # RBAC permissions for service accounts
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["rolebindings"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # CloudNative PostgreSQL CRD permissions
-  - apiGroups: ["postgresql.cnpg.io"]
-    resources: ["clusters", "poolers", "backups", "scheduledbackups"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  - apiGroups: ["postgresql.cnpg.io"]
-    resources: ["clusters/status", "poolers/status", "backups/status", "scheduledbackups/status"]
-    verbs: ["get", "patch", "update"]
-
-  - apiGroups: ["postgresql.cnpg.io"]
-    resources: ["clusters/finalizers", "poolers/finalizers", "backups/finalizers", "scheduledbackups/finalizers"]
-    verbs: ["update"]
-
-  # Monitoring permissions
-  - apiGroups: ["monitoring.coreos.com"]
-    resources: ["podmonitors", "servicemonitors"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # Storage permissions
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
-
-  # Volume snapshot permissions
-  - apiGroups: ["snapshot.storage.k8s.io"]
-    resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # Metrics and coordination
-  - apiGroups: ["coordination.k8s.io"]
-    resources: ["leases"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # Admission controller permissions
-  - apiGroups: ["admissionregistration.k8s.io"]
-    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
----
-# ClusterRoleBinding for CloudNative PostgreSQL Operator
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cloudnative-pg-analytics-coordinator
-subjects:
-  - kind: ServiceAccount
-    name: cloudnative-pg-analytics-coordinator
-    namespace: storage
-
----
-# Role for PostgreSQL Instance Management
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-instance
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
-  # ConfigMap permissions for PostgreSQL configuration
   - apiGroups: [""]
-    resources: ["configmaps"]
+    resources: ["configmaps", "secrets", "pods", "services", "events"]
     verbs: ["get", "list", "watch"]
-
-  # Secret permissions for credentials
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "watch"]
-
-  # Pod permissions for instance management
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch"]
-
-  # Service permissions for networking
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["get", "list", "watch"]
-
-  # Event permissions for logging
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
-
-  # Lease permissions for leader election
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 
 ---
-# RoleBinding for PostgreSQL Instance
+# RoleBinding: Instance
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-instance
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-coordinator
     namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cloudnative-pg-analytics-coordinator-instance
 
 ---
-# Role for Backup Operations
+# Role: Backup (namespaced)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-backup
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
-  # Secret permissions for backup credentials
   - apiGroups: [""]
-    resources: ["secrets"]
+    resources: ["secrets", "configmaps"]
     verbs: ["get", "list", "watch"]
-
-  # ConfigMap permissions for backup configuration
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list", "watch"]
-
-  # Pod permissions for backup jobs
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "create", "delete"]
-
-  # Job permissions for backup scheduling
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-
-  # Event permissions for backup logging
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
-
-  # Volume snapshot permissions
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshots"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 
 ---
-# ServiceAccount for Backup Operations
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-  annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
-automountServiceAccountToken: true
-
----
-# RoleBinding for Backup Operations
+# RoleBinding: Backup
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-backup
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-coordinator
     namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cloudnative-pg-analytics-coordinator-backup
 
 ---
-# Role for Monitoring Integration
+# Role: Monitoring (namespaced)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-monitoring
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
-  # Pod permissions for metrics collection
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
-
-  # Service permissions for service discovery
   - apiGroups: [""]
     resources: ["services", "endpoints"]
     verbs: ["get", "list", "watch"]
-
-  # ConfigMap permissions for monitoring configuration
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
 
 ---
-# ServiceAccount for Monitoring
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
-  labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
-  annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
-automountServiceAccountToken: true
-
----
-# RoleBinding for Monitoring
+# RoleBinding: Monitoring
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-monitoring
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-coordinator
     namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cloudnative-pg-analytics-coordinator-monitoring
 
 ---
-# ClusterRole for cross-namespace monitoring (if needed)
+# ClusterRole: Instance (cross-namespace basics and CNPG CRDs)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-instance
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
-  # Read-only access to nodes for monitoring
   - apiGroups: [""]
-    resources: ["nodes", "nodes/metrics"]
+    resources: ["nodes", "namespaces", "persistentvolumes"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["scheduling.k8s.io"]
+    resources: ["priorityclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "poolers", "backups", "scheduledbackups"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters/status", "poolers/status", "backups/status", "scheduledbackups/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters/finalizers", "poolers/finalizers", "backups/finalizers", "scheduledbackups/finalizers"]
+    verbs: ["update"]
 
 ---
-# ClusterRoleBinding for cross-namespace monitoring
+# ClusterRoleBinding: Instance
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-instance
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
@@ -517,7 +190,81 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-instance
+subjects:
+  - kind: ServiceAccount
+    name: cloudnative-pg-analytics-coordinator
+    namespace: storage
+
+---
+# ClusterRole: Backup (snapshot classes and PV visibility)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cloudnative-pg-analytics-coordinator-backup
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+rules:
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses", "volumesnapshotcontents"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding: Backup
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cloudnative-pg-analytics-coordinator-backup
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cloudnative-pg-analytics-coordinator-backup
+subjects:
+  - kind: ServiceAccount
+    name: cloudnative-pg-analytics-coordinator
+    namespace: storage
+
+---
+# ClusterRole: Monitoring (cross-namespace read + optional monitor management)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cloudnative-pg-analytics-coordinator-monitoring
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/metrics"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["podmonitors", "servicemonitors"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+---
+# ClusterRoleBinding: Monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cloudnative-pg-analytics-coordinator-monitoring
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: postgresql
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cloudnative-pg-analytics-coordinator-monitoring
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-coordinator
