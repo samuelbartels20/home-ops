@@ -13,20 +13,20 @@ spec:
   primaryUpdateStrategy: unsupervised
 
   storage:
-    size: 50Gi
+    size: 20Gi
     storageClass: openebs-hostpath
     resizeInUseVolumes: true
   walStorage:
-    size: 50Gi
+    size: 20Gi
     storageClass: openebs-hostpath
 
   tablespaces:
     - name: hot_data
-      storage: { size: 50Gi, storageClass: openebs-hostpath }
+      storage: { size: 20Gi, storageClass: openebs-hostpath }
     - name: warm_data
-      storage: { size: 100Gi, storageClass: openebs-hostpath }
+      storage: { size: 20Gi, storageClass: openebs-hostpath }
     - name: cold_data
-      storage: { size: 50Gi, storageClass: openebs-hostpath }
+      storage: { size: 20Gi, storageClass: openebs-hostpath }
 
   superuserSecret:
     name: cloudnative-pg
