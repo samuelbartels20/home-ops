@@ -33,7 +33,7 @@ spec:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: cloudnative-pg
-      namespace: storage
+      namespace: *namespace
   healthCheckExprs:
     - apiVersion: &postgresVersion postgresql.cnpg.io/v1
       kind: &postgresKind Cluster
@@ -63,7 +63,7 @@ spec:
       app.kubernetes.io/name: *app
   dependsOn:
     - name: cloudnative-pg-cluster
-      namespace: storage
+      namespace: *namespace
   interval: 1h
   path: ./kubernetes/apps/storage/cloudnative-pg/backup
   prune: true
@@ -81,15 +81,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-loadbalancing
-  namespace: storage
+  name: &app cloudnative-pg-loadbalancing
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: postgres-loadbalancing
-      app.kubernetes.io/component: loadbalancing
-      app.kubernetes.io/part-of: cloudnative-pg-loadbalancing
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/loadbalancing
   prune: true
   sourceRef:
@@ -102,7 +100,7 @@ spec:
   timeout: 5m
   dependsOn:
     - name: cloudnative-pg
-      namespace: storage
+      namespace: *namespace
     - name: external-secrets
       namespace: security
     - name: onepassword
@@ -168,15 +166,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-analytics-coordinator
-  namespace: storage
+  name: &app cloudnative-pg-analytics-coordinator
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
-      app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-coordinator
   prune: true 
   sourceRef:
@@ -199,15 +195,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-analytics-worker-one
-  namespace: storage
+  name: &app cloudnative-pg-analytics-worker-one
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
-      app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-one
   prune: true 
   sourceRef:
@@ -230,15 +224,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-analytics-worker-two
-  namespace: storage
+  name: &app cloudnative-pg-analytics-worker-two
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
-      app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-two
   prune: true 
   sourceRef:
@@ -261,15 +253,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-analytics-worker-three
-  namespace: storage
+  name: &app cloudnative-pg-analytics-worker-three
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
-      app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-three
   prune: true 
   sourceRef:
@@ -292,15 +282,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cloudnative-pg-analytics-worker-four
-  namespace: storage
+  name: &app cloudnative-pg-analytics-worker-four
+  namespace: &namespace storage
 spec:
-  targetNamespace: storage
+  targetNamespace: *namespace
   commonMetadata:
     labels:
-      app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
-      app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
+      app.kubernetes.io/name: *app
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-four
   prune: true 
   sourceRef:
