@@ -1,13 +1,13 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: postgres-analytics-worker-one-hpa
+  name: cloudnative-pg-analytics-worker-one-hpa
   namespace: storage
 spec:
   scaleTargetRef:
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
-    name: postgres-analytics-worker-one
+    name: cloudnative-pg-analytics-worker-one
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -30,7 +30,7 @@ spec:
       describedObject:
         apiVersion: postgresql.cnpg.io/v1
         kind: Cluster
-        name: postgres-analytics-worker-one 
+        name: cloudnative-pg-analytics-worker-one 
       target:
         type: AverageValue
         averageValue: "100"

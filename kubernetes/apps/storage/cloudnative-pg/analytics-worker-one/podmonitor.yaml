@@ -3,7 +3,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: postgres-analytics-worker-one-pods
+  name: cloudnative-pg-analytics-worker-one-pods
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -13,11 +13,11 @@ metadata:
     environment: production
   annotations:
     prometheus.io/scrape: "true"
-    monitoring.cnpg.io/cluster: "postgres-analytics-worker-one"
+    monitoring.cnpg.io/cluster: "cloudnative-pg-analytics-worker-one"
 spec:
   selector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics-worker-one  
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-one  
   podMetricsEndpoints:
     - port: metrics
       interval: 30s

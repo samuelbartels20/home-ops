@@ -3,7 +3,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-analytics-worker-one
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
 spec:
   instances: 1
@@ -68,10 +68,10 @@ spec:
             key: minio_secret_access_key
   bootstrap:
     initdb:
-      database: postgres-analytics-worker-one
+      database: cloudnative-pg-analytics-worker-one
       owner: postgres
       secret:
-        name: postgres-analytics-worker-one
+        name: cloudnative-pg-analytics-worker-one
       postInitSQL:
         # Required extensions
         - "CREATE EXTENSION IF NOT EXISTS citus;"

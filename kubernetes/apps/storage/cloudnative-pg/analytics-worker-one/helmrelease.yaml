@@ -2,14 +2,14 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: postgres-analytics-worker-one
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgres-analytics-worker-one
-    app.kubernetes.io/component: analytics-worker-one
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
+    app.kubernetes.io/component: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/part-of: postgresql
     environment: production
-    tier: analytics-worker-one
+    tier: cloudnative-pg-analytics-worker-one
 spec:
   interval: 15m
   timeout: 10m
@@ -60,13 +60,13 @@ spec:
                 done
 
             env:
-              POSTGRES_HOST: "postgres-analytics-worker-one-rw.storage.svc.cluster.local"
+              POSTGRES_HOST: "cloudnative-pg-analytics-worker-one-rw.storage.svc.cluster.local"
               POSTGRES_PORT: "5432"
               POSTGRES_DB: "analytics"
 
             envFrom:
               - secretRef:
-                  name: postgres-analytics-worker-one
+                  name: cloudnative-pg-analytics-worker-one
 
             resources:
               requests:
@@ -90,9 +90,9 @@ spec:
 
         pod:
           labels:
-            app.kubernetes.io/name: postgres-analytics-worker-one
-            app.kubernetes.io/instance: postgres-analytics-worker-one
-            app.kubernetes.io/component: analytics-worker-one
+            app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
+            app.kubernetes.io/instance: cloudnative-pg-analytics-worker-one
+            app.kubernetes.io/component: cloudnative-pg-analytics-worker-one
             monitoring: "true"
 
           securityContext:
@@ -114,7 +114,7 @@ spec:
       analytics-scripts:
         enabled: true
         type: configMap
-        name: postgres-analytics-config
+        name: cloudnative-pg-analytics-worker-one-config
         defaultMode: 0755
         globalMounts:
           - path: /scripts
@@ -122,4 +122,4 @@ spec:
 
     serviceAccount:
       create: false
-      name: postgres-analytics-worker-one
+      name: cloudnative-pg-analytics-worker-one

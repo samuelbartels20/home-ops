@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-analytics-worker-one-network-policy
+  name: cloudnative-pg-analytics-worker-one-network-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -16,7 +16,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics-worker-one
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   policyTypes:
     - Ingress
     - Egress
@@ -94,7 +94,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432
@@ -166,7 +166,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432
@@ -182,7 +182,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-analytics-worker-one-backup-network-policy
+  name: cloudnative-pg-analytics-worker-one-backup-network-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -217,7 +217,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432
@@ -249,7 +249,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-analytics-worker-one-client-access-policy
+  name: cloudnative-pg-analytics-worker-one-client-access-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-client-access
@@ -276,7 +276,7 @@ spec:
               name: storage
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432
@@ -290,7 +290,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-analytics-worker-one-pooler-network-policy
+  name: cloudnative-pg-analytics-worker-one-pooler-network-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-pooler
@@ -299,7 +299,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/pooler: postgres-analytics-worker-one
+      cnpg.io/pooler: cloudnative-pg-analytics-worker-one
   policyTypes:
     - Ingress
     - Egress
@@ -333,7 +333,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432

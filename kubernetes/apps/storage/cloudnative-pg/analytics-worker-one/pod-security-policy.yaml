@@ -250,12 +250,12 @@ spec:
 
     - name: config
       configMap:
-        name: postgres-analytics-worker-one-config
+        name: cloudnative-pg-analytics-worker-one-config
         defaultMode: 0444
 
     - name: tls-certs
       secret:
-        secretName: postgres-analytics-worker-one-tls-certs
+        secretName: cloudnative-pg-analytics-worker-one-tls-certs
         defaultMode: 0400
         items:
           - key: tls.crt

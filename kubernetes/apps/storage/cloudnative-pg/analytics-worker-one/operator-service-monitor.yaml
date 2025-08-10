@@ -40,7 +40,7 @@ spec:
           regex: 'cnpg_.*|controller_runtime_.*|workqueue_.*'
           action: keep
         - targetLabel: cluster
-          replacement: postgres-analytics-worker-one
+          replacement: cloudnative-pg-analytics-worker-one
   namespaceSelector:
     matchNames:
       - storage
