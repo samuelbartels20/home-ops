@@ -1,7 +1,7 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: cloudnative-pg-analytics-worker-two-hpa
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-two

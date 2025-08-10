@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: cloudnative-pg-analytics-worker-one
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     environment: production
     tier: cloudnative-pg-analytics-worker-one
     citus-cluster: cloudnative-pg-analytics-worker-one
@@ -115,7 +115,7 @@ spec:
       analytics-scripts:
         enabled: true
         type: configMap
-        name: cloudnative-pg-analytics-worker-one-config
+        name: cloudnative-pg-analytics-worker-one
         defaultMode: 0755
         globalMounts:
           - path: /scripts

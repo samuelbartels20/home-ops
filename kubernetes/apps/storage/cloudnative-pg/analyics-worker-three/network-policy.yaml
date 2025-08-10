@@ -2,13 +2,13 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-network-policy
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-three
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     environment: production
     security-level: strict
   annotations:
@@ -114,9 +114,9 @@ metadata:
   name: cloudnative-pg-operator-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: operator-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     environment: production
     security-level: strict
 spec:
@@ -187,9 +187,9 @@ metadata:
   name: postgres-backup-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: backup-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     environment: production
 spec:
   podSelector:
@@ -254,9 +254,9 @@ metadata:
   name: postgres-client-access-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-client-access
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: client-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
 spec:
   podSelector:
     matchLabels:
@@ -295,9 +295,9 @@ metadata:
   name: postgres-pooler-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-pooler
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: pooler-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
 spec:
   podSelector:
     matchLabels:

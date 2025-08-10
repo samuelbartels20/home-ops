@@ -7,7 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: analytics
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
     citus-cluster: cloudnative-pg-analytics-worker-four
     environment: production
     tier: analytics
@@ -61,7 +61,7 @@ spec:
                 done
 
             env:
-              POSTGRES_HOST: "cloudnative-pg-analytics-worker-four-engine-rw.storage.svc.cluster.local"
+              POSTGRES_HOST: "cloudnative-pg-analytics-worker-four-rw.storage.svc.cluster.local"
               POSTGRES_PORT: "5432"
               POSTGRES_DB: "cloudnative-pg-analytics-worker-four"
 

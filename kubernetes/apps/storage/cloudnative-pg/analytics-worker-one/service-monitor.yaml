@@ -3,12 +3,12 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cloudnative-pg-analytics-worker-one-instances
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     monitoring: prometheus
     environment: production
   annotations:

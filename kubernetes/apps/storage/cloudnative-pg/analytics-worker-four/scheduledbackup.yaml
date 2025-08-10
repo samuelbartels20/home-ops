@@ -4,6 +4,14 @@ apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: cloudnative-pg-analytics-worker-four
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
+    citus-cluster: cloudnative-pg-analytics-worker-four
+    backup-type: daily
+    retention: long-term
+    environment: production
 spec:
   schedule: "@daily"
   immediate: true
@@ -20,9 +28,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
+    citus-cluster: cloudnative-pg-analytics-worker-four
     backup-type: daily
     retention: long-term
     environment: production
@@ -49,9 +58,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
+    citus-cluster: cloudnative-pg-analytics-worker-four
     backup-type: weekly
     retention: archive
     environment: production
@@ -79,9 +89,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
+    citus-cluster: cloudnative-pg-analytics-worker-four
     backup-type: monthly
     retention: compliance
     environment: production

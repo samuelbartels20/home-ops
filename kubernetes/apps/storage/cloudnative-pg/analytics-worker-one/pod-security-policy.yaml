@@ -2,12 +2,12 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: postgres-analytics-worker-one-security-policy
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: security-policy
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     security.kubernetes.io/policy: restricted
     security.cnpg.io/hardened: "true"
   annotations:
@@ -287,12 +287,12 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-security-config
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: security-config
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 data:
   postgresql.conf: |
     ssl = on
@@ -349,17 +349,17 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-analytics-worker-one-security-policy
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     security-level: strict
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres-analytics-worker-one
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   policyTypes:
     - Ingress
     - Egress
@@ -389,7 +389,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432
@@ -405,7 +405,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres-analytics-worker-one
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-one
       ports:
         - protocol: TCP
           port: 5432

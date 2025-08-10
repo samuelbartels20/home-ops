@@ -3,12 +3,12 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cronjob
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one-cronjob
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: maintenance
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     citus-cluster: cloudnative-pg-analytics-worker-one
 spec:
   schedule: "0 2 * * *"
@@ -47,7 +47,7 @@ spec:
                 - name: POSTGRES_PORT
                   value: "5432"
                 - name: POSTGRES_DB
-                  value: "analytics"
+                  value: "cloudnative-pg-analytics-worker-one"
                 - name: POSTGRES_USER
                   valueFrom:
                     secretKeyRef:

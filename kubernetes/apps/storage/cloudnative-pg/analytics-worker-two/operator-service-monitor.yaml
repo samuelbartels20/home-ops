@@ -3,13 +3,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cloudnative-pg-analytics-worker-two-operator
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-two
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     monitoring: prometheus
     environment: production
   annotations:
@@ -18,7 +18,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
   endpoints:
     - port: metrics
       interval: 30s

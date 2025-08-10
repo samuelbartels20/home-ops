@@ -3,15 +3,23 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-backup
+  name: cloudnative-pg-analytics-worker-two
   labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     citus-cluster: cloudnative-pg-analytics-worker-two
+    backup-type: daily
+    retention: long-term
+    environment: production
+  annotations:
+    backup.cnpg.io/schedule: "daily"
 spec:
   schedule: "@daily"
   immediate: true
   backupOwnerReference: self
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-worker-two
   method: barmanObjectStore
   target: primary
 
@@ -19,17 +27,16 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-daily-backup
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
+    citus-cluster: cloudnative-pg-analytics-worker-two
     backup-type: daily
     retention: long-term
     environment: production
-    citus-cluster: cloudnative-pg-analytics-worker-two
-  annotations:
     backup.cnpg.io/schedule: "daily"
     backup.cnpg.io/retention: "90d"
     backup.cnpg.io/compression: "bzip2"
@@ -40,7 +47,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-worker-two
   method: barmanObjectStore
   target: primary
 
@@ -49,12 +56,12 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-weekly-backup
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     backup-type: weekly
     retention: archive
     environment: production
@@ -70,7 +77,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-worker-two
   method: barmanObjectStore
   target: prefer-standby
 
@@ -80,12 +87,12 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-monthly-backup
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     backup-type: monthly
     retention: compliance
     environment: production
@@ -102,6 +109,6 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-worker-two
   method: barmanObjectStore
   target: prefer-standby

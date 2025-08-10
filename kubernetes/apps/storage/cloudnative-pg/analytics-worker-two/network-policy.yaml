@@ -5,9 +5,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     environment: production
     security-level: strict
   annotations:
@@ -114,9 +114,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-operator-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: operator-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     environment: production
     security-level: strict
     citus-cluster: cloudnative-pg-analytics-worker-two
@@ -187,9 +187,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-backup-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: backup-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     environment: production
     citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
@@ -255,9 +255,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-client-access-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-client-access
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: client-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
@@ -297,9 +297,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-pooler-network-policy
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-pooler
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: pooler-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:

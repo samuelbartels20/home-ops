@@ -3,19 +3,19 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: analytics-optimization
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: analytics-optimization
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: maintenance
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
 spec:
   schedule: "0 2 * * *"
   jobTemplate:
     spec:
       template:
         spec:
-          serviceAccountName: postgres-query-accelerator
+          serviceAccountName: cloudnative-pg-analytics-worker-three
           containers:
             - name: optimization
               image: postgres:17.2
@@ -42,20 +42,20 @@ spec:
 
               env:
                 - name: POSTGRES_HOST
-                  value: "postgres-analytics-engine-rw.storage.svc.cluster.local"
+                  value: "cloudnative-pg-analytics-worker-three-rw.storage.svc.cluster.local"
                 - name: POSTGRES_PORT
                   value: "5432"
                 - name: POSTGRES_DB
-                  value: "analytics"
+                  value: "cloudnative-pg-analytics-worker-three"
                 - name: POSTGRES_USER
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-analytics
+                      name: cloudnative-pg-analytics-worker-three
                       key: username
                 - name: POSTGRES_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-analytics
+                      name: cloudnative-pg-analytics-worker-three
                       key: password
 
               resources:

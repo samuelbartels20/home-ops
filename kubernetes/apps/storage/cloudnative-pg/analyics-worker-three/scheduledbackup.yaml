@@ -4,6 +4,19 @@ apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: cloudnative-pg-analytics-worker-three
+  labels:
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
+    citus-cluster: cloudnative-pg-analytics-worker-three
+    backup-type: daily
+    retention: long-term
+    environment: production 
+  annotations:
+    backup.cnpg.io/schedule: "daily"
+    backup.cnpg.io/retention: "90d"
+    backup.cnpg.io/compression: "bzip2"
+    backup.cnpg.io/encryption: "AES256"
 spec:
   schedule: "@daily"
   immediate: true
@@ -20,9 +33,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
+    citus-cluster: cloudnative-pg-analytics-worker-three
     backup-type: daily
     retention: long-term
     environment: production
@@ -49,9 +63,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
+    citus-cluster: cloudnative-pg-analytics-worker-three
     backup-type: weekly
     retention: archive
     environment: production
@@ -79,9 +94,10 @@ metadata:
   name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
+    citus-cluster: cloudnative-pg-analytics-worker-three
     backup-type: monthly
     retention: compliance
     environment: production

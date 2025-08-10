@@ -109,8 +109,4 @@ spec:
 
         - "ALTER SYSTEM SET citus.shard_count = '64';"
 
-        - "SELECT citus_add_node('postgres-analytics-worker-1-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-2-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-3-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-4-rw', 5432);"
-        - "SELECT cron.schedule('vacuum-analyze-weekly', '0 3 * * 0', 'VACUUM ANALYZE;');"
+        - "SELECT citus_set_coordinator_host('postgres-analytics-coordinator-rw', 5432);"

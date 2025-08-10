@@ -3,12 +3,12 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: cloudnative-pg-analytics-worker-two-pods
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     monitoring: prometheus
     environment: production
     citus-cluster: cloudnative-pg-analytics-worker-two

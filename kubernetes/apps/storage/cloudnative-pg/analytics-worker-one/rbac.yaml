@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cluster-sa
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
 
 ---
@@ -11,14 +11,14 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cloudnative-pg-analytics-worker-one-instance
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
   annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one-instance
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one
 automountServiceAccountToken: true
 
 ---
@@ -26,7 +26,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cluster-role
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
 rules:
   # Pod management
@@ -109,7 +109,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cluster-cluster-role
+  name: cloudnative-pg-analytics-worker-one
 rules:
   # Node access for monitoring
   - apiGroups: [""]
@@ -151,23 +151,23 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cluster-rolebinding
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
 subjects:
   - kind: ServiceAccount
-    name: cloudnative-pg-analytics-worker-one-cluster-sa
+    name: cloudnative-pg-analytics-worker-one
     namespace: storage
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: cloudnative-pg-analytics-worker-one-cluster-role
+  name: cloudnative-pg-analytics-worker-one
 
 ---
 # ClusterRoleBinding for cluster-scoped permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cloudnative-pg-analytics-worker-one-cluster-cluster-rolebinding
+  name: cloudnative-pg-analytics-worker-one
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-worker-one-cluster-sa
@@ -175,20 +175,20 @@ subjects:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cloudnative-pg-analytics-worker-one-cluster-cluster-role
+  name: cloudnative-pg-analytics-worker-one
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cloudnative-pg-analytics-worker-one-operator
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
   annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one-operator
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one
 automountServiceAccountToken: true
 
 ---
@@ -196,11 +196,11 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: cloudnative-pg-analytics-worker-one-operator
+  name: cloudnative-pg-analytics-worker-one
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 rules:
   # Core Kubernetes API permissions
   - apiGroups: [""]
@@ -275,9 +275,9 @@ kind: ClusterRoleBinding
 metadata:
   name: cloudnative-pg-analytics-worker-one-operator
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -292,12 +292,12 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-worker-one-instance
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 rules:
   # ConfigMap permissions for PostgreSQL configuration
   - apiGroups: [""]
@@ -334,19 +334,19 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-worker-one-instance
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: cloudnative-pg-analytics-worker-one-instance
+  name: cloudnative-pg-analytics-worker-one
 subjects:
   - kind: ServiceAccount
-    name: cloudnative-pg-analytics-worker-one-instance
+    name: cloudnative-pg-analytics-worker-one
     namespace: storage
 
 ---
@@ -354,12 +354,12 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-worker-one-backup
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 rules:
   # Secret permissions for backup credentials
   - apiGroups: [""]
@@ -396,14 +396,14 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cloudnative-pg-analytics-worker-one-backup
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
   annotations:
-    kubernetes.io/service-account.name: postgres-backup
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one
 automountServiceAccountToken: true
 
 ---
@@ -411,12 +411,12 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: cloudnative-pg-analytics-worker-one-backup
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -431,12 +431,12 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: cloudnative-pg-analytics-worker-one-monitoring
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 rules:
   # Pod permissions for metrics collection
   - apiGroups: [""]
@@ -458,14 +458,14 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: cloudnative-pg-analytics-worker-one-monitoring
+  name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
   annotations:
-    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one-monitoring
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-worker-one
 automountServiceAccountToken: true
 
 ---
@@ -476,9 +476,9 @@ metadata:
   name: cloudnative-pg-analytics-worker-one-monitoring
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -495,9 +495,9 @@ kind: ClusterRole
 metadata:
   name: cloudnative-pg-analytics-worker-one-monitoring-cluster
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 rules:
   # Read-only access to nodes for monitoring
   - apiGroups: [""]
@@ -509,15 +509,15 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: cloudnative-pg-analytics-worker-one-monitoring-cluster
+  name: cloudnative-pg-analytics-worker-one
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cloudnative-pg-analytics-worker-one-monitoring-cluster
+  name: cloudnative-pg-analytics-worker-one
 subjects:
   - kind: ServiceAccount
     name: cloudnative-pg-analytics-worker-one-monitoring

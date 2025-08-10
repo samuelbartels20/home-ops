@@ -3,13 +3,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cloudnative-pg-operator
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-four
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
     monitoring: prometheus
     environment: production
     tier: analytics

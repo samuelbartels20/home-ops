@@ -2,7 +2,7 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: cloudnative-pg-analytics-worker-two-pdb
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-two
@@ -15,7 +15,7 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: cloudnative-pg-analytics-worker-two-primary-pdb
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-two

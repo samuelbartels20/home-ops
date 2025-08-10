@@ -9,7 +9,7 @@ metadata:
     citus-cluster: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
     app.kubernetes.io/component: maintenance
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
 spec:
   schedule: "0 2 * * *"
   jobTemplate:
@@ -43,7 +43,7 @@ spec:
 
               env:
                 - name: POSTGRES_HOST
-                  value: "cloudnative-pg-analytics-worker-four-engine-rw.storage.svc.cluster.local"
+                  value: "cloudnative-pg-analytics-worker-four-rw.storage.svc.cluster.local"
                 - name: POSTGRES_PORT
                   value: "5432"
                 - name: POSTGRES_DB

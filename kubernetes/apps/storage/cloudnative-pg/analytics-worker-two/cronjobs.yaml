@@ -3,12 +3,12 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: cloudnative-pg-analytics-worker-two-optimization
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two-optimization
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: maintenance
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
     citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   schedule: "0 2 * * *"
@@ -16,7 +16,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: cloudnative-pg-analytics-worker-two-query-accelerator
+          serviceAccountName: cloudnative-pg-analytics-worker-two
           containers:
             - name: optimization
               image: postgres:17.2
@@ -43,7 +43,7 @@ spec:
 
               env:
                 - name: POSTGRES_HOST
-                  value: "cloudnative-pg-analytics-engine-rw.storage.svc.cluster.local"
+                  value: "cloudnative-pg-analytics-worker-two-rw.storage.svc.cluster.local"
                 - name: POSTGRES_PORT
                   value: "5432"
                 - name: POSTGRES_DB

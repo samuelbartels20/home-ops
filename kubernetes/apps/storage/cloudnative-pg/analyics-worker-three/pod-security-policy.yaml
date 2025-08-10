@@ -6,9 +6,9 @@ metadata:
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-worker-three
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: security-policy
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     security.kubernetes.io/policy: restricted
     security.cnpg.io/hardened: "true"
   annotations:
@@ -43,7 +43,7 @@ spec:
       type: "spc_t"
       level: "s0:c123,c456"
 
-  serviceAccountName: postgres-instance
+  serviceAccountName: cloudnative-pg-analytics-worker-three
   automountServiceAccountToken: false
 
   nodeSelector:
@@ -67,7 +67,7 @@ spec:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
             matchLabels:
-              app.kubernetes.io/name: postgresql
+              app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
               cnpg.io/cluster: cloudnative-pg-analytics-worker-three
           topologyKey: kubernetes.io/hostname
 
@@ -87,7 +87,7 @@ spec:
   preemptionPolicy: Never
 
   containers:
-    - name: postgres
+    - name: cloudnative-pg-analytics-worker-three
       image: ghcr.io/cloudnative-pg/postgresql:17.2
       imagePullPolicy: IfNotPresent
 
@@ -234,11 +234,11 @@ spec:
   volumes:
     - name: pgdata
       persistentVolumeClaim:
-        claimName: pgdata-postgres-1
+        claimName: pgdata-cloudnative-pg-analytics-worker-three
 
     - name: pgwal
       persistentVolumeClaim:
-        claimName: pgwal-postgres-1
+        claimName: pgwal-cloudnative-pg-analytics-worker-three
 
     - name: tmp
       emptyDir:
@@ -251,12 +251,12 @@ spec:
 
     - name: config
       configMap:
-        name: postgres-config
+        name: cloudnative-pg-analytics-worker-three
         defaultMode: 0444
 
     - name: tls-certs
       secret:
-        secretName: postgres-tls-certs
+        secretName: cloudnative-pg-analytics-worker-three
         defaultMode: 0400
         items:
           - key: tls.crt
@@ -288,12 +288,12 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-security-config
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: security-config
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
 data:
   postgresql.conf: |
     ssl = on
@@ -350,12 +350,12 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-worker-three
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     security-level: strict
 spec:
   podSelector:

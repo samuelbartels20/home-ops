@@ -8,7 +8,7 @@ metadata:
     citus-cluster: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
     app.kubernetes.io/component: analytics
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
     environment: production
     tier: analytics
 spec:
