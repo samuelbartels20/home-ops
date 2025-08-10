@@ -27,7 +27,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: cloudnative-pg-analytics-worker-two
+  name: cloudnative-pg-analytics-worker-two-daily
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
@@ -56,7 +56,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: cloudnative-pg-analytics-worker-two
+  name: cloudnative-pg-analytics-worker-two-weekly
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
@@ -87,7 +87,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: cloudnative-pg-analytics-worker-two
+  name: cloudnative-pg-analytics-worker-two-monthly
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
