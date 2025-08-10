@@ -177,7 +177,7 @@ spec:
       app.kubernetes.io/name: postgres-analytics
       app.kubernetes.io/component: analytics
       app.kubernetes.io/part-of: postgresql
-  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-cordinator
+  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-coordinator
   prune: true 
   sourceRef:
     kind: GitRepository
