@@ -40,7 +40,7 @@ spec:
       - auto_explain
     synchronous:
       method: any
-      number: 0
+      number: 1
     parameters:
       max_connections: "200"
       shared_buffers: "160MB"
