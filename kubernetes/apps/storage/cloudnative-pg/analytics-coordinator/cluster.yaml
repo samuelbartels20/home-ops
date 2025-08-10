@@ -8,7 +8,7 @@ metadata:
   labels:
     citus-cluster: postgres-analytics-coordinator
 spec:
-  instances: 3
+  instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
   primaryUpdateStrategy: unsupervised
   storage:
