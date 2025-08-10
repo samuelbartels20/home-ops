@@ -8,7 +8,7 @@ metadata:
     citus-cluster: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: coordinator
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
     environment: production
     tier: coordinator
 spec:
