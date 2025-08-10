@@ -81,10 +81,6 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS citus_columnar;"
         - "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
         - "CREATE EXTENSION IF NOT EXISTS postgres_fdw;"
-        # Tablespaces (paths are mounted by CNPG)
-        - "CREATE TABLESPACE hot_data  LOCATION '/var/lib/postgresql/tablespaces/hot_data';"
-        - "CREATE TABLESPACE warm_data LOCATION '/var/lib/postgresql/tablespaces/warm_data';"
-        - "CREATE TABLESPACE cold_data LOCATION '/var/lib/postgresql/tablespaces/cold_data';"
 
         - "ALTER SYSTEM SET citus.shard_count = '64';"
         - "ALTER SYSTEM SET citus.replication_factor = '2';"
