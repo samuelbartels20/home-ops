@@ -89,7 +89,7 @@ spec:
     labels:
       app.kubernetes.io/name: postgres-loadbalancing
       app.kubernetes.io/component: loadbalancing
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-loadbalancing
   path: ./kubernetes/apps/storage/cloudnative-pg/loadbalancing
   prune: true
   sourceRef:
@@ -174,9 +174,9 @@ spec:
   targetNamespace: storage
   commonMetadata:
     labels:
-      app.kubernetes.io/name: postgres-analytics
+      app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
       app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-coordinator
   prune: true 
   sourceRef:
@@ -207,7 +207,7 @@ spec:
     labels:
       app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
       app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-one
   prune: true 
   sourceRef:
@@ -238,7 +238,7 @@ spec:
     labels:
       app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
       app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-two
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-two
   prune: true 
   sourceRef:
@@ -269,7 +269,7 @@ spec:
     labels:
       app.kubernetes.io/name: cloudnative-pg-analytics-worker-three
       app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-three
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-three
   prune: true 
   sourceRef:
@@ -300,7 +300,7 @@ spec:
     labels:
       app.kubernetes.io/name: cloudnative-pg-analytics-worker-four
       app.kubernetes.io/component: analytics
-      app.kubernetes.io/part-of: postgresql
+      app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-four
   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-four
   prune: true 
   sourceRef:
