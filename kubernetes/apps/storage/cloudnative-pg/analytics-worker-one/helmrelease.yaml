@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     environment: production
     tier: cloudnative-pg-analytics-worker-one
+    citus-cluster: cloudnative-pg-analytics-worker-one
 spec:
   interval: 15m
   timeout: 10m
