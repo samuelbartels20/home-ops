@@ -7,9 +7,9 @@ metadata:
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
     monitoring: prometheus
     environment: production
   annotations:
