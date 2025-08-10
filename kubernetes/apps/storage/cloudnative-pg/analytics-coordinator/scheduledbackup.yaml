@@ -3,13 +3,13 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-backup
+  name: cloudnative-pg-analytics-coordinator
 spec:
   schedule: "@daily"
   immediate: true
   backupOwnerReference: self
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-coordinator
   method: barmanObjectStore
   target: primary
 
@@ -17,7 +17,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-daily-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -37,7 +37,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-coordinator
   method: barmanObjectStore
   target: primary
 
@@ -46,7 +46,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-weekly-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -66,7 +66,7 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-coordinator
   method: barmanObjectStore
   target: prefer-standby
 
@@ -76,7 +76,7 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: postgres-analytics-monthly-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -97,6 +97,6 @@ spec:
   immediate: false
   suspend: false
   cluster:
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-coordinator
   method: barmanObjectStore
   target: prefer-standby

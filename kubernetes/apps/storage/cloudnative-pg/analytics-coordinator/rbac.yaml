@@ -14,7 +14,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
@@ -184,7 +184,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
@@ -198,7 +198,7 @@ kind: ClusterRole
 metadata:
   name: cloudnative-pg-analytics-coordinator
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
@@ -275,7 +275,7 @@ kind: ClusterRoleBinding
 metadata:
   name: cloudnative-pg-analytics-coordinator
   labels:
-    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 roleRef:
@@ -295,7 +295,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
@@ -337,7 +337,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 roleRef:
@@ -357,7 +357,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
@@ -399,11 +399,11 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-backup
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
 automountServiceAccountToken: true
 
 ---
@@ -414,16 +414,16 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-backup
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-backup
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 
 ---
@@ -434,7 +434,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
@@ -461,7 +461,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
@@ -476,7 +476,7 @@ metadata:
   name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 roleRef:
@@ -495,7 +495,7 @@ kind: ClusterRole
 metadata:
   name: cloudnative-pg-analytics-coordinator
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 rules:
@@ -509,9 +509,9 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: postgres-monitoring-cluster
+  name: cloudnative-pg-analytics-coordinator
   labels:
-    app.kubernetes.io/name: postgresql-monitoring
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
 roleRef:
