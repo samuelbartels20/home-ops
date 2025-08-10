@@ -13,6 +13,7 @@ metadata:
   annotations:
     network-policy.kubernetes.io/type: "zero-trust"
     security.cnpg.io/policy-version: "v1.2"
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:
@@ -118,6 +119,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     environment: production
     security-level: strict
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:
@@ -189,6 +191,7 @@ metadata:
     app.kubernetes.io/component: backup-security
     app.kubernetes.io/part-of: postgresql
     environment: production
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:
@@ -255,6 +258,7 @@ metadata:
     app.kubernetes.io/name: postgresql-client-access
     app.kubernetes.io/component: client-security
     app.kubernetes.io/part-of: postgresql
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:
@@ -296,6 +300,7 @@ metadata:
     app.kubernetes.io/name: postgresql-pooler
     app.kubernetes.io/component: pooler-security
     app.kubernetes.io/part-of: postgresql
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:

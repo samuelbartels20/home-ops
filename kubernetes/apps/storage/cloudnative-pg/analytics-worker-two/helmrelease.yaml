@@ -5,6 +5,7 @@ metadata:
   name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: analytics
     app.kubernetes.io/part-of: postgresql
@@ -60,7 +61,7 @@ spec:
                 done
 
             env:
-              POSTGRES_HOST: "cloudnative-pg-analytics-engine-rw.storage.svc.cluster.local"
+              POSTGRES_HOST: "cloudnative-pg-analytics-coordinator-rw.storage.svc.cluster.local"
               POSTGRES_PORT: "5432"
               POSTGRES_DB: "cloudnative-pg-analytics-worker-two"
 

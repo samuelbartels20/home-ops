@@ -11,6 +11,7 @@ metadata:
     app.kubernetes.io/part-of: postgresql
     monitoring: prometheus
     environment: production
+    citus-cluster: cloudnative-pg-analytics-worker-two
   annotations:
     prometheus.io/scrape: "true"
     monitoring.cnpg.io/cluster: "cloudnative-pg-analytics-worker-two"

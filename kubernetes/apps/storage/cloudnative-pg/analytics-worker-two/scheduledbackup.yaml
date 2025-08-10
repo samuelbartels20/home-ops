@@ -4,6 +4,8 @@ apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
   name: postgres-analytics-backup
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   schedule: "@daily"
   immediate: true
@@ -26,6 +28,7 @@ metadata:
     backup-type: daily
     retention: long-term
     environment: production
+    citus-cluster: cloudnative-pg-analytics-worker-two
   annotations:
     backup.cnpg.io/schedule: "daily"
     backup.cnpg.io/retention: "90d"
@@ -55,6 +58,7 @@ metadata:
     backup-type: weekly
     retention: archive
     environment: production
+    citus-cluster: cloudnative-pg-analytics-worker-two
   annotations:
     backup.cnpg.io/schedule: "weekly"
     backup.cnpg.io/retention: "1y"
@@ -85,6 +89,7 @@ metadata:
     backup-type: monthly
     retention: compliance
     environment: production
+    citus-cluster: cloudnative-pg-analytics-worker-two
   annotations:
     backup.cnpg.io/schedule: "monthly"
     backup.cnpg.io/retention: "7y"

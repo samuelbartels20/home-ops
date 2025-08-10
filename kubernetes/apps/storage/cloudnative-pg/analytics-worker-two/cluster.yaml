@@ -5,6 +5,8 @@ kind: Cluster
 metadata:
   name: cloudnative-pg-analytics-worker-two
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
@@ -17,20 +19,14 @@ spec:
     storageClass: openebs-hostpath
   superuserSecret:
     name: cloudnative-pg-analytics-worker-two
+  enableSuperuserAccess: true
   topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchExpressions:
-      - key: cnpg.io/cluster
-        operator: In
-        values:
-        - postgres-analytics-coordinator
-        - cloudnative-pg-analytics-worker-one
-        - cloudnative-pg-analytics-worker-two
-        - cloudnative-pg-analytics-worker-three
-        - cloudnative-pg-analytics-worker-four
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          citus-cluster: cloudnative-pg-analytics-worker-two
   affinity:
     enablePodAntiAffinity: true
     podAntiAffinityType: required
@@ -42,10 +38,12 @@ spec:
               - key: cnpg.io/cluster
                 operator: In
                 values:
-                  - postgres-analytics-coordinator
                   - cloudnative-pg-analytics-worker-one
+                  - cloudnative-pg-analytics-worker-three
+                  - cloudnative-pg-analytics-worker-four
+                  - cloudnative-pg-analytics-coordinator
           topologyKey: kubernetes.io/hostname
-  enableSuperuserAccess: true
+
   postgresql:
     shared_preload_libraries:
       - citus
@@ -112,8 +110,4 @@ spec:
 
         - "ALTER SYSTEM SET citus.shard_count = '64';"
 
-        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-1-rw', 5432);"
-        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-2-rw', 5432);"
-        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-3-rw', 5432);"
-        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-4-rw', 5432);"
-        - "SELECT cron.schedule('vacuum-analyze-weekly', '0 3 * * 0', 'VACUUM ANALYZE;');"
+        - "SELECT citus_set_coordinator_host('postgres-analytics-coordinator-rw', 5432);"

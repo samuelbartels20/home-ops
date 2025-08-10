@@ -6,6 +6,7 @@ metadata:
   name: cloudnative-pg-analytics-worker-two-operator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: monitoring
     app.kubernetes.io/part-of: postgresql

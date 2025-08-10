@@ -293,6 +293,7 @@ metadata:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-config
     app.kubernetes.io/part-of: postgresql
+    citus-cluster: cloudnative-pg-analytics-worker-two
 data:
   postgresql.conf: |
     ssl = on
@@ -356,6 +357,7 @@ metadata:
     app.kubernetes.io/component: network-security
     app.kubernetes.io/part-of: postgresql
     security-level: strict
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   podSelector:
     matchLabels:

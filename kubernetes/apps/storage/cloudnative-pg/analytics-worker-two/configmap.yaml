@@ -6,6 +6,7 @@ metadata:
   name: postgres-analytics-config
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: config
     app.kubernetes.io/part-of: postgresql

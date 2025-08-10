@@ -4,6 +4,8 @@ kind: PodDisruptionBudget
 metadata:
   name: cloudnative-pg-analytics-worker-two-pdb
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   minAvailable: 2
   selector:
@@ -15,6 +17,8 @@ kind: PodDisruptionBudget
 metadata:
   name: cloudnative-pg-analytics-worker-two-primary-pdb
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-two
 spec:
   minAvailable: 1
   selector:
