@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-pooler
 spec:
   cluster:
     name: cloudnative-pg-analytics-coordinator
