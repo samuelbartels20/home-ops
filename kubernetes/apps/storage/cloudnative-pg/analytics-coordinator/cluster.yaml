@@ -19,6 +19,7 @@ spec:
     storageClass: openebs-hostpath
   superuserSecret:
     name: cloudnative-pg
+  enableSuperuserAccess: true
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
@@ -42,7 +43,7 @@ spec:
                   - cloudnative-pg-analytics-worker-three
                   - cloudnative-pg-analytics-worker-four
           topologyKey: kubernetes.io/hostname
-  enableSuperuserAccess: true
+
   postgresql:
     shared_preload_libraries:
       - citus
