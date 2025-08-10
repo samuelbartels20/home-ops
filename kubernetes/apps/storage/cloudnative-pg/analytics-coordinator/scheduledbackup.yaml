@@ -1,0 +1,102 @@
+---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/scheduledbackup_v1.json
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-analytics-backup
+spec:
+  schedule: "@daily"
+  immediate: true
+  backupOwnerReference: self
+  cluster:
+    name: postgres-analytics
+  method: barmanObjectStore
+  target: primary
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-analytics-daily-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    backup-type: daily
+    retention: long-term
+    environment: production
+  annotations:
+    backup.cnpg.io/schedule: "daily"
+    backup.cnpg.io/retention: "90d"
+    backup.cnpg.io/compression: "bzip2"
+    backup.cnpg.io/encryption: "AES256"
+spec:
+  schedule: "0 2 * * *"
+  backupOwnerReference: self
+  immediate: false
+  suspend: false
+  cluster:
+    name: postgres-analytics
+  method: barmanObjectStore
+  target: primary
+
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-analytics-weekly-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    backup-type: weekly
+    retention: archive
+    environment: production
+  annotations:
+    backup.cnpg.io/schedule: "weekly"
+    backup.cnpg.io/retention: "1y"
+    backup.cnpg.io/compression: "bzip2"
+    backup.cnpg.io/encryption: "AES256"
+spec:
+  schedule: "0 1 * * 7"
+  backupOwnerReference: self
+  immediate: false
+  suspend: false
+  cluster:
+    name: postgres-analytics
+  method: barmanObjectStore
+  target: prefer-standby
+
+
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: postgres-analytics-monthly-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+    backup-type: monthly
+    retention: compliance
+    environment: production
+  annotations:
+    backup.cnpg.io/schedule: "monthly"
+    backup.cnpg.io/retention: "7y"
+    backup.cnpg.io/compression: "bzip2"
+    backup.cnpg.io/encryption: "AES256"
+    backup.cnpg.io/compliance: "sox-gdpr"
+spec: 
+  schedule: "0 0 1 * *"
+  backupOwnerReference: self
+  immediate: false
+  suspend: false
+  cluster:
+    name: postgres-analytics
+  method: barmanObjectStore
+  target: prefer-standby

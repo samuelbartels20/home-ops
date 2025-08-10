@@ -1,0 +1,91 @@
+---
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/postgresql.cnpg.io/cluster_v1.json
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-analytics-coordinator
+  namespace: storage
+spec:
+  instances: 1
+  imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: 5Gi
+    storageClass: openebs-hostpath
+  walStorage:
+    size: 5Gi
+    storageClass: openebs-hostpath
+  superuserSecret:
+    name: cloudnative-pg
+  enableSuperuserAccess: true
+  postgresql:
+    shared_preload_libraries:
+      - citus
+      - pg_stat_statements
+      - pg_cron
+      - auto_explain
+    parameters:
+      max_connections: "100"
+      shared_buffers: 256MB
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1024Mi
+  monitoring:
+    enablePodMonitor: true
+  backup:
+    retentionPolicy: 30d
+    barmanObjectStore: &barmanObjectStore
+      data:
+        compression: bzip2
+      wal:
+        compression: bzip2
+        maxParallel: 8
+      destinationPath: s3://pgbackup/
+      endpointURL: http://192.168.8.102:9000
+      serverName: &currentCluster postgres-v1
+      s3Credentials:
+        accessKeyId:
+          name: cloudnative-pg
+          key: minio_access_key_id
+        secretAccessKey:
+          name: cloudnative-pg
+          key: minio_secret_access_key
+  externalClusters:
+    - name: clusterBackup
+      barmanObjectStore:
+        destinationPath: s3://pgbackup
+        endpointURL: http://192.168.8.102:9000
+        serverName: postgres-v1
+        s3Credentials:
+          accessKeyId:
+            name: cloudnative-pg
+            key: minio_access_key_id
+          secretAccessKey:
+            name: cloudnative-pg
+            key: minio_secret_access_key
+  bootstrap:
+    initdb:
+      database: postgres-analytics
+      owner: postgres
+      secret:
+        name: postgres-analytics
+      postInitSQL:
+        # Required extensions
+        - "CREATE EXTENSION IF NOT EXISTS citus;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+
+        - "CREATE EXTENSION IF NOT EXISTS pg_cron;"
+        - "CREATE EXTENSION IF NOT EXISTS citus_columnar;"
+        - "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+        - "CREATE EXTENSION IF NOT EXISTS postgres_fdw;"
+
+        - "ALTER SYSTEM SET citus.shard_count = '64';"
+
+        - "SELECT citus_add_node('postgres-analytics-worker-1-rw', 5432);"
+        - "SELECT citus_add_node('postgres-analytics-worker-2-rw', 5432);"
+        - "SELECT citus_add_node('postgres-analytics-worker-3-rw', 5432);"
+        - "SELECT citus_add_node('postgres-analytics-worker-4-rw', 5432);"
+        - "SELECT cron.schedule('vacuum-analyze-weekly', '0 3 * * 0', 'VACUUM ANALYZE;');"

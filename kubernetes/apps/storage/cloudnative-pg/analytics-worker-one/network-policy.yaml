@@ -1,0 +1,339 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-analytics-worker-one-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: network-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    security-level: strict
+  annotations:
+    network-policy.kubernetes.io/type: "zero-trust"
+    security.cnpg.io/policy-version: "v1.2"
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: postgres-analytics-worker-one
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/allowed-postgres-access: "true"
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/database-client: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9187  
+        - protocol: TCP
+          port: 8000  
+
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8000  
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: backup
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: backup
+      ports:
+        - protocol: TCP
+          port: 5432
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 123
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443  
+        - protocol: TCP
+          port: 80   
+      namespaceSelector: {}
+
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-analytics-worker-one
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443  
+        - protocol: TCP
+          port: 443   
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudnative-pg-analytics-worker-one-operator-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: operator-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+    security-level: strict
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 9443  
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080  
+
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8081  
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-analytics-worker-one
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8000
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-analytics-worker-one-backup-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-backup
+    app.kubernetes.io/component: backup-security
+    app.kubernetes.io/part-of: postgresql
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/backup: "true"
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-analytics-worker-one
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: security-baseline
+    app.kubernetes.io/component: network-security
+    security-policy: default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-analytics-worker-one-client-access-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-client-access
+    app.kubernetes.io/component: client-security
+    app.kubernetes.io/part-of: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/database-client: "true"
+  policyTypes:
+    - Egress
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-analytics-worker-one
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-analytics-worker-one-pooler-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: postgresql-pooler
+    app.kubernetes.io/component: pooler-security
+    app.kubernetes.io/part-of: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/pooler: postgres-analytics-worker-one
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/allowed-postgres-access: "true"
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/database-client: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9127  
+
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres-analytics-worker-one
+      ports:
+        - protocol: TCP
+          port: 5432

@@ -1,0 +1,23 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-analytics-worker-one-pdb
+  namespace: storage
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-analytics-worker-one
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-analytics-worker-one-primary-pdb
+  namespace: storage
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      cnpg.io/cluster: postgres-analytics-worker-one
+      cnpg.io/instanceRole: primary 
