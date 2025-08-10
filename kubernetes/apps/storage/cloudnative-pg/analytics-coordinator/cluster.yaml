@@ -5,10 +5,8 @@ kind: Cluster
 metadata:
   name: postgres-analytics-coordinator
   namespace: storage
-podTemplate:
-  metadata:
-    labels:
-      citus-cluster: postgres-analytics-coordinator
+  labels:
+    citus-cluster: postgres-analytics-coordinator
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
