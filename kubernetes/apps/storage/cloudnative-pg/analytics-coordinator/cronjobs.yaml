@@ -3,10 +3,11 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: analytics-optimization
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    app.kubernetes.io/name: analytics-optimization
+    citus-cluster: cloudnative-pg-analytics-coordinator
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: maintenance
     app.kubernetes.io/part-of: postgresql
 spec:
@@ -15,7 +16,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: postgres-query-accelerator
+          serviceAccountName: cloudnative-pg-analytics-coordinator
           containers:
             - name: optimization
               image: postgres:17.2
@@ -42,20 +43,20 @@ spec:
 
               env:
                 - name: POSTGRES_HOST
-                  value: "postgres-analytics-engine-rw.storage.svc.cluster.local"
+                  value: "cloudnative-pg-analytics-coordinator-rw.storage.svc.cluster.local"
                 - name: POSTGRES_PORT
                   value: "5432"
                 - name: POSTGRES_DB
-                  value: "analytics"
+                  value: "cloudnative-pg-analytics-coordinator"
                 - name: POSTGRES_USER
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-analytics
+                      name: cloudnative-pg-analytics-coordinator
                       key: username
                 - name: POSTGRES_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: postgres-analytics
+                      name: cloudnative-pg-analytics-coordinator
                       key: password
 
               resources:

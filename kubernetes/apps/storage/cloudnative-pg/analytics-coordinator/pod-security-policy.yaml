@@ -2,9 +2,10 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-policy
     app.kubernetes.io/part-of: postgresql
@@ -42,7 +43,7 @@ spec:
       type: "spc_t"
       level: "s0:c123,c456"
 
-  serviceAccountName: postgres-instance
+  serviceAccountName: cloudnative-pg-analytics-coordinator
   automountServiceAccountToken: false
 
   nodeSelector:
@@ -67,7 +68,7 @@ spec:
         - labelSelector:
             matchLabels:
               app.kubernetes.io/name: postgresql
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-coordinator
           topologyKey: kubernetes.io/hostname
 
   tolerations:
@@ -86,7 +87,7 @@ spec:
   preemptionPolicy: Never
 
   containers:
-    - name: postgres
+    - name: cloudnative-pg-analytics-coordinator
       image: ghcr.io/cloudnative-pg/postgresql:17.2
       imagePullPolicy: IfNotPresent
 
@@ -121,9 +122,9 @@ spec:
 
       env:
         - name: PGUSER
-          value: "postgres"
+          value: "cloudnative-pg-analytics-coordinator"
         - name: POSTGRES_DB
-          value: "postgres"
+          value: "cloudnative-pg-analytics-coordinator"
         - name: PGTZ
           value: "UTC"
         - name: TZ
@@ -281,15 +282,16 @@ spec:
   terminationGracePeriodSeconds: 180
 
   imagePullSecrets:
-    - name: postgres-registry-secret
+    - name: cloudnative-pg-analytics-coordinator
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-security-config
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: security-config
     app.kubernetes.io/part-of: postgresql
@@ -349,9 +351,10 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
+    citus-cluster: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: network-security
     app.kubernetes.io/part-of: postgresql
@@ -359,7 +362,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: cloudnative-pg-analytics-coordinator
   policyTypes:
     - Ingress
     - Egress
@@ -389,7 +392,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-coordinator
       ports:
         - protocol: TCP
           port: 5432
@@ -405,7 +408,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-coordinator
       ports:
         - protocol: TCP
           port: 5432

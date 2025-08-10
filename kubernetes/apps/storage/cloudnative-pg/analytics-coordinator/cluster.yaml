@@ -3,10 +3,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
-    citus-cluster: postgres-analytics-coordinator
+    citus-cluster: cloudnative-pg-analytics-coordinator
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
@@ -26,7 +26,7 @@ spec:
       whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
-          citus-cluster: postgres-analytics-coordinator
+          citus-cluster: cloudnative-pg-analytics-coordinator
   affinity:
     enablePodAntiAffinity: true
     podAntiAffinityType: required
@@ -94,10 +94,10 @@ spec:
             key: minio_secret_access_key
   bootstrap:
     initdb:
-      database: postgres-analytics
+      database: cloudnative-pg-analytics-coordinator
       owner: postgres
       secret:
-        name: postgres-analytics
+        name: cloudnative-pg-analytics-coordinator
       postInitSQL:
         # Required extensions
         - "CREATE EXTENSION IF NOT EXISTS citus;"

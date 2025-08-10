@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: postgres-cluster-sa
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
 
 ---
@@ -11,14 +11,14 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: postgres-instance
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-instance
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
 automountServiceAccountToken: true
 
 ---
@@ -26,7 +26,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-cluster-role
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
 rules:
   # Pod management
@@ -109,7 +109,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-cluster-cluster-role
+  name: cloudnative-pg-analytics-coordinator
 rules:
   # Node access for monitoring
   - apiGroups: [""]
@@ -151,44 +151,44 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: postgres-cluster-rolebinding
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
 subjects:
   - kind: ServiceAccount
-    name: postgres-cluster-sa
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-cluster-role
+  name: cloudnative-pg-analytics-coordinator
 
 ---
 # ClusterRoleBinding for cluster-scoped permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: postgres-cluster-cluster-rolebinding
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-cluster-sa
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: postgres-cluster-cluster-role
+  name: cloudnative-pg-analytics-coordinator
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: postgres-operator
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-operator
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
 automountServiceAccountToken: true
 
 ---
@@ -196,7 +196,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-operator
+  name: cloudnative-pg-analytics-coordinator
   labels:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: rbac
@@ -273,7 +273,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: postgres-operator
+  name: cloudnative-pg-analytics-coordinator
   labels:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: rbac
@@ -281,10 +281,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: postgres-operator
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-operator
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 
 ---
@@ -292,7 +292,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-instance
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -334,7 +334,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: postgres-instance
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -343,10 +343,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-instance
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-instance
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 
 ---
@@ -354,7 +354,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -396,7 +396,7 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: postgres-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -411,7 +411,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: postgres-backup
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-backup
@@ -431,7 +431,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: postgres-monitoring
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-monitoring
@@ -458,14 +458,14 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: postgres-monitoring
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
     app.kubernetes.io/part-of: postgresql
   annotations:
-    kubernetes.io/service-account.name: postgres-monitoring
+    kubernetes.io/service-account.name: cloudnative-pg-analytics-coordinator
 automountServiceAccountToken: true
 
 ---
@@ -473,7 +473,7 @@ automountServiceAccountToken: true
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: postgres-monitoring
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql-monitoring
@@ -482,10 +482,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: postgres-monitoring
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-monitoring
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage
 
 ---
@@ -493,7 +493,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: postgres-monitoring-cluster
+  name: cloudnative-pg-analytics-coordinator
   labels:
     app.kubernetes.io/name: postgresql-monitoring
     app.kubernetes.io/component: rbac
@@ -517,8 +517,8 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: postgres-monitoring-cluster
+  name: cloudnative-pg-analytics-coordinator
 subjects:
   - kind: ServiceAccount
-    name: postgres-monitoring
+    name: cloudnative-pg-analytics-coordinator
     namespace: storage

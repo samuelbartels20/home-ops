@@ -373,3 +373,15 @@ metadata:
 stringData:
      username: op://K8s/cloudnative-pg-analytics-worker-two/username
      password: op://K8s/cloudnative-pg-analytics-worker-two/password
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloudnative-pg-analytics-coordinator
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     username: op://K8s/cloudnative-pg-analytics-coordinator/username
+     password: op://K8s/cloudnative-pg-analytics-coordinator/password

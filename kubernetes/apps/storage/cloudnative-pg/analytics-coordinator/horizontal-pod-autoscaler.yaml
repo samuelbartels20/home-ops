@@ -1,13 +1,15 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: postgres-hpa
+  name: cloudnative-pg-analytics-coordinator
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-coordinator
 spec:
   scaleTargetRef:
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
-    name: postgres-analytics
+    name: cloudnative-pg-analytics-coordinator
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -30,7 +32,7 @@ spec:
       describedObject:
         apiVersion: postgresql.cnpg.io/v1
         kind: Cluster
-        name: postgres-analytics
+        name: cloudnative-pg-analytics-coordinator
       target:
         type: AverageValue
         averageValue: "100"
