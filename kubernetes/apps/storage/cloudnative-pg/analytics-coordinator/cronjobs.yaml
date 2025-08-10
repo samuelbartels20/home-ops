@@ -9,7 +9,7 @@ metadata:
     citus-cluster: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: maintenance
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
 spec:
   schedule: "0 2 * * *"
   jobTemplate:
