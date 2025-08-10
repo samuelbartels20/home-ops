@@ -3,8 +3,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-analytics-coordinator
+  name: cloudnative-pg-analytics-worker-four
   namespace: storage
+  labels:
+    citus-cluster: cloudnative-pg-analytics-worker-four
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
@@ -18,6 +20,29 @@ spec:
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          citus-cluster: cloudnative-pg-analytics-worker-four 
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+    additionalPodAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: In
+                values:
+                  - postgres-analytics-coordinator
+                  - cloudnative-pg-analytics-worker-one
+                  - cloudnative-pg-analytics-worker-two
+                  - cloudnative-pg-analytics-worker-three
+          topologyKey: kubernetes.io/hostname
   postgresql:
     shared_preload_libraries:
       - citus
