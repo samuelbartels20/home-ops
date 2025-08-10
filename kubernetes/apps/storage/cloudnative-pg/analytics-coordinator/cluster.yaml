@@ -17,6 +17,20 @@ spec:
     storageClass: openebs-hostpath
   superuserSecret:
     name: cloudnative-pg
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchExpressions:
+      - key: cnpg.io/cluster
+        operator: In
+        values:
+        - postgres-analytics-coordinator
+        - cloudnative-pg-analytics-worker-one
+        - cloudnative-pg-analytics-worker-two
+        - cloudnative-pg-analytics-worker-three
+        - cloudnative-pg-analytics-worker-four
   enableSuperuserAccess: true
   postgresql:
     shared_preload_libraries:

@@ -3,7 +3,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgres-analytics-coordinator
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
 spec:
   instances: 1
@@ -16,7 +16,21 @@ spec:
     size: 5Gi
     storageClass: openebs-hostpath
   superuserSecret:
-    name: cloudnative-pg
+    name: cloudnative-pg-analytics-worker-two
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchExpressions:
+      - key: cnpg.io/cluster
+        operator: In
+        values:
+        - postgres-analytics-coordinator
+        - cloudnative-pg-analytics-worker-one
+        - cloudnative-pg-analytics-worker-two
+        - cloudnative-pg-analytics-worker-three
+        - cloudnative-pg-analytics-worker-four
   enableSuperuserAccess: true
   postgresql:
     shared_preload_libraries:
@@ -68,10 +82,10 @@ spec:
             key: minio_secret_access_key
   bootstrap:
     initdb:
-      database: postgres-analytics
+      database: cloudnative-pg-analytics-worker-two
       owner: postgres
       secret:
-        name: postgres-analytics
+        name: cloudnative-pg-analytics-worker-two
       postInitSQL:
         # Required extensions
         - "CREATE EXTENSION IF NOT EXISTS citus;"
@@ -84,8 +98,8 @@ spec:
 
         - "ALTER SYSTEM SET citus.shard_count = '64';"
 
-        - "SELECT citus_add_node('postgres-analytics-worker-1-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-2-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-3-rw', 5432);"
-        - "SELECT citus_add_node('postgres-analytics-worker-4-rw', 5432);"
+        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-1-rw', 5432);"
+        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-2-rw', 5432);"
+        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-3-rw', 5432);"
+        - "SELECT citus_add_node('cloudnative-pg-analytics-worker-4-rw', 5432);"
         - "SELECT cron.schedule('vacuum-analyze-weekly', '0 3 * * 0', 'VACUUM ANALYZE;');"
