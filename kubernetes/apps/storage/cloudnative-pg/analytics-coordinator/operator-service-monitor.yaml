@@ -18,7 +18,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
   endpoints:
     - port: metrics
       interval: 30s
