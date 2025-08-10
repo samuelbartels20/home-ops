@@ -5,7 +5,7 @@ metadata:
   name: postgres-analytics-pgbouncer
 spec:
   cluster:
-    name: postgres-analytics
+    name: postgres-analytics-coordinator
   instances: 3
   type: rw
   monitoring:
