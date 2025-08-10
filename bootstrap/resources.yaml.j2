@@ -351,7 +351,7 @@ stringData:
       POSTGRES_USER: op://K8s/cnpg-vector-backup/POSTGRES_USER
       POSTGRES_PASSWORD: op://K8s/cnpg-vector-backup/POSTGRES_PASSWORD
       POSTGRES_PORT: op://K8s/cnpg-vector-backup/POSTGRES_PORT
-
+---
 apiVersion: v1
 kind: Secret
 metadata:
@@ -362,3 +362,14 @@ metadata:
 stringData:
      username: op://K8s/cloudnative-pg-analytics-worker-one/username
      password: op://K8s/cloudnative-pg-analytics-worker-one/password
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloudnative-pg-analytics-worker-two
+    namespace: storage
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     username: op://K8s/cloudnative-pg-analytics-worker-two/username
+     password: op://K8s/cloudnative-pg-analytics-worker-two/password
