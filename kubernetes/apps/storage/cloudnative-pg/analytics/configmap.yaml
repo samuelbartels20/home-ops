@@ -18,14 +18,6 @@ data:
     citus.enable_partitionwise_sort = on
     citus.enable_partitionwise_limit = on
 
-  # TimescaleDB Configuration
-  timescaledb.conf: |
-    timescaledb.enable_partitionwise_join = on
-    timescaledb.enable_partitionwise_aggregate = on
-    timescaledb.enable_partitionwise_group_by = on
-    timescaledb.enable_partitionwise_sort = on
-    timescaledb.enable_partitionwise_limit = on
-
   citus-create.sql: |
     -- Run only if the citus extension is available (avoids errors on non-amd64 builds)
     DO $$
@@ -57,7 +49,7 @@ data:
     log_statement = 'ddl'
 
     # Extensions and Monitoring
-    shared_preload_libraries = 'pg_stat_statements,citus,timescaledb'
+    shared_preload_libraries = 'pg_stat_statements,citus'
     pg_stat_statements.max = 1000
     pg_stat_statements.track = top
     pg_stat_statements.save = on
