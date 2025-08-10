@@ -35,8 +35,12 @@ spec:
     additionalPodAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:
-            matchLabels:
-              citus-cluster: postgres-analytics-coordinator
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: In
+                values:
+                  - cloudnative-pg-analytics-worker-one
+                  - cloudnative-pg-analytics-worker-two
           topologyKey: kubernetes.io/hostname
   enableSuperuserAccess: true
   postgresql:

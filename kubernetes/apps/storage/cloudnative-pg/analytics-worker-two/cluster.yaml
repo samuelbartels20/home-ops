@@ -31,6 +31,20 @@ spec:
         - cloudnative-pg-analytics-worker-two
         - cloudnative-pg-analytics-worker-three
         - cloudnative-pg-analytics-worker-four
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+    additionalPodAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: In
+                values:
+                  - postgres-analytics-coordinator
+                  - cloudnative-pg-analytics-worker-one
+          topologyKey: kubernetes.io/hostname
   enableSuperuserAccess: true
   postgresql:
     shared_preload_libraries:
