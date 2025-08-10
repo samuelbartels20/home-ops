@@ -6,9 +6,9 @@ metadata:
   namespace: storage
   labels:
     citus-cluster: cloudnative-pg-analytics-coordinator
-    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/name: cloudnative-pg-analytics-coordinator
     app.kubernetes.io/component: network-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
     environment: production
     security-level: strict
   annotations:
@@ -116,7 +116,7 @@ metadata:
   labels:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: operator-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
     environment: production
     security-level: strict
 spec:
@@ -188,7 +188,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-backup
     app.kubernetes.io/component: backup-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
     environment: production
 spec:
   podSelector:
@@ -255,7 +255,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-client-access
     app.kubernetes.io/component: client-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
 spec:
   podSelector:
     matchLabels:
@@ -296,7 +296,7 @@ metadata:
   labels:
     app.kubernetes.io/name: postgresql-pooler
     app.kubernetes.io/component: pooler-security
-    app.kubernetes.io/part-of: postgresql
+    app.kubernetes.io/part-of: cloudnative-pg-analytics-coordinator
 spec:
   podSelector:
     matchLabels:
