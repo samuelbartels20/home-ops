@@ -12,6 +12,12 @@ metadata:
     backup-type: daily
     retention: long-term
     environment: production
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
+  annotations:
+    backup.cnpg.io/schedule: "daily"
+    backup.cnpg.io/retention: "90d"
+    backup.cnpg.io/compression: "bzip2"
+    backup.cnpg.io/encryption: "AES256"
 spec:
   schedule: "@daily"
   immediate: true
@@ -28,6 +34,7 @@ metadata:
   name: cloudnative-pg-analytics-worker-one-daily
   namespace: storage
   labels:
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: backup
     app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
@@ -63,6 +70,7 @@ metadata:
     backup-type: weekly
     retention: archive
     environment: production
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   annotations:
     backup.cnpg.io/schedule: "weekly"
     backup.cnpg.io/retention: "1y"
@@ -93,6 +101,7 @@ metadata:
     backup-type: monthly
     retention: compliance
     environment: production
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   annotations:
     backup.cnpg.io/schedule: "monthly"
     backup.cnpg.io/retention: "7y"

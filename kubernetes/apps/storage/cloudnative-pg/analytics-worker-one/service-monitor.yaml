@@ -11,6 +11,7 @@ metadata:
     app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
     monitoring: prometheus
     environment: production
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   annotations:
     prometheus.io/scrape: "true"
     monitoring.cnpg.io/cluster: "cloudnative-pg-analytics-worker-one"

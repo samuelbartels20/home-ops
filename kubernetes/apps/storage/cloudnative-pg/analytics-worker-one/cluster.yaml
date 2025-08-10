@@ -6,7 +6,7 @@ metadata:
   name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
-    citus-cluster: cloudnative-pg-analytics-worker-one
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
 spec:
   instances: 1
   imageName: "ghcr.io/samuelbartels20/postgres-cnpg-citus:17.2-citus12.1"
@@ -25,11 +25,20 @@ spec:
       whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
-          citus-cluster: cloudnative-pg-analytics-worker-one
+          cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   affinity:
     enablePodAntiAffinity: true
     podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
+    nodeSelector:
+      kubernetes.io/hostname: control-plane-2
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
     additionalPodAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         - labelSelector:

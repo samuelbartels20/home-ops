@@ -32,7 +32,7 @@ spec:
     podAntiAffinityType: required
     topologyKey: kubernetes.io/hostname
     nodeSelector:
-      kubernetes.io/hostname: control-plane-1
+      kubernetes.io/hostname: control-plane-3
     tolerations:
       - key: "node-role.kubernetes.io/control-plane"
         operator: "Exists"

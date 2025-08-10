@@ -290,6 +290,7 @@ metadata:
   name: cloudnative-pg-analytics-worker-one
   namespace: storage
   labels:
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: security-config
     app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one

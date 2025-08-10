@@ -7,6 +7,7 @@ metadata:
   labels:
     prometheus: k8s
     role: alert-rules
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
 spec:
   groups:
     - name: cloudnative-pg-analytics-worker-one.rules

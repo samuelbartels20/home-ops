@@ -18,6 +18,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-one
   endpoints:
     - port: metrics
       interval: 30s

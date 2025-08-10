@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg-analytics-worker-one
     app.kubernetes.io/component: maintenance
     app.kubernetes.io/part-of: cloudnative-pg-analytics-worker-one
-    citus-cluster: cloudnative-pg-analytics-worker-one
+    cnpg.io/cluster: cloudnative-pg-analytics-worker-one
 spec:
   schedule: "0 2 * * *"
   jobTemplate:
