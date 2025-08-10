@@ -39,6 +39,8 @@ spec:
                 values:
                   - cloudnative-pg-analytics-worker-one
                   - cloudnative-pg-analytics-worker-two
+                  - cloudnative-pg-analytics-worker-three
+                  - cloudnative-pg-analytics-worker-four
           topologyKey: kubernetes.io/hostname
   enableSuperuserAccess: true
   postgresql:
