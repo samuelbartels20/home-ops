@@ -83,7 +83,6 @@ spec:
         - "CREATE EXTENSION IF NOT EXISTS postgres_fdw;"
 
         - "ALTER SYSTEM SET citus.shard_count = '64';"
-        - "ALTER SYSTEM SET citus.replication_factor = '2';"
 
         - "SELECT citus_add_node('postgres-analytics-worker-1-rw', 5432);"
         - "SELECT citus_add_node('postgres-analytics-worker-2-rw', 5432);"
