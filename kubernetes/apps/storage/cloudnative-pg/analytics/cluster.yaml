@@ -15,13 +15,6 @@ spec:
   walStorage:
     size: 5Gi
     storageClass: openebs-hostpath
-  tablespaces:
-    - name: hot_data
-      storage: { size: 20Gi, storageClass: openebs-hostpath }
-    - name: warm_data
-      storage: { size: 20Gi, storageClass: openebs-hostpath }
-    - name: cold_data
-      storage: { size: 20Gi, storageClass: openebs-hostpath }
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
