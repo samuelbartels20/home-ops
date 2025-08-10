@@ -2,10 +2,10 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: postgres-analytics
+  name: cloudnative-pg-analytics-worker-two
   namespace: storage
   labels:
-    app.kubernetes.io/name: postgres-analytics
+    app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
     app.kubernetes.io/component: analytics
     app.kubernetes.io/part-of: postgresql
     environment: production
@@ -60,13 +60,13 @@ spec:
                 done
 
             env:
-              POSTGRES_HOST: "postgres-analytics-engine-rw.storage.svc.cluster.local"
+              POSTGRES_HOST: "cloudnative-pg-analytics-engine-rw.storage.svc.cluster.local"
               POSTGRES_PORT: "5432"
-              POSTGRES_DB: "analytics"
+              POSTGRES_DB: "cloudnative-pg-analytics-worker-two"
 
             envFrom:
               - secretRef:
-                  name: postgres-analytics
+                  name: cloudnative-pg-analytics-worker-two
 
             resources:
               requests:
@@ -90,8 +90,8 @@ spec:
 
         pod:
           labels:
-            app.kubernetes.io/name: postgres-analytics
-            app.kubernetes.io/instance: postgres-analytics
+            app.kubernetes.io/name: cloudnative-pg-analytics-worker-two
+            app.kubernetes.io: cloudnative-pg-analytics-worker-two
             app.kubernetes.io/component: analytics
             monitoring: "true"
 
@@ -114,7 +114,7 @@ spec:
       analytics-scripts:
         enabled: true
         type: configMap
-        name: postgres-analytics-config
+        name: cloudnative-pg-analytics-worker-two-config
         defaultMode: 0755
         globalMounts:
           - path: /scripts
@@ -122,4 +122,4 @@ spec:
 
     serviceAccount:
       create: false
-      name: postgres-analytics
+      name: cloudnative-pg-analytics-worker-two

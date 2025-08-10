@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-worker-two-security-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -42,7 +42,7 @@ spec:
       type: "spc_t"
       level: "s0:c123,c456"
 
-  serviceAccountName: postgres-instance
+  serviceAccountName: cloudnative-pg-analytics-worker-two-instance
   automountServiceAccountToken: false
 
   nodeSelector:
@@ -67,7 +67,7 @@ spec:
         - labelSelector:
             matchLabels:
               app.kubernetes.io/name: postgresql
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-two
           topologyKey: kubernetes.io/hostname
 
   tolerations:
@@ -233,11 +233,11 @@ spec:
   volumes:
     - name: pgdata
       persistentVolumeClaim:
-        claimName: pgdata-postgres-1
+        claimName: pgdata-cloudnative-pg-analytics-worker-two-1
 
     - name: pgwal
       persistentVolumeClaim:
-        claimName: pgwal-postgres-1
+        claimName: pgwal-cloudnative-pg-analytics-worker-two-1
 
     - name: tmp
       emptyDir:
@@ -250,12 +250,12 @@ spec:
 
     - name: config
       configMap:
-        name: postgres-config
+        name: cloudnative-pg-analytics-worker-two-config
         defaultMode: 0444
 
     - name: tls-certs
       secret:
-        secretName: postgres-tls-certs
+        secretName: cloudnative-pg-analytics-worker-two-tls-certs
         defaultMode: 0400
         items:
           - key: tls.crt
@@ -349,7 +349,7 @@ data:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: postgres-security-policy
+  name: cloudnative-pg-analytics-worker-two-security-policy
   namespace: storage
   labels:
     app.kubernetes.io/name: postgresql
@@ -359,7 +359,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      cnpg.io/cluster: postgres
+      cnpg.io/cluster: cloudnative-pg-analytics-worker-two
   policyTypes:
     - Ingress
     - Egress
@@ -368,10 +368,10 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              postgres-access: "allowed"
+              cloudnative-pg-analytics-worker-two-access: "allowed"
         - podSelector:
             matchLabels:
-              postgres-client: "true"
+              cloudnative-pg-analytics-worker-two-client: "true"
       ports:
         - protocol: TCP
           port: 5432
@@ -379,7 +379,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              name: observability
+              name: cloudnative-pg-analytics-worker-two-observability
       ports:
         - protocol: TCP
           port: 9187  
@@ -389,7 +389,7 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-two
       ports:
         - protocol: TCP
           port: 5432
@@ -405,7 +405,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              cnpg.io/cluster: postgres
+              cnpg.io/cluster: cloudnative-pg-analytics-worker-two
       ports:
         - protocol: TCP
           port: 5432

@@ -3,7 +3,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: cloudnative-pg-operator
+  name: cloudnative-pg-analytics-worker-two-operator
   namespace: storage
   labels:
     app.kubernetes.io/name: cloudnative-pg
@@ -40,7 +40,7 @@ spec:
           regex: 'cnpg_.*|controller_runtime_.*|workqueue_.*'
           action: keep
         - targetLabel: cluster
-          replacement: postgres-analytics
+          replacement: cloudnative-pg-analytics-worker-two
   namespaceSelector:
     matchNames:
       - storage
