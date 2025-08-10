@@ -13,11 +13,11 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: cloudnative-pg-analytics-coordinator
+  name: cloudnative-pg-analytics-coordinator-primary
   namespace: storage
 spec:
   minAvailable: 1
   selector:
     matchLabels:
       cnpg.io/cluster: cloudnative-pg-analytics-coordinator
-      cnpg.io/instanceRole: primary 
+      cnpg.io/instanceRole: primary
