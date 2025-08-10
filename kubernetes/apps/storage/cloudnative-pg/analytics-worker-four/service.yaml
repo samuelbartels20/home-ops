@@ -9,7 +9,7 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-    - name: postgres
+    - name: cloudnative-pg-analytics-worker-four
       port: 5432
       protocol: TCP
       targetPort: 5432
