@@ -20,23 +20,23 @@ spec:
   superuserSecret:
     name: cloudnative-pg
   enableSuperuserAccess: true
-  topologySpreadConstraints: []
-  affinity:
-    enablePodAntiAffinity: true
-    podAntiAffinityType: required
-    topologyKey: kubernetes.io/hostname
-    additionalPodAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - key: cnpg.io/cluster
-                operator: In
-                values:
-                  - cloudnative-pg-analytics-worker-one
-                  - cloudnative-pg-analytics-worker-two
-                  - cloudnative-pg-analytics-worker-three
-                  - cloudnative-pg-analytics-worker-four
-          topologyKey: kubernetes.io/hostname
+  # topologySpreadConstraints: []
+  # affinity:
+  #   enablePodAntiAffinity: true
+  #   podAntiAffinityType: required
+  #   topologyKey: kubernetes.io/hostname
+  #   additionalPodAntiAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       - labelSelector:
+  #           matchExpressions:
+  #             - key: cnpg.io/cluster
+  #               operator: In
+  #               values:
+  #                 - cloudnative-pg-analytics-worker-one
+  #                 - cloudnative-pg-analytics-worker-two
+  #                 - cloudnative-pg-analytics-worker-three
+  #                 - cloudnative-pg-analytics-worker-four
+  #         topologyKey: kubernetes.io/hostname
 
   postgresql:
     shared_preload_libraries:

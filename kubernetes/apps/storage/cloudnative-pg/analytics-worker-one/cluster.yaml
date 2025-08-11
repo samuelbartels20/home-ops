@@ -19,32 +19,32 @@ spec:
     storageClass: openebs-hostpath
   superuserSecret:
     name: cloudnative-pg-analytics-worker-one
-  topologySpreadConstraints: []
-  affinity:
-    enablePodAntiAffinity: true
-    podAntiAffinityType: required
-    topologyKey: kubernetes.io/hostname
-    nodeSelector:
-      kubernetes.io/hostname: control-plane-2
-    tolerations:
-      - key: "node-role.kubernetes.io/control-plane"
-        operator: "Exists"
-        effect: "NoSchedule"
-      - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
-        effect: "NoSchedule"
-    additionalPodAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchExpressions:
-              - key: cnpg.io/cluster
-                operator: In
-                values:
-                  - postgres-analytics-coordinator
-                  - cloudnative-pg-analytics-worker-two
-                  - cloudnative-pg-analytics-worker-three
-                  - cloudnative-pg-analytics-worker-four
-          topologyKey: kubernetes.io/hostname
+  # topologySpreadConstraints: []
+  # affinity:
+  #   enablePodAntiAffinity: true
+  #   podAntiAffinityType: required
+  #   topologyKey: kubernetes.io/hostname
+  #   nodeSelector:
+  #     kubernetes.io/hostname: control-plane-2
+  #   tolerations:
+  #     - key: "node-role.kubernetes.io/control-plane"
+  #       operator: "Exists"
+  #       effect: "NoSchedule"
+  #     - key: "node-role.kubernetes.io/master"
+  #       operator: "Exists"
+  #       effect: "NoSchedule"
+  #   additionalPodAntiAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #       - labelSelector:
+  #           matchExpressions:
+  #             - key: cnpg.io/cluster
+  #               operator: In
+  #               values:
+  #                 - postgres-analytics-coordinator
+  #                 - cloudnative-pg-analytics-worker-two
+  #                 - cloudnative-pg-analytics-worker-three
+  #                 - cloudnative-pg-analytics-worker-four
+  #         topologyKey: kubernetes.io/hostname
   enableSuperuserAccess: true
   postgresql:
     shared_preload_libraries:
