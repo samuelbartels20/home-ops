@@ -1,6 +1,4 @@
 ---
-# Production ServiceMonitor for Kromgo Metrics Badge Service
-# Comprehensive monitoring for kromgo performance, health, and operational metrics
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
