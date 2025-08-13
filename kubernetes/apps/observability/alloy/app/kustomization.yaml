@@ -1,0 +1,133 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+metadata:
+  name: alloy
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: telemetry-collector
+    observability.samcloud.online/tier: production
+
+resources:
+  # Core Alloy deployment
+  - ./helmrelease.yaml
+
+  # Security and RBAC
+  - ./security-policy.yaml
+  - ./networkpolicy.yaml
+
+  # Monitoring and alerting
+  - ./monitoring.yaml
+
+  # Backup and disaster recovery
+  - ./backup-restore.yaml
+
+  # Big Tech Standards Implementation
+  - ./advanced-cost-controls.yaml
+  - ./multi-region-architecture.yaml
+  - ./compliance-automation.yaml
+  - ./chaos-engineering.yaml
+
+configMapGenerator:
+  # Main Alloy configuration
+  - name: alloy-configmap
+    files:
+      - ./resources/config.alloy
+    options:
+      disableNameSuffixHash: true
+      labels:
+        app.kubernetes.io/name: alloy
+        app.kubernetes.io/component: configuration
+        observability.samcloud.online/tier: production
+
+# Production-grade labels for all resources
+commonLabels:
+  app.kubernetes.io/name: alloy
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: observability-stack
+  observability.samcloud.online/tier: production
+  observability.samcloud.online/component: telemetry-collector
+
+# Production annotations
+commonAnnotations:
+  alloy.observability.com/version: "v1.4.0"
+  alloy.observability.com/cluster: "home-ops-production"
+  alloy.observability.com/environment: "production"
+  documentation.url: "https://grafana.com/docs/alloy/latest/"
+  support.contact: "observability-team@homelab.local"
+
+# Images for production use
+images:
+  - name: grafana/alloy
+    newTag: v1.4.0
+  - name: registry.k8s.io/kubectl
+    newTag: v1.28.0
+  - name: alpine
+    newTag: "3.18"
+
+# Patches for production hardening
+patchesStrategicMerge:
+  - |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: alloy
+      namespace: observability
+    spec:
+      template:
+        metadata:
+          annotations:
+            # Security scanning
+            trivy-scanner/scan: "true"
+            falco-security/monitor: "true"
+
+            # Compliance
+            compliance.security.io/cis: "true"
+            compliance.security.io/nist: "true"
+            compliance.security.io/soc2: "true"
+
+            # Production tracking
+            deployment.kubernetes.io/revision: "latest"
+            kubectl.kubernetes.io/last-applied-configuration: ""
+
+        spec:
+          # Production security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+
+# Replacements for environment-specific values
+replacements:
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.cluster-name
+    targets:
+      - select:
+          kind: ConfigMap
+          name: alloy-configmap
+        fieldPaths:
+          - data.config\.alloy
+        options:
+          delimiter: "cluster = \""
+          index: 1
+
+  - source:
+      kind: ConfigMap
+      name: cluster-config
+      fieldPath: data.environment
+    targets:
+      - select:
+          kind: ConfigMap
+          name: alloy-configmap
+        fieldPaths:
+          - data.config\.alloy
+        options:
+          delimiter: "environment = \""
+          index: 1

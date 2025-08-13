@@ -1,0 +1,192 @@
+---
+# Production RBAC for Kromgo Metrics Badge Service
+# Minimal permissions following principle of least privilege
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kromgo
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: observability-infrastructure
+    production-grade: "true"
+  annotations:
+    security.kubernetes.io/description: "ServiceAccount for kromgo with minimal privileges"
+automountServiceAccountToken: false  # Security best practice
+
+---
+# ClusterRole with minimal required permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kromgo-reader
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: rbac
+    production-grade: "true"
+rules:
+# Read-only access to metrics endpoints (if needed for health checks)
+- apiGroups: [""]
+  resources: ["endpoints", "services"]
+  verbs: ["get", "list"]
+  resourceNames: ["prometheus-operated"]
+# No other permissions needed since kromgo only queries Prometheus via HTTP
+
+---
+# ClusterRoleBinding with minimal scope
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kromgo-reader
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: rbac
+    production-grade: "true"
+subjects:
+- kind: ServiceAccount
+  name: kromgo
+  namespace: observability
+roleRef:
+  kind: ClusterRole
+  name: kromgo-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy for kromgo (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: kromgo-psp
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: security-policy
+    production-grade: "true"
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  # Privilege escalation
+  allowPrivilegeEscalation: false
+
+  # Required to prevent escalations to root
+  requiresNonRoot: true
+  runAsUser:
+    rule: 'MustRunAs'
+    ranges:
+    - min: 65534
+      max: 65534
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+    - min: 65534
+      max: 65534
+
+  # Security contexts
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+    - min: 65534
+      max: 65534
+
+  # Volumes
+  volumes:
+  - 'configMap'
+  - 'emptyDir'
+  - 'projected'
+  - 'secret'
+  - 'downwardAPI'
+
+  # Capabilities
+  allowedCapabilities: []
+  defaultAllowPrivilegeEscalation: false
+
+  # File system
+  readOnlyRootFilesystem: true
+
+  # Networking
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+---
+# Role for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kromgo-psp
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: security-policy
+    production-grade: "true"
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames: ['kromgo-psp']
+
+---
+# RoleBinding for PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kromgo-psp
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: security-policy
+    production-grade: "true"
+subjects:
+- kind: ServiceAccount
+  name: kromgo
+  namespace: observability
+roleRef:
+  kind: Role
+  name: kromgo-psp
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Security Context Constraints for OpenShift (if applicable)
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: kromgo-scc
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: security-constraints
+    production-grade: "true"
+  annotations:
+    kubernetes.io/description: "SCC for kromgo with restricted privileges"
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 65534
+    max: 65534
+readOnlyRootFilesystem: true
+requiredDropCapabilities:
+- ALL
+runAsUser:
+  type: MustRunAs
+  uid: 65534
+seLinuxContext:
+  type: MustRunAs
+users:
+- system:serviceaccount:observability:kromgo
+volumes:
+- configMap
+- emptyDir
+- projected
+- secret
+- downwardAPI

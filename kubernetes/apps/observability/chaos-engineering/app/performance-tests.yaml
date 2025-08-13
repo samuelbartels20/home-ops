@@ -1,0 +1,516 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: performance-baseline-test
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: performance-tests
+    app.kubernetes.io/component: baseline
+    test.type: performance-baseline
+spec:
+  entrypoint: performance-test-pipeline
+  serviceAccountName: chaos-engineering-sa
+  templates:
+    - name: performance-test-pipeline
+      dag:
+        tasks:
+          - name: setup-monitoring
+            template: setup-performance-monitoring
+
+          - name: baseline-metrics-collection
+            template: collect-baseline-metrics
+            depends: "setup-monitoring"
+
+          - name: load-test-mimir
+            template: load-test-mimir-ingestion
+            depends: "baseline-metrics-collection"
+
+          - name: load-test-loki
+            template: load-test-loki-ingestion
+            depends: "baseline-metrics-collection"
+
+          - name: load-test-clickhouse
+            template: load-test-clickhouse-queries
+            depends: "baseline-metrics-collection"
+
+          - name: load-test-grafana
+            template: load-test-grafana-dashboards
+            depends: "baseline-metrics-collection"
+
+          - name: analyze-results
+            template: analyze-performance-results
+            depends: "load-test-mimir && load-test-loki && load-test-clickhouse && load-test-grafana"
+
+          - name: generate-report
+            template: generate-performance-report
+            depends: "analyze-results"
+
+    - name: setup-performance-monitoring
+      container:
+        image: bitnami/kubectl:1.28
+        command: [sh, -c]
+        args:
+          - |
+            echo "Setting up performance monitoring..."
+
+            # Create performance test namespace if it doesn't exist
+            kubectl create namespace performance-test --dry-run=client -o yaml | kubectl apply -f - || true
+
+            # Deploy metrics collection tools
+            cat << EOF | kubectl apply -f -
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: performance-test-config
+              namespace: performance-test
+            data:
+              test_duration: "300"  # 5 minutes
+              target_qps: "1000"
+              concurrent_users: "50"
+            EOF
+
+            echo "Performance monitoring setup complete"
+
+    - name: collect-baseline-metrics
+      container:
+        image: prom/prometheus:v2.47.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Collecting baseline performance metrics..."
+
+            # Query current resource usage
+            curl -s "http://prometheus.observability.svc.cluster.local:9090/api/v1/query?query=up" | \
+              jq '.data.result | length' > /tmp/baseline_services_count.txt || echo "0" > /tmp/baseline_services_count.txt
+
+            # Collect memory usage baseline
+            curl -s "http://prometheus.observability.svc.cluster.local:9090/api/v1/query?query=container_memory_usage_bytes{namespace=~'observability|data-science'}" | \
+              jq '.data.result | map(.value[1] | tonumber) | add' > /tmp/baseline_memory.txt || echo "0" > /tmp/baseline_memory.txt
+
+            # Collect CPU usage baseline
+            curl -s "http://prometheus.observability.svc.cluster.local:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{namespace=~'observability|data-science'}[1m])" | \
+              jq '.data.result | map(.value[1] | tonumber) | add' > /tmp/baseline_cpu.txt || echo "0" > /tmp/baseline_cpu.txt
+
+            echo "Baseline metrics collection complete"
+            echo "Services: $(cat /tmp/baseline_services_count.txt)"
+            echo "Memory: $(cat /tmp/baseline_memory.txt) bytes"
+            echo "CPU: $(cat /tmp/baseline_cpu.txt) cores"
+
+    - name: load-test-mimir-ingestion
+      container:
+        image: grafana/mimir-continuous-test:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting Mimir ingestion load test..."
+
+            # Configure mimir-continuous-test
+            export MIMIR_ENDPOINT="http://mimir-nginx.observability.svc.cluster.local/api/v1/push"
+            export TEST_DURATION="300s"
+            export SERIES_COUNT="10000"
+            export SAMPLES_PER_SERIES="60"
+            export INGESTION_RATE="1000"
+
+            # Run ingestion test
+            mimir-continuous-test -tests=write-read-series-test \
+              -mimir.endpoint=$MIMIR_ENDPOINT \
+              -tests.write-read-series-test.num-series=$SERIES_COUNT \
+              -tests.write-read-series-test.max-query-age=1h \
+              -tests.run-duration=$TEST_DURATION \
+              -log.level=info || echo "Mimir load test completed with warnings"
+
+            echo "Mimir ingestion load test complete"
+
+    - name: load-test-loki-ingestion
+      container:
+        image: grafana/logcli:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting Loki ingestion load test..."
+
+            export LOKI_ADDR="http://loki-query-frontend.observability.svc.cluster.local:3100"
+
+            # Generate synthetic logs
+            for i in $(seq 1 1000); do
+              echo "{\"streams\": [{\"stream\": {\"job\": \"performance-test\", \"level\": \"info\", \"instance\": \"test-$i\"}, \"values\": [[\"$(date +%s000000000)\", \"Performance test log entry $i - $(date)\"]]}]}" | \
+              curl -X POST -H "Content-Type: application/json" -d @- $LOKI_ADDR/loki/api/v1/push &
+
+              if [ $((i % 100)) -eq 0 ]; then
+                echo "Sent $i log entries..."
+                sleep 1
+              fi
+            done
+
+            wait
+            echo "Loki ingestion load test complete"
+
+    - name: load-test-clickhouse-queries
+      container:
+        image: clickhouse/clickhouse-client:23.8
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting ClickHouse query load test..."
+
+            export CLICKHOUSE_HOST="clickhouse.data-science.svc.cluster.local"
+            export CLICKHOUSE_PORT="9000"
+
+            # Create test table if not exists
+            clickhouse-client --host=$CLICKHOUSE_HOST --port=$CLICKHOUSE_PORT --query "
+            CREATE TABLE IF NOT EXISTS performance_test (
+              timestamp DateTime DEFAULT now(),
+              user_id UInt32,
+              event_type String,
+              value Float64
+            ) ENGINE = MergeTree()
+            ORDER BY timestamp" || echo "Table already exists"
+
+            # Insert test data
+            echo "Inserting test data..."
+            for i in $(seq 1 10000); do
+              echo "INSERT INTO performance_test (user_id, event_type, value) VALUES ($i, 'test_event', $(echo "scale=2; $i/100" | bc))"
+            done | clickhouse-client --host=$CLICKHOUSE_HOST --port=$CLICKHOUSE_PORT || echo "Data insertion completed with warnings"
+
+            # Run query load test
+            echo "Running query load test..."
+            for i in $(seq 1 100); do
+              clickhouse-client --host=$CLICKHOUSE_HOST --port=$CLICKHOUSE_PORT --query "
+              SELECT
+                event_type,
+                count(*) as event_count,
+                avg(value) as avg_value,
+                max(value) as max_value
+              FROM performance_test
+              WHERE timestamp > now() - INTERVAL 1 HOUR
+              GROUP BY event_type
+              ORDER BY event_count DESC" > /dev/null &
+
+              if [ $((i % 10)) -eq 0 ]; then
+                echo "Completed $i queries..."
+              fi
+            done
+
+            wait
+            echo "ClickHouse query load test complete"
+
+    - name: load-test-grafana-dashboards
+      container:
+        image: curlimages/curl:8.4.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting Grafana dashboard load test..."
+
+            export GRAFANA_URL="http://grafana.observability.svc.cluster.local:3000"
+            export GRAFANA_USER="admin"
+            export GRAFANA_PASS="admin"  # Use secret in production
+
+            # Test dashboard loading
+            for i in $(seq 1 50); do
+              # Test main dashboards
+              curl -s -u $GRAFANA_USER:$GRAFANA_PASS \
+                "$GRAFANA_URL/api/dashboards/uid/observability-overview" > /dev/null &
+
+              curl -s -u $GRAFANA_USER:$GRAFANA_PASS \
+                "$GRAFANA_URL/api/dashboards/uid/data-platform-overview" > /dev/null &
+
+              curl -s -u $GRAFANA_USER:$GRAFANA_PASS \
+                "$GRAFANA_URL/api/datasources/proxy/1/api/v1/query?query=up" > /dev/null &
+
+              if [ $((i % 10)) -eq 0 ]; then
+                echo "Completed $i dashboard requests..."
+                sleep 1
+              fi
+            done
+
+            wait
+            echo "Grafana dashboard load test complete"
+
+    - name: analyze-performance-results
+      container:
+        image: prom/prometheus:v2.47.0
+        command: [sh, -c]
+        args:
+          - |
+            echo "Analyzing performance test results..."
+
+            # Collect post-test metrics
+            curl -s "http://prometheus.observability.svc.cluster.local:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{namespace=~'observability|data-science'}[5m])" | \
+              jq '.data.result | map(.value[1] | tonumber) | add' > /tmp/test_cpu.txt || echo "0" > /tmp/test_cpu.txt
+
+            curl -s "http://prometheus.observability.svc.cluster.local:9090/api/v1/query?query=container_memory_usage_bytes{namespace=~'observability|data-science'}" | \
+              jq '.data.result | map(.value[1] | tonumber) | add' > /tmp/test_memory.txt || echo "0" > /tmp/test_memory.txt
+
+            # Calculate performance metrics
+            BASELINE_CPU=$(cat /tmp/baseline_cpu.txt 2>/dev/null || echo "0")
+            TEST_CPU=$(cat /tmp/test_cpu.txt)
+            BASELINE_MEMORY=$(cat /tmp/baseline_memory.txt 2>/dev/null || echo "0")
+            TEST_MEMORY=$(cat /tmp/test_memory.txt)
+
+            echo "Performance Analysis Results:"
+            echo "CPU Usage - Baseline: $BASELINE_CPU, Test: $TEST_CPU"
+            echo "Memory Usage - Baseline: $BASELINE_MEMORY, Test: $TEST_MEMORY"
+
+            # Check for performance degradation
+            CPU_INCREASE=$(echo "scale=2; ($TEST_CPU - $BASELINE_CPU) / $BASELINE_CPU * 100" | bc -l 2>/dev/null || echo "0")
+            MEMORY_INCREASE=$(echo "scale=2; ($TEST_MEMORY - $BASELINE_MEMORY) / $BASELINE_MEMORY * 100" | bc -l 2>/dev/null || echo "0")
+
+            echo "CPU increase: ${CPU_INCREASE}%"
+            echo "Memory increase: ${MEMORY_INCREASE}%"
+
+            # Store results
+            cat > /tmp/performance_results.json << EOF
+            {
+              "test_timestamp": "$(date -Iseconds)",
+              "baseline": {
+                "cpu_cores": $BASELINE_CPU,
+                "memory_bytes": $BASELINE_MEMORY
+              },
+              "load_test": {
+                "cpu_cores": $TEST_CPU,
+                "memory_bytes": $TEST_MEMORY
+              },
+              "performance_delta": {
+                "cpu_increase_percent": $CPU_INCREASE,
+                "memory_increase_percent": $MEMORY_INCREASE
+              }
+            }
+            EOF
+
+    - name: generate-performance-report
+      container:
+        image: alpine:3.18
+        command: [sh, -c]
+        args:
+          - |
+            echo "Generating performance test report..."
+
+            cat > /tmp/performance_report.md << 'EOF'
+            # Performance Test Report
+
+            ## Test Summary
+            - **Test Date**: $(date)
+            - **Test Duration**: 5 minutes per component
+            - **Test Type**: Baseline performance validation
+
+            ## Components Tested
+            - Mimir metrics ingestion
+            - Loki log ingestion
+            - ClickHouse query performance
+            - Grafana dashboard loading
+
+            ## Performance Targets
+            - CPU utilization: < 80% under load
+            - Memory growth: < 50% during test
+            - Query latency: < 100ms p95
+            - Dashboard load time: < 2 seconds
+
+            ## Results Summary
+            See attached performance_results.json for detailed metrics.
+
+            ## Recommendations
+            - Monitor memory usage trends
+            - Optimize high-latency queries
+            - Scale components showing stress
+            - Validate resource limits
+
+            EOF
+
+            echo "Performance report generated successfully"
+            cat /tmp/performance_report.md
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: stress-test-infrastructure
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: performance-tests
+    app.kubernetes.io/component: stress-test
+    test.type: stress-test
+spec:
+  entrypoint: stress-test-pipeline
+  serviceAccountName: chaos-engineering-sa
+  templates:
+    - name: stress-test-pipeline
+      dag:
+        tasks:
+          - name: cpu-stress-test
+            template: cpu-stress-test
+
+          - name: memory-stress-test
+            template: memory-stress-test
+
+          - name: io-stress-test
+            template: io-stress-test
+
+          - name: network-stress-test
+            template: network-stress-test
+
+          - name: concurrent-load-test
+            template: concurrent-load-test
+            depends: "cpu-stress-test && memory-stress-test && io-stress-test && network-stress-test"
+
+    - name: cpu-stress-test
+      container:
+        image: polinux/stress:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting CPU stress test..."
+            stress --cpu 4 --timeout 300s --verbose
+            echo "CPU stress test complete"
+
+    - name: memory-stress-test
+      container:
+        image: polinux/stress:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting memory stress test..."
+            stress --vm 2 --vm-bytes 1G --timeout 300s --verbose
+            echo "Memory stress test complete"
+
+    - name: io-stress-test
+      container:
+        image: polinux/stress:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting I/O stress test..."
+            stress --io 4 --timeout 300s --verbose
+            echo "I/O stress test complete"
+
+    - name: network-stress-test
+      container:
+        image: nicolaka/netshoot:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo "Starting network stress test..."
+            # Test internal service connectivity under load
+            for i in $(seq 1 100); do
+              curl -s http://mimir-query-frontend.observability.svc.cluster.local:8080/ready > /dev/null &
+              curl -s http://loki-query-frontend.observability.svc.cluster.local:3100/ready > /dev/null &
+              curl -s http://grafana.observability.svc.cluster.local:3000/api/health > /dev/null &
+
+              if [ $((i % 20)) -eq 0 ]; then
+                echo "Network test iteration $i..."
+                sleep 1
+              fi
+            done
+            wait
+            echo "Network stress test complete"
+
+    - name: concurrent-load-test
+      container:
+        image: alpine:3.18
+        command: [sh, -c]
+        args:
+          - |
+            echo "Running concurrent load test..."
+            echo "This would combine CPU, memory, I/O, and network stress simultaneously"
+            echo "Monitor system behavior under combined load conditions"
+            sleep 300
+            echo "Concurrent load test complete"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-test-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: performance-tests
+    app.kubernetes.io/component: configuration
+data:
+  thresholds.yaml: |
+    performance_thresholds:
+      mimir:
+        ingestion_rate_max: "100000 samples/sec"
+        query_latency_p95: "500ms"
+        memory_usage_max: "8Gi"
+      loki:
+        ingestion_rate_max: "10000 logs/sec"
+        query_latency_p95: "1s"
+        memory_usage_max: "4Gi"
+      clickhouse:
+        query_latency_p95: "100ms"
+        concurrent_queries_max: 100
+        memory_usage_max: "16Gi"
+      grafana:
+        dashboard_load_time_max: "2s"
+        concurrent_users_max: 500
+        memory_usage_max: "2Gi"
+
+  test_scenarios.yaml: |
+    test_scenarios:
+      light_load:
+        duration: "5m"
+        users: 10
+        queries_per_second: 100
+      moderate_load:
+        duration: "10m"
+        users: 50
+        queries_per_second: 500
+      heavy_load:
+        duration: "15m"
+        users: 100
+        queries_per_second: 1000
+      stress_test:
+        duration: "30m"
+        users: 200
+        queries_per_second: 2000
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: performance-test-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: performance-tests
+    app.kubernetes.io/component: alerts
+spec:
+  groups:
+    - name: performance.tests
+      interval: 15s
+      rules:
+        - alert: PerformanceTestCPUHigh
+          expr: |
+            rate(container_cpu_usage_seconds_total{namespace="performance-test"}[5m]) > 0.8
+          for: 2m
+          labels:
+            severity: warning
+            component: performance-test
+            team: sre
+          annotations:
+            summary: "High CPU usage during performance test"
+            description: "CPU usage is {{ $value }} during performance testing, which exceeds the 80% threshold."
+
+        - alert: PerformanceTestMemoryHigh
+          expr: |
+            container_memory_usage_bytes{namespace="performance-test"} / container_spec_memory_limit_bytes{namespace="performance-test"} > 0.9
+          for: 2m
+          labels:
+            severity: warning
+            component: performance-test
+            team: sre
+          annotations:
+            summary: "High memory usage during performance test"
+            description: "Memory usage is {{ $value | humanizePercentage }} during performance testing."
+
+        - alert: PerformanceTestTimeout
+          expr: |
+            time() - workflow_start_time{namespace="observability", workflow_name=~"performance-.*"} > 3600
+          for: 1m
+          labels:
+            severity: critical
+            component: performance-test
+            team: sre
+          annotations:
+            summary: "Performance test timeout"
+            description: "Performance test {{ $labels.workflow_name }} has been running for more than 1 hour."

@@ -1,0 +1,24 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+# OpenTelemetry Monitoring Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: opentelemetry-collector-rules
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  groups:
+    - name: opentelemetry.collector.rules
+      rules:
+        - alert: OpenTelemetryCollectorDown
+          expr: up{job="opentelemetry-collector"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenTelemetry Collector is down"
+            description: "OpenTelemetry Collector has been down for more than 5 minutes"

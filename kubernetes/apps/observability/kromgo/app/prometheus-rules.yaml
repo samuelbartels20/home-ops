@@ -1,0 +1,302 @@
+# yaml-language-server: disable
+---
+# Production PrometheusRule for Kromgo Metrics Badge Service
+# Comprehensive alerting for kromgo health, performance, and availability
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kromgo-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: observability-infrastructure
+    monitoring: prometheus
+    production-grade: "true"
+  annotations:
+    prometheus.io/description: "PrometheusRule for kromgo metrics badge service alerts"
+spec:
+  groups:
+
+  # =======================================
+  # KROMGO CRITICAL SERVICE ALERTS
+  # =======================================
+  - name: kromgo.critical
+    interval: 30s
+    rules:
+
+    # Service availability
+    - alert: KromgoServiceDown
+      expr: up{job=~".*kromgo.*"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        component: observability
+        service: kromgo
+        alert_type: availability
+        oncall_team: platform
+      annotations:
+        summary: "[CRITICAL] Kromgo metrics badge service is down"
+        description: |
+          Kromgo service has been down for more than 2 minutes on {{ $labels.instance }}.
+          Public metrics badges and endpoints are unavailable.
+
+          Impact: Public status badges are showing as failed
+          Action: Check kromgo pod status and logs immediately
+        runbook_url: "https://github.com/kashalls/kromgo/blob/main/docs/troubleshooting.md"
+        dashboard_url: "https://grafana.samcloud.online/d/kromgo/kromgo-dashboard"
+
+    # High availability
+    - alert: KromgoInsufficientReplicas
+      expr: kube_deployment_status_replicas_available{deployment="kromgo"} < 2
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: availability
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo has insufficient replicas running"
+        description: |
+          Kromgo has {{ $value }} replicas available, less than the expected 2+ for high availability.
+          Service may be vulnerable to outages.
+
+          Current: {{ $value }} replicas
+          Expected: 2+ replicas
+
+    # Health check failures
+    - alert: KromgoHealthCheckFailing
+      expr: kube_pod_container_status_ready{container="kromgo"} == 0
+      for: 3m
+      labels:
+        severity: critical
+        component: observability
+        service: kromgo
+        alert_type: health
+        oncall_team: platform
+      annotations:
+        summary: "[CRITICAL] Kromgo health checks are failing"
+        description: |
+          Kromgo container health checks have been failing for more than 3 minutes.
+          Pod: {{ $labels.pod }}
+
+          This indicates the service may not be responding to requests properly.
+
+  # =======================================
+  # KROMGO PERFORMANCE ALERTS
+  # =======================================
+  - name: kromgo.performance
+    interval: 30s
+    rules:
+
+    # High response time
+    - alert: KromgoHighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~".*kromgo.*"}[5m])) > 5
+      for: 10m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: performance
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo response time is high"
+        description: |
+          95th percentile response time for kromgo is {{ $value }}s, exceeding 5s threshold.
+          This may indicate performance issues or Prometheus connectivity problems.
+
+          Current P95: {{ $value }}s
+          Threshold: 5s
+
+    # High error rate
+    - alert: KromgoHighErrorRate
+      expr: rate(http_requests_total{job=~".*kromgo.*", code!~"2.*"}[5m]) / rate(http_requests_total{job=~".*kromgo.*"}[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: errors
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo error rate is elevated"
+        description: |
+          Kromgo error rate is {{ $value | humanizePercentage }}, exceeding 10% threshold.
+          Check logs for failed Prometheus queries or connectivity issues.
+
+          Error rate: {{ $value | humanizePercentage }}
+          Threshold: 10%
+
+    # Prometheus connectivity issues
+    - alert: KromgoPrometheusConnectivityFailure
+      expr: increase(prometheus_query_errors_total{job=~".*kromgo.*"}[10m]) > 5
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: connectivity
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo cannot connect to Prometheus"
+        description: |
+          Kromgo has experienced {{ $value }} Prometheus query errors in the last 10 minutes.
+          Check Prometheus service health and network connectivity.
+
+          Errors: {{ $value }} in 10min
+          This will cause badges to show stale or error data.
+
+  # =======================================
+  # KROMGO RESOURCE ALERTS
+  # =======================================
+  - name: kromgo.resources
+    interval: 30s
+    rules:
+
+    # High memory usage
+    - alert: KromgoHighMemoryUsage
+      expr: container_memory_working_set_bytes{container="kromgo"} / container_spec_memory_limit_bytes{container="kromgo"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: resources
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo memory usage is high"
+        description: |
+          Kromgo container on {{ $labels.pod }} is using {{ $value | humanizePercentage }} of memory limit.
+          Consider investigating memory leaks or increasing limits.
+
+          Usage: {{ $value | humanizePercentage }}
+          Threshold: 80%
+
+    # High CPU usage
+    - alert: KromgoHighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{container="kromgo"}[5m]) / container_spec_cpu_quota{container="kromgo"} * container_spec_cpu_period{container="kromgo"} > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: resources
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo CPU usage is high"
+        description: |
+          Kromgo container on {{ $labels.pod }} is using {{ $value | humanizePercentage }} of CPU limit.
+          This may indicate performance bottlenecks or high request volume.
+
+          Usage: {{ $value | humanizePercentage }}
+          Threshold: 80%
+
+    # Container restarts
+    - alert: KromgoContainerRestarting
+      expr: increase(kube_pod_container_status_restarts_total{container="kromgo"}[1h]) > 2
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: stability
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo container is restarting frequently"
+        description: |
+          Kromgo container on {{ $labels.pod }} has restarted {{ $value }} times in the last hour.
+          Check logs for crash reasons and resource constraints.
+
+          Restarts: {{ $value }} in 1h
+          Threshold: 2 restarts/h
+
+  # =======================================
+  # KROMGO CACHE PERFORMANCE
+  # =======================================
+  - name: kromgo.cache
+    interval: 30s
+    rules:
+
+    # Low cache hit rate
+    - alert: KromgoCacheHitRateLow
+      expr: rate(kromgo_cache_hits_total[5m]) / (rate(kromgo_cache_hits_total[5m]) + rate(kromgo_cache_misses_total[5m])) < 0.7
+      for: 10m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: performance
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo cache hit rate is low"
+        description: |
+          Kromgo cache hit rate is {{ $value | humanizePercentage }}, below 70% threshold.
+          This may increase response times and Prometheus query load.
+
+          Hit rate: {{ $value | humanizePercentage }}
+          Threshold: 70%
+
+    # Cache size near limit
+    - alert: KromgoCacheNearLimit
+      expr: kromgo_cache_size_bytes / kromgo_cache_max_size_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: resources
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo cache is near size limit"
+        description: |
+          Kromgo cache is using {{ $value | humanizePercentage }} of maximum size.
+          Consider increasing cache limits or reducing TTL values.
+
+          Usage: {{ $value | humanizePercentage }}
+          Threshold: 90%
+
+  # =======================================
+  # KROMGO PUBLIC ACCESS ALERTS
+  # =======================================
+  - name: kromgo.public-access
+    interval: 60s
+    rules:
+
+    # External connectivity check
+    - alert: KromgoExternalAccessFailing
+      expr: probe_success{job="blackbox", instance=~".*kromgo.*"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        component: observability
+        service: kromgo
+        alert_type: external-access
+        oncall_team: platform
+      annotations:
+        summary: "[CRITICAL] Kromgo external access is failing"
+        description: |
+          External connectivity checks to kromgo are failing.
+          Public badges and endpoints may be inaccessible from the internet.
+
+          Target: {{ $labels.instance }}
+          This affects public status displays and README badges.
+
+    # High external response time
+    - alert: KromgoExternalResponseTimeSlow
+      expr: probe_duration_seconds{job="blackbox", instance=~".*kromgo.*"} > 10
+      for: 10m
+      labels:
+        severity: warning
+        component: observability
+        service: kromgo
+        alert_type: external-performance
+        oncall_team: platform
+      annotations:
+        summary: "[WARNING] Kromgo external response time is slow"
+        description: |
+          External response time for kromgo is {{ $value }}s, exceeding 10s threshold.
+          This may affect user experience for public badge loading.
+
+          Response time: {{ $value }}s
+          Threshold: 10s

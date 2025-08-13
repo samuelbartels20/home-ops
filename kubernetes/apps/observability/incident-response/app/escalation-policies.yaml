@@ -1,0 +1,480 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: escalation-policies
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: incident-response
+    app.kubernetes.io/component: escalation
+data:
+  escalation-policies.yaml: |
+    # Escalation Policies for Production Infrastructure
+    # Based on big tech incident response practices
+
+    version: "1.0"
+    last_updated: "2025-01-26"
+
+    # === GLOBAL ESCALATION CONFIGURATION ===
+    global:
+      business_hours:
+        timezone: "UTC"
+        weekdays: "Monday-Friday 09:00-17:00"
+        weekends: "Saturday-Sunday (on-call only)"
+        holidays: "Per company calendar"
+
+      notification_channels:
+        slack:
+          critical_channel: "#incidents-critical"
+          general_channel: "#incidents"
+          sre_channel: "#sre-team"
+          data_channel: "#data-team"
+          platform_channel: "#platform-team"
+
+        pagerduty:
+          sre_service: "SRE-Primary"
+          data_service: "Data-Platform"
+          platform_service: "Platform-Infrastructure"
+          executive_service: "Executive-Escalation"
+
+        email:
+          sre_list: "sre-team@company.com"
+          engineering_leads: "engineering-leads@company.com"
+          executives: "cto@company.com,vp-engineering@company.com"
+
+        phone:
+          emergency_hotline: "+1-555-INCIDENT"
+          cto_direct: "+1-555-CTO-HELP"
+
+    # === SERVICE-SPECIFIC ESCALATION POLICIES ===
+    services:
+      # === OBSERVABILITY STACK ===
+      mimir:
+        service_name: "Mimir Metrics Platform"
+        tier: "critical"
+        owner_team: "sre"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE"
+            timeout: "5 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Primary"
+              - type: "slack"
+                target: "#sre-team"
+
+          level_2:
+            title: "SRE Lead"
+            timeout: "15 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Lead"
+              - type: "phone"
+                target: "+1-555-SRE-LEAD"
+              - type: "slack"
+                target: "#incidents-critical"
+
+          level_3:
+            title: "Engineering Manager"
+            timeout: "30 minutes"
+            contacts:
+              - type: "email"
+                target: "engineering-manager@company.com"
+              - type: "phone"
+                target: "+1-555-ENG-MGR"
+
+          level_4:
+            title: "VP Engineering"
+            timeout: "60 minutes"
+            contacts:
+              - type: "email"
+                target: "vp-engineering@company.com"
+              - type: "phone"
+                target: "+1-555-VP-ENG"
+
+        severity_overrides:
+          critical:
+            # Skip level 1 for critical Mimir issues
+            start_level: 2
+            accelerated_timeout: "10 minutes"
+            additional_notifications:
+              - type: "slack"
+                target: "#incidents-critical"
+                message: "[CRITICAL] Mimir metrics platform down - All monitoring affected"
+
+      loki:
+        service_name: "Loki Log Platform"
+        tier: "critical"
+        owner_team: "sre"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE"
+            timeout: "5 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Primary"
+
+          level_2:
+            title: "SRE Lead + Data Team"
+            timeout: "15 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Lead"
+              - type: "slack"
+                target: "#data-team"
+
+        severity_overrides:
+          critical:
+            additional_notifications:
+              - type: "slack"
+                target: "#incidents-critical"
+                message: "[CRITICAL] Loki log platform down - Log ingestion stopped"
+
+      tempo:
+        service_name: "Tempo Tracing Platform"
+        tier: "high"
+        owner_team: "sre"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE"
+            timeout: "10 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Primary"
+
+          level_2:
+            title: "SRE Lead"
+            timeout: "30 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Lead"
+
+      grafana:
+        service_name: "Grafana Visualization Platform"
+        tier: "high"
+        owner_team: "sre"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE"
+            timeout: "10 minutes"
+            contacts:
+              - type: "slack"
+                target: "#sre-team"
+
+          level_2:
+            title: "SRE Lead"
+            timeout: "30 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Lead"
+
+      # === DATA PLATFORM ===
+      clickhouse:
+        service_name: "ClickHouse Analytics Platform"
+        tier: "critical"
+        owner_team: "data"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call Data Engineer"
+            timeout: "5 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Data-Platform"
+              - type: "slack"
+                target: "#data-team"
+
+          level_2:
+            title: "Data Team Lead + SRE"
+            timeout: "15 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Data-Lead"
+              - type: "pagerduty"
+                target: "SRE-Primary"
+              - type: "slack"
+                target: "#incidents-critical"
+
+          level_3:
+            title: "Data Engineering Manager"
+            timeout: "30 minutes"
+            contacts:
+              - type: "email"
+                target: "data-eng-manager@company.com"
+              - type: "phone"
+                target: "+1-555-DATA-MGR"
+
+        severity_overrides:
+          critical:
+            start_level: 1
+            accelerated_timeout: "8 minutes"
+            additional_notifications:
+              - type: "slack"
+                target: "#incidents-critical"
+                message: "[CRITICAL] ClickHouse cluster down - Analytics platform unavailable"
+              - type: "email"
+                target: "analytics-users@company.com"
+                subject: "Analytics Platform Outage"
+
+      druid:
+        service_name: "Druid Real-time Analytics"
+        tier: "high"
+        owner_team: "data"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call Data Engineer"
+            timeout: "10 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Data-Platform"
+
+          level_2:
+            title: "Data Team Lead"
+            timeout: "30 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Data-Lead"
+
+      superset:
+        service_name: "Superset BI Platform"
+        tier: "medium"
+        owner_team: "data"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call Data Engineer"
+            timeout: "15 minutes"
+            contacts:
+              - type: "slack"
+                target: "#data-team"
+
+          level_2:
+            title: "Data Team Lead"
+            timeout: "1 hour"
+            contacts:
+              - type: "pagerduty"
+                target: "Data-Lead"
+
+      # === INFRASTRUCTURE ===
+      kubernetes:
+        service_name: "Kubernetes Platform"
+        tier: "critical"
+        owner_team: "platform"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE + Platform Engineer"
+            timeout: "2 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Primary"
+              - type: "pagerduty"
+                target: "Platform-Infrastructure"
+              - type: "slack"
+                target: "#incidents-critical"
+
+          level_2:
+            title: "SRE Lead + Platform Lead"
+            timeout: "10 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Lead"
+              - type: "pagerduty"
+                target: "Platform-Lead"
+              - type: "phone"
+                target: "+1-555-PLATFORM"
+
+          level_3:
+            title: "Engineering Leadership"
+            timeout: "20 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Executive-Escalation"
+              - type: "phone"
+                target: "+1-555-VP-ENG"
+
+        severity_overrides:
+          critical:
+            start_level: 1
+            accelerated_timeout: "5 minutes"
+            additional_notifications:
+              - type: "slack"
+                target: "#general"
+                message: "[CRITICAL] Kubernetes cluster issues - All services may be affected"
+              - type: "email"
+                target: "all-engineering@company.com"
+                subject: "Platform Critical Incident"
+
+      storage:
+        service_name: "Ceph Storage Cluster"
+        tier: "critical"
+        owner_team: "platform"
+
+        escalation_levels:
+          level_1:
+            title: "On-Call SRE + Storage Expert"
+            timeout: "3 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "SRE-Primary"
+              - type: "phone"
+                target: "+1-555-STORAGE"
+
+          level_2:
+            title: "Platform Team + SRE Lead"
+            timeout: "10 minutes"
+            contacts:
+              - type: "pagerduty"
+                target: "Platform-Infrastructure"
+              - type: "pagerduty"
+                target: "SRE-Lead"
+
+        severity_overrides:
+          critical:
+            additional_notifications:
+              - type: "slack"
+                target: "#incidents-critical"
+                message: "[CRITICAL] Ceph cluster degraded - Data loss risk"
+
+    # === SPECIAL ESCALATION SCENARIOS ===
+    special_scenarios:
+      data_loss_risk:
+        description: "Any incident with potential for data loss"
+        immediate_escalation:
+          - type: "pagerduty"
+            target: "Executive-Escalation"
+          - type: "phone"
+            target: "+1-555-CTO-HELP"
+          - type: "slack"
+            target: "#incidents-critical"
+            message: "[CRITICAL] DATA LOSS RISK: Immediate executive attention required"
+
+      security_incident:
+        description: "Security breach or suspected compromise"
+        immediate_escalation:
+          - type: "pagerduty"
+            target: "Security-Team"
+          - type: "phone"
+            target: "+1-555-SECURITY"
+          - type: "email"
+            target: "security@company.com,legal@company.com"
+
+      compliance_breach:
+        description: "Potential regulatory compliance violation"
+        immediate_escalation:
+          - type: "email"
+            target: "compliance@company.com,legal@company.com"
+          - type: "phone"
+            target: "+1-555-COMPLIANCE"
+
+      customer_facing_outage:
+        description: "Customer-facing services completely down"
+        immediate_escalation:
+          - type: "pagerduty"
+            target: "Executive-Escalation"
+          - type: "slack"
+            target: "#customer-success"
+          - type: "email"
+            target: "customer-success@company.com"
+
+    # === ON-CALL ROTATION ===
+    on_call_rotation:
+      sre_primary:
+        schedule: "24/7"
+        rotation_length: "1 week"
+        members:
+          - "sre-engineer-1@company.com"
+          - "sre-engineer-2@company.com"
+          - "sre-engineer-3@company.com"
+          - "sre-engineer-4@company.com"
+        backup:
+          - "sre-lead@company.com"
+
+      data_platform:
+        schedule: "business hours + weekend backup"
+        rotation_length: "2 weeks"
+        members:
+          - "data-engineer-1@company.com"
+          - "data-engineer-2@company.com"
+          - "data-engineer-3@company.com"
+        backup:
+          - "data-lead@company.com"
+
+      platform_infrastructure:
+        schedule: "24/7"
+        rotation_length: "1 week"
+        members:
+          - "platform-engineer-1@company.com"
+          - "platform-engineer-2@company.com"
+        backup:
+          - "platform-lead@company.com"
+
+    # === AUTO-ESCALATION RULES ===
+    auto_escalation:
+      time_based:
+        # Auto-escalate if not acknowledged within timeout
+        enabled: true
+        default_timeout: "15 minutes"
+
+      metric_based:
+        # Auto-escalate based on severity metrics
+        error_budget_exhaustion:
+          threshold: "90% consumed"
+          action: "immediate_escalation"
+          target: "Executive-Escalation"
+
+        multi_service_outage:
+          threshold: "3+ critical services down"
+          action: "executive_notification"
+          target: "vp-engineering@company.com"
+
+        prolonged_outage:
+          threshold: "2+ hours critical outage"
+          action: "c_level_notification"
+          target: "cto@company.com"
+
+    # === COMMUNICATION TEMPLATES ===
+    communication_templates:
+      initial_notification:
+                  subject: "[CRITICAL] {severity} - {service} Incident #{incident_id}"
+        body: |
+          **Service**: {service}
+          **Severity**: {severity}
+          **Status**: {status}
+          **Impact**: {impact}
+          **Started**: {start_time}
+
+          **Initial Assessment**: {initial_assessment}
+          **Actions Taken**: {actions_taken}
+          **Next Update**: {next_update_time}
+
+          **Incident Commander**: {incident_commander}
+          **War Room**: {war_room_link}
+          **Status Page**: {status_page_link}
+
+      escalation_notification:
+        subject: "[ESCALATED] - {service} Incident #{incident_id}"
+        body: |
+          This incident has been escalated to {escalation_level}.
+
+          **Duration**: {duration}
+          **Previous Actions**: {previous_actions}
+          **Why Escalated**: {escalation_reason}
+          **Needed**: {help_needed}
+
+      resolution_notification:
+                  subject: "[RESOLVED] {service} Incident #{incident_id}"
+        body: |
+          **Service**: {service}
+          **Resolved**: {resolution_time}
+          **Duration**: {total_duration}
+          **Root Cause**: {root_cause}
+          **Resolution**: {resolution_summary}
+
+          **Post-Mortem**: {postmortem_link}
+          **Follow-up Actions**: {followup_actions}

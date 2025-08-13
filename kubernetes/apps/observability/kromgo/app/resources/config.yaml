@@ -1,0 +1,378 @@
+---
+# Production Kromgo Configuration
+# Comprehensive metrics collection for homelab infrastructure monitoring
+# Provides public-safe exposure of key cluster metrics via badges and HTTP endpoints
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kromgo-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: configuration
+    production-grade: "true"
+data:
+  config.yaml: |
+    # Badge styling configuration
+    badge:
+      font: Verdana.ttf
+      size: 11
+      padding: 6
+      radius: 3
+
+    # Cache configuration for performance
+    cache:
+      ttl: 300s
+      max_size: 1000
+
+    # Server configuration
+    server:
+      read_timeout: 30s
+      write_timeout: 30s
+      idle_timeout: 120s
+      max_header_bytes: 1048576
+
+    # Metrics configuration
+    metrics:
+
+    # ================================
+    # INFRASTRUCTURE OVERVIEW
+    # ================================
+
+    # Cluster version information
+    - name: talos_version
+      query: label_replace(node_os_info{name="Talos"}, "version_id", "$1", "version_id", "v(.+)")
+      label: version_id
+      title: Talos
+      description: "Talos Linux operating system version"
+
+    - name: kubernetes_version
+      query: label_replace(kubernetes_build_info{service="kubernetes"}, "git_version", "$1", "git_version", "v(.+)")
+      label: git_version
+      title: Kubernetes
+      description: "Kubernetes cluster version"
+
+    - name: flux_version
+      query: label_replace(flux_instance_info, "revision", "$1", "revision", "v(.+)@sha256:.+")
+      label: revision
+      title: Flux
+      description: "Flux GitOps controller version"
+
+    # Cluster scale metrics
+    - name: cluster_node_count
+      query: count(count by (node) (kube_node_status_condition{condition="Ready", status="True"}))
+      colors:
+        - { color: "red", min: 0, max: 2 }
+        - { color: "orange", min: 3, max: 3 }
+        - { color: "green", min: 4, max: 9999 }
+      title: Nodes
+      description: "Total number of ready cluster nodes"
+
+    - name: cluster_pod_count
+      query: sum(kube_pod_status_phase{phase="Running"})
+      colors:
+        - { color: "green", min: 0, max: 200 }
+        - { color: "orange", min: 201, max: 400 }
+        - { color: "red", min: 401, max: 9999 }
+      title: Pods
+      description: "Total number of running pods"
+
+    - name: cluster_workload_count
+      query: count(count by (namespace) (kube_deployment_labels))
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: Workloads
+      description: "Total number of deployments"
+
+    # ================================
+    # RESOURCE UTILIZATION
+    # ================================
+
+    - name: cluster_cpu_usage
+      query: round(avg(instance:node_cpu_utilisation:rate5m{kubernetes_node!=""}) * 100, 0.1)
+      suffix: "%"
+      colors:
+        - { color: "green", min: 0, max: 35 }
+        - { color: "orange", min: 36, max: 75 }
+        - { color: "red", min: 76, max: 9999 }
+      title: CPU
+      description: "Average cluster CPU utilization"
+
+    - name: cluster_memory_usage
+      query: round(sum(node_memory_MemTotal_bytes{kubernetes_node!=""} - node_memory_MemAvailable_bytes{kubernetes_node!=""}) / sum(node_memory_MemTotal_bytes{kubernetes_node!=""}) * 100, 0.1)
+      suffix: "%"
+      colors:
+        - { color: "green", min: 0, max: 35 }
+        - { color: "orange", min: 36, max: 75 }
+        - { color: "red", min: 76, max: 9999 }
+      title: Memory
+      description: "Cluster memory utilization"
+
+    - name: cluster_disk_usage
+      query: round(100 - (avg(node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"}) * 100), 0.1)
+      suffix: "%"
+      colors:
+        - { color: "green", min: 0, max: 70 }
+        - { color: "orange", min: 71, max: 85 }
+        - { color: "red", min: 86, max: 9999 }
+      title: Disk
+      description: "Average cluster disk utilization"
+
+    # ================================
+    # STORAGE INFRASTRUCTURE
+    # ================================
+
+    - name: storage_pvc_count
+      query: count(kube_persistentvolumeclaim_info)
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: PVCs
+      description: "Total persistent volume claims"
+
+    - name: storage_ceph_health
+      query: ceph_health_status
+      colors:
+        - { color: "red", min: -1, max: 0 }
+        - { color: "orange", min: 1, max: 1 }
+        - { color: "green", min: 2, max: 2 }
+      title: Ceph
+      description: "Ceph storage cluster health status"
+
+    - name: storage_longhorn_health
+      query: longhorn_volume_robustness == 0
+      colors:
+        - { color: "red", min: 0, max: 0 }
+        - { color: "green", min: 1, max: 1 }
+      title: Longhorn
+      description: "Longhorn storage system health"
+
+    # ================================
+    # NETWORK & CONNECTIVITY
+    # ================================
+
+    - name: network_ingress_count
+      query: count(kube_ingress_info)
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: Ingress
+      description: "Total number of ingress resources"
+
+    - name: network_service_count
+      query: count(kube_service_info{type!="ExternalName"})
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: Services
+      description: "Total number of cluster services"
+
+    - name: network_external_dns_status
+      query: external_dns_controller_last_reconcile_duration_seconds > 0
+      colors:
+        - { color: "red", min: 0, max: 0 }
+        - { color: "green", min: 1, max: 9999 }
+      title: External DNS
+      description: "External DNS controller status"
+
+    # ================================
+    # SECURITY & COMPLIANCE
+    # ================================
+
+    - name: security_pod_security_violations
+      query: count(kube_pod_container_status_running{container=~".*"}) - count(kube_pod_security_policy{})
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 5 }
+        - { color: "red", min: 6, max: 9999 }
+      title: Security
+      description: "Pod security policy violations"
+
+    - name: security_cert_expiry_days
+      query: round(min((cert_manager_certificate_expiration_timestamp_seconds - time()) / 86400))
+      suffix: "d"
+      colors:
+        - { color: "red", min: 0, max: 7 }
+        - { color: "orange", min: 8, max: 30 }
+        - { color: "green", min: 31, max: 9999 }
+      title: Cert Expiry
+      description: "Days until next certificate expires"
+
+    - name: security_falco_alerts
+      query: increase(falco_events_total[24h])
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 10 }
+        - { color: "red", min: 11, max: 9999 }
+      title: Falco
+      description: "Security events detected by Falco"
+
+    # ================================
+    # OBSERVABILITY STACK
+    # ================================
+
+    - name: prometheus_targets_up
+      query: round(prometheus_sd_discovered_targets{job="prometheus-operated"} / prometheus_sd_discovered_targets{job="prometheus-operated"} * 100, 0.1)
+      suffix: "%"
+      colors:
+        - { color: "red", min: 0, max: 90 }
+        - { color: "orange", min: 91, max: 95 }
+        - { color: "green", min: 96, max: 100 }
+      title: Targets
+      description: "Prometheus target health percentage"
+
+    - name: grafana_dashboard_count
+      query: count(grafana_stat_totals_dashboard)
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: Dashboards
+      description: "Total Grafana dashboards"
+
+    - name: loki_ingestion_rate
+      query: round(rate(loki_ingester_streams_created_total[5m]) * 60, 0.1)
+      suffix: "/min"
+      colors:
+        - { color: "green", min: 0, max: 9999 }
+      title: Logs
+      description: "Log ingestion rate per minute"
+
+    # ================================
+    # OPERATIONAL METRICS
+    # ================================
+
+    - name: cluster_age_days
+      query: round((time() - min(kube_node_created)) / 86400)
+      suffix: "d"
+      colors:
+        - { color: "green", min: 0, max: 180 }
+        - { color: "orange", min: 181, max: 360 }
+        - { color: "red", min: 361, max: 9999 }
+      title: Age
+      description: "Cluster age in days"
+
+    - name: cluster_uptime_days
+      query: round(avg(node_time_seconds{kubernetes_node!=""} - node_boot_time_seconds{kubernetes_node!=""}) / 86400)
+      suffix: "d"
+      colors:
+        - { color: "red", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 1 }
+        - { color: "green", min: 2, max: 9999 }
+      title: Uptime
+      description: "Average node uptime in days"
+
+    - name: cluster_restarts_24h
+      query: sum(increase(kube_pod_container_status_restarts_total[24h]))
+      colors:
+        - { color: "green", min: 0, max: 5 }
+        - { color: "orange", min: 6, max: 20 }
+        - { color: "red", min: 21, max: 9999 }
+      title: Restarts
+      description: "Container restarts in last 24 hours"
+
+    # ================================
+    # ALERTING & HEALTH
+    # ================================
+
+    - name: cluster_alert_count
+      query: count(ALERTS{alertstate="firing"}) or vector(0)
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 5 }
+        - { color: "red", min: 6, max: 9999 }
+      title: Alerts
+      description: "Active firing alerts"
+
+    - name: cluster_critical_alerts
+      query: count(ALERTS{alertstate="firing", severity="critical"}) or vector(0)
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "red", min: 1, max: 9999 }
+      title: Critical
+      description: "Critical alerts currently firing"
+
+    - name: alertmanager_notifications_failed
+      query: increase(alertmanager_notifications_failed_total[24h])
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 5 }
+        - { color: "red", min: 6, max: 9999 }
+      title: Failed Alerts
+      description: "Failed alert notifications in 24h"
+
+    # ================================
+    # POWER & INFRASTRUCTURE
+    # ================================
+
+    - name: cluster_power_usage
+      query: round(sum(upsHighPrecOutputLoad) or vector(0), 0.1)
+      suffix: "W"
+      colors:
+        - { color: "green", min: 0, max: 400 }
+        - { color: "orange", min: 401, max: 750 }
+        - { color: "red", min: 751, max: 9999 }
+      title: Power
+      description: "Total cluster power consumption"
+
+    - name: ups_battery_charge
+      query: round(upsBatteryStatus or vector(100), 1)
+      suffix: "%"
+      colors:
+        - { color: "red", min: 0, max: 20 }
+        - { color: "orange", min: 21, max: 50 }
+        - { color: "green", min: 51, max: 100 }
+      title: UPS
+      description: "UPS battery charge percentage"
+
+    - name: cluster_temperature
+      query: round(avg(node_hwmon_temp_celsius{chip="coretemp-isa-0000"}) or vector(0), 1)
+      suffix: "°C"
+      colors:
+        - { color: "green", min: 0, max: 65 }
+        - { color: "orange", min: 66, max: 80 }
+        - { color: "red", min: 81, max: 9999 }
+      title: Temperature
+      description: "Average cluster CPU temperature"
+
+    # ================================
+    # BACKUP & DATA PROTECTION
+    # ================================
+
+    - name: backup_success_rate
+      query: round(increase(velero_backup_success_total[24h]) / (increase(velero_backup_success_total[24h]) + increase(velero_backup_failure_total[24h])) * 100 or vector(100), 1)
+      suffix: "%"
+      colors:
+        - { color: "red", min: 0, max: 80 }
+        - { color: "orange", min: 81, max: 95 }
+        - { color: "green", min: 96, max: 100 }
+      title: Backups
+      description: "Backup success rate last 24h"
+
+    - name: backup_last_success_hours
+      query: round((time() - velero_backup_last_successful_timestamp) / 3600 or vector(0), 1)
+      suffix: "h"
+      colors:
+        - { color: "green", min: 0, max: 24 }
+        - { color: "orange", min: 25, max: 48 }
+        - { color: "red", min: 49, max: 9999 }
+      title: Last Backup
+      description: "Hours since last successful backup"
+
+    # ================================
+    # DEVELOPER PRODUCTIVITY
+    # ================================
+
+    - name: argocd_app_health
+      query: count(argocd_app_health_status{health_status="Healthy"}) / count(argocd_app_health_status) * 100 or vector(100)
+      suffix: "%"
+      colors:
+        - { color: "red", min: 0, max: 80 }
+        - { color: "orange", min: 81, max: 95 }
+        - { color: "green", min: 96, max: 100 }
+      title: ArgoCD
+      description: "Healthy ArgoCD applications percentage"
+
+    - name: flux_reconcile_errors
+      query: sum(increase(gotk_reconcile_condition{type="Ready", status="False"}[24h])) or vector(0)
+      colors:
+        - { color: "green", min: 0, max: 0 }
+        - { color: "orange", min: 1, max: 5 }
+        - { color: "red", min: 6, max: 9999 }
+      title: Flux Errors
+      description: "Flux reconciliation errors in 24h"

@@ -1,0 +1,213 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrepository-source-v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: robusta
+  namespace: observability 
+spec:
+  interval: 1h
+  url: https://robusta-dev.github.io/helm-charts
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: robusta-krr
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: krr
+      version: 1.8.7
+      sourceRef:
+        kind: HelmRepository
+        name: robusta
+        namespace: observability
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    # Production-ready configuration
+    replicaCount: 2
+
+    image:
+      repository: quay.io/robusta/krr
+      tag: v1.9.5
+      pullPolicy: IfNotPresent
+
+    # Resource recommendations for the KRR pod itself
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Auto-discovery configuration for your Mimir/Prometheus setup
+    config:
+      prometheus:
+        # Auto-discovery will look for Mimir service
+        auto_discovery: true
+        # Fallback URL if auto-discovery fails
+        url: "http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+        # Custom labels for centralized monitoring
+        custom_labels:
+          cluster: "kubernetes"
+        # Authentication if needed
+        auth_header: ""
+        ssl_enabled: false
+
+      # Algorithm configuration for recommendations
+      strategy:
+        cpu:
+          percentile: 95  # 95th percentile for CPU requests
+          buffer_ratio: 0.15  # 15% buffer
+        memory:
+          buffer_ratio: 0.15  # 15% buffer for memory
+          history_duration: "7d"  # Look back 7 days
+
+      # Output configuration
+      output:
+        format: "table"
+        file: "/tmp/krr-recommendations.txt"
+
+      # Scanning configuration
+      scanning:
+        # Include all namespaces except system ones
+        include_namespaces: []
+        exclude_namespaces:
+          - "kube-system"
+          - "kube-public"
+          - "flux-system"
+          - "default"
+        # Include specific resource types
+        include_resources:
+          - "Deployment"
+          - "StatefulSet"
+          - "DaemonSet"
+          - "Job"
+          - "CronJob"
+
+    # Service configuration for web UI
+    service:
+      type: ClusterIP
+      port: 8080
+      targetPort: 8080
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+
+    # ServiceMonitor for Prometheus scraping
+    serviceMonitor:
+      enabled: true
+      namespace: observability
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        app.kubernetes.io/name: robusta-krr
+      annotations:
+        prometheus.io/scrape: "true"
+
+    # Pod Security Context
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Security Context
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65534
+
+    # Node selection
+    nodeSelector:
+      kubernetes.io/os: linux
+
+    # Tolerations for scheduling
+    tolerations: []
+
+    # Affinity rules for HA
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: robusta-krr
+              topologyKey: kubernetes.io/hostname
+
+    # Persistent storage for caching and reports
+    persistence:
+      enabled: true
+      storageClass: "ceph-block"
+      size: 1Gi
+      mountPath: "/tmp"
+
+    # Environment variables
+    env:
+      - name: PYTHONPATH
+        value: "/app"
+      - name: KRR_LOG_LEVEL
+        value: "INFO"
+      - name: KRR_PROMETHEUS_URL
+        value: "http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+
+    # Liveness and Readiness probes
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: 8080
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+    # CronJob for automated scanning
+    cronjob:
+      enabled: true
+      schedule: "0 6 * * 1"  # Weekly on Monday at 6 AM
+      args:
+        - "simple"
+        - "--logtostderr"
+        - "--format=json"
+        - "--namespace=all"
+        - "--prometheus-url=http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+
+    # RBAC Configuration
+    rbac:
+      create: true
+
+    serviceAccount:
+      create: true
+      name: robusta-krr
+      annotations:
+        app.kubernetes.io/name: robusta-krr

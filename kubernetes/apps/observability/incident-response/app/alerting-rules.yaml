@@ -1,0 +1,344 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-burn-rate-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: slo-alerting
+    app.kubernetes.io/component: burn-rate-alerts
+spec:
+  groups:
+  # === SLO BURN RATE ALERTS ===
+  - name: slo.burn.rate.alerts
+    interval: 30s
+    rules:
+
+    # === MIMIR SLO ALERTS ===
+    - alert: MimirErrorBudgetBurnRateCritical
+      expr: |
+        (
+          slo:mimir_error_budget_burn_rate_5m > 14.4
+          and
+          slo:mimir_error_budget_burn_rate_30m > 14.4
+        )
+        or
+        (
+          slo:mimir_error_budget_burn_rate_2h > 6
+          and
+          slo:mimir_error_budget_burn_rate_6h > 6
+        )
+      for: 2m
+      labels:
+        severity: critical
+        service: mimir
+        slo: availability
+        team: sre
+      annotations:
+        summary: "Mimir is burning through error budget too fast"
+        description: |
+          Mimir availability SLO is burning error budget at {{ $value }}x the normal rate.
+          At this rate, the monthly error budget will be exhausted in {{ with query "slo:mimir_error_budget_remaining_ratio * 720 / $value" }}{{ . | first | value | humanizeDuration }}{{ end }}.
+
+          **Current Availability**: {{ with query "slo:mimir_availability_5m * 100" }}{{ . | first | value | printf "%.3f" }}%{{ end }}
+          **SLO Target**: 99.95%
+          **Error Budget Remaining**: {{ with query "slo:mimir_error_budget_remaining_ratio * 100" }}{{ . | first | value | printf "%.2f" }}%{{ end }}
+
+          **Runbook**: https://runbooks.samcloud.online/mimir/high-error-rate
+          **Dashboard**: https://grafana.samcloud.online/d/mimir-overview
+        runbook_url: "https://runbooks.samcloud.online/mimir/high-error-rate"
+        dashboard_url: "https://grafana.samcloud.online/d/mimir-overview"
+
+    - alert: MimirErrorBudgetBurnRateWarning
+      expr: |
+        (
+          slo:mimir_error_budget_burn_rate_2h > 3
+          and
+          slo:mimir_error_budget_burn_rate_6h > 3
+        )
+        or
+        (
+          slo:mimir_error_budget_burn_rate_6h > 1
+          and
+          slo:mimir_error_budget_burn_rate_2h > 1
+        )
+      for: 15m
+      labels:
+        severity: warning
+        service: mimir
+        slo: availability
+        team: sre
+      annotations:
+        summary: "Mimir error budget burn rate elevated"
+        description: |
+          Mimir availability SLO is burning error budget at {{ $value }}x the normal rate.
+          **Error Budget Remaining**: {{ with query "slo:mimir_error_budget_remaining_ratio * 100" }}{{ . | first | value | printf "%.2f" }}%{{ end }}
+
+    # === LOKI SLO ALERTS ===
+    - alert: LokiErrorBudgetBurnRateCritical
+      expr: |
+        (
+          slo:loki_error_budget_burn_rate_5m > 10
+          and
+          slo:loki_error_budget_burn_rate_30m > 10
+        )
+      for: 2m
+      labels:
+        severity: critical
+        service: loki
+        slo: availability
+        team: sre
+      annotations:
+        summary: "Loki is burning through error budget too fast"
+        description: |
+          Loki availability SLO is burning error budget at {{ $value }}x the normal rate.
+          **Current Availability**: {{ with query "slo:loki_availability_5m * 100" }}{{ . | first | value | printf "%.3f" }}%{{ end }}
+          **SLO Target**: 99.9%
+          **Runbook**: https://runbooks.samcloud.online/loki/ingestion-failure
+
+    # === CLICKHOUSE SLO ALERTS ===
+    - alert: ClickHouseErrorBudgetBurnRateCritical
+      expr: |
+        (
+          slo:clickhouse_error_budget_burn_rate_5m > 14.4
+        )
+      for: 2m
+      labels:
+        severity: critical
+        service: clickhouse
+        slo: availability
+        team: data
+      annotations:
+        summary: "ClickHouse is burning through error budget too fast"
+        description: |
+          ClickHouse availability SLO is burning error budget at {{ $value }}x the normal rate.
+          **Current Availability**: {{ with query "slo:clickhouse_availability_5m * 100" }}{{ . | first | value | printf "%.3f" }}%{{ end }}
+          **SLO Target**: 99.95%
+          **Runbook**: https://runbooks.samcloud.online/clickhouse/cluster-down
+
+    # === INFRASTRUCTURE SLO ALERTS ===
+    - alert: KubernetesAPIErrorBudgetBurnRateCritical
+      expr: |
+        (
+          (1 - (rate(apiserver_request_total{code!~"5.."}[5m]) / rate(apiserver_request_total[5m]))) / (1 - 0.9999) > 100
+        )
+      for: 2m
+      labels:
+        severity: critical
+        service: kubernetes-api
+        slo: availability
+        team: platform
+      annotations:
+        summary: "Kubernetes API Server burning error budget critically"
+        description: |
+          Kubernetes API Server availability SLO is burning error budget at {{ $value }}x the normal rate.
+          **API Success Rate**: {{ with query "rate(apiserver_request_total{code!~'5..'}[5m]) / rate(apiserver_request_total[5m]) * 100" }}{{ . | first | value | printf "%.3f" }}%{{ end }}
+          **SLO Target**: 99.99%
+
+    - alert: StorageClusterErrorBudgetBurnRateCritical
+      expr: |
+        ceph_health_status != 0
+      for: 2m
+      labels:
+        severity: critical
+        service: ceph-storage
+        slo: availability
+        team: platform
+      annotations:
+        summary: "Ceph storage cluster health degraded"
+        description: |
+          Ceph storage cluster is not in healthy state.
+          **Cluster Status**: {{ with query "ceph_health_status" }}{{ if eq (. | first | value) 1.0 }}HEALTH_WARN{{ else if eq (. | first | value) 2.0 }}HEALTH_ERR{{ else }}UNKNOWN{{ end }}{{ end }}
+          **Runbook**: https://runbooks.samcloud.online/storage/cluster-health
+
+  # === LATENCY SLO ALERTS ===
+  - name: slo.latency.alerts
+    interval: 30s
+    rules:
+
+    - alert: MimirLatencyBreach
+      expr: |
+        histogram_quantile(0.95, rate(cortex_request_duration_seconds_bucket[5m])) * 1000 > 500
+      for: 5m
+      labels:
+        severity: warning
+        service: mimir
+        slo: latency
+        team: sre
+      annotations:
+        summary: "Mimir query latency exceeding SLO"
+        description: |
+          Mimir 95th percentile query latency is {{ $value }}ms, exceeding the 500ms SLO.
+          **Dashboard**: https://grafana.samcloud.online/d/mimir-performance
+
+    - alert: LokiLatencyBreach
+      expr: |
+        histogram_quantile(0.95, rate(loki_request_duration_seconds_bucket[5m])) * 1000 > 1000
+      for: 5m
+      labels:
+        severity: warning
+        service: loki
+        slo: latency
+        team: sre
+      annotations:
+        summary: "Loki query latency exceeding SLO"
+        description: |
+          Loki 95th percentile query latency is {{ $value }}ms, exceeding the 1000ms SLO.
+
+    - alert: ClickHouseLatencyBreach
+      expr: |
+        histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m])) * 1000 > 5000
+      for: 5m
+      labels:
+        severity: warning
+        service: clickhouse
+        slo: latency
+        team: data
+      annotations:
+        summary: "ClickHouse query latency exceeding SLO"
+        description: |
+          ClickHouse 95th percentile query latency is {{ $value }}ms, exceeding the 5000ms SLO.
+
+    - alert: GrafanaLatencyBreach
+      expr: |
+        histogram_quantile(0.95, rate(grafana_http_request_duration_seconds_bucket[5m])) * 1000 > 3000
+      for: 5m
+      labels:
+        severity: warning
+        service: grafana
+        slo: latency
+        team: sre
+      annotations:
+        summary: "Grafana dashboard load time exceeding SLO"
+        description: |
+          Grafana 95th percentile dashboard load time is {{ $value }}ms, exceeding the 3000ms SLO.
+
+  # === THROUGHPUT SLO ALERTS ===
+  - name: slo.throughput.alerts
+    interval: 30s
+    rules:
+
+    - alert: MimirThroughputBreach
+      expr: |
+        rate(cortex_distributor_samples_in_total[5m]) < 100000
+      for: 5m
+      labels:
+        severity: warning
+        service: mimir
+        slo: throughput
+        team: sre
+      annotations:
+        summary: "Mimir ingestion throughput below SLO"
+        description: |
+          Mimir is ingesting {{ $value }} samples/sec, below the 100K samples/sec SLO.
+
+    - alert: DruidIngestionLag
+      expr: |
+        druid_ingestion_lag_seconds > 60
+      for: 2m
+      labels:
+        severity: warning
+        service: druid
+        slo: freshness
+        team: data
+      annotations:
+        summary: "Druid ingestion lag exceeding SLO"
+        description: |
+          Druid real-time ingestion lag is {{ $value }}s, exceeding the 60s SLO.
+
+  # === ERROR BUDGET EXHAUSTION ALERTS ===
+  - name: slo.error.budget.exhaustion
+    interval: 1h
+    rules:
+
+    - alert: ErrorBudgetExhaustedCritical
+      expr: |
+        slo:mimir_error_budget_remaining_ratio < 0.1
+        or
+        slo:loki_error_budget_remaining_ratio < 0.1
+        or
+        slo:clickhouse_error_budget_remaining_ratio < 0.1
+      for: 0m
+      labels:
+        severity: critical
+        team: sre
+      annotations:
+        summary: "Service error budget critically low"
+        description: |
+          Service {{ $labels.service }} has less than 10% of monthly error budget remaining.
+          **Remaining Budget**: {{ $value | humanizePercentage }}
+          **Recommendation**: Halt non-essential deployments and focus on reliability.
+
+    - alert: ErrorBudgetExhaustedWarning
+      expr: |
+        slo:mimir_error_budget_remaining_ratio < 0.3
+        or
+        slo:loki_error_budget_remaining_ratio < 0.3
+        or
+        slo:clickhouse_error_budget_remaining_ratio < 0.3
+      for: 0m
+      labels:
+        severity: warning
+        team: sre
+      annotations:
+        summary: "Service error budget running low"
+        description: |
+          Service {{ $labels.service }} has less than 30% of monthly error budget remaining.
+          **Remaining Budget**: {{ $value | humanizePercentage }}
+
+  # === MULTI-WINDOW BURN RATE ALERTS ===
+  - name: slo.multiwindow.burn.rate
+    interval: 30s
+    rules:
+
+    # Critical: 2% budget in 1 hour
+    - alert: CriticalErrorBudgetBurn1h
+      expr: |
+        (
+          (1 - slo:mimir_availability_5m) / (1 - 0.9995) > 14.4
+          and
+          (1 - slo:mimir_availability_30m) / (1 - 0.9995) > 14.4
+        )
+      for: 2m
+      labels:
+        severity: critical
+        service: mimir
+        burn_rate_window: 1h
+        team: sre
+      annotations:
+        summary: "Critical error budget burn - 2% budget consumed in 1 hour"
+        description: "At current burn rate, the entire monthly error budget will be consumed in {{ with query \"720 / ((1 - slo:mimir_availability_5m) / (1 - 0.9995))\" }}{{ . | first | value | humanizeDuration }}{{ end }}"
+
+    # Warning: 5% budget in 6 hours
+    - alert: WarningErrorBudgetBurn6h
+      expr: |
+        (
+          (1 - slo:mimir_availability_30m) / (1 - 0.9995) > 6
+          and
+          (1 - slo:mimir_availability_2h) / (1 - 0.9995) > 6
+        )
+      for: 15m
+      labels:
+        severity: warning
+        service: mimir
+        burn_rate_window: 6h
+        team: sre
+      annotations:
+        summary: "Warning error budget burn - 5% budget consumed in 6 hours"
+
+    # Page: 10% budget in 3 days
+    - alert: PageErrorBudgetBurn3d
+      expr: |
+        (
+          (1 - slo:mimir_availability_6h) / (1 - 0.9995) > 1
+          and
+          (1 - slo:mimir_availability_6h) / (1 - 0.9995) > 1
+        )
+      for: 1h
+      labels:
+        severity: warning
+        service: mimir
+        burn_rate_window: 3d
+        team: sre
+      annotations:
+        summary: "Elevated error budget burn - 10% budget consumed in 3 days"

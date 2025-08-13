@@ -1,0 +1,71 @@
+---
+# Production-Grade Kromgo Metrics Badge Service
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kromgo
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: metrics-collector
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kromgo
+      version: 1.0.0
+      sourceRef:
+        kind: HelmRepository
+        name: kromgo
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+
+    config:
+      collectors:
+        - name: node-metrics
+          type: node
+          interval: 60s
+          metrics:
+            - cpu
+            - memory
+            - disk
+            - network
+        - name: pod-metrics
+          type: pod
+          interval: 60s
+          metrics:
+            - cpu
+            - memory
+            - network
+        - name: container-metrics
+          type: container
+          interval: 60s
+          metrics:
+            - cpu
+            - memory
+            - disk
+            - network

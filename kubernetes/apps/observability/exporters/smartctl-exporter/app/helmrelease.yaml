@@ -1,0 +1,89 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: smartctl-exporter
+spec:
+  interval: 5m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 0.15.1
+  url: oci://ghcr.io/prometheus-community/charts/prometheus-smartctl-exporter
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: smartctl-exporter
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: smartctl-exporter
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: prometheus-smartctl-exporter
+      version: 0.5.0
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+
+    config:
+      devices:
+        - /dev/sda
+        - /dev/sdb
+      smartAttributes:
+        - id: 5
+          name: reallocated_sector_ct
+          critical: true
+        - id: 187
+          name: reported_uncorrect
+          critical: true
+        - id: 188
+          name: command_timeout
+          critical: true
+        - id: 197
+          name: current_pending_sector
+          critical: true
+        - id: 198
+          name: offline_uncorrectable
+          critical: true
+        - id: 199
+          name: udma_crc_error_count
+          critical: true
+
+    securityContext:
+      privileged: true
+
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+
+    nodeSelector:
+      kubernetes.io/os: linux

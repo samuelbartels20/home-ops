@@ -1,0 +1,82 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: opencost
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/component: cost-analysis
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: opencost
+      version: 1.22.0
+      sourceRef:
+        kind: HelmRepository
+        name: opencost
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    opencost:
+      prometheus:
+        external:
+          url: http://prometheus-operated:9090
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+
+    metrics:
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+
+    service:
+      type: ClusterIP
+      port: 9003
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        hajimari.io/icon: mdi:currency-usd
+      hosts:
+        - host: &host "cost.${SECRET_DOMAIN}"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - hosts:
+            - *host
+
+    config:
+      pricing:
+        enabled: true
+        defaultRegion: "custom"
+        provider: "custom"
+        cpu: 0.031611
+        ram: 0.004237
+        gpu: 0.95
+        storage: 0.00005479452
+        shared: true
+      clusters:
+        - name: home
+          address: http://prometheus-operated:9090

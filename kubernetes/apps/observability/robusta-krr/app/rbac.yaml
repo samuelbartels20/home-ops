@@ -1,0 +1,194 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: robusta-krr
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+  annotations:
+    app.kubernetes.io/managed-by: Helm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: robusta-krr
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+rules:
+  # Core resource reading permissions
+  - apiGroups: [""]
+    resources:
+      - "pods"
+      - "pods/log"
+      - "pods/status"
+      - "services"
+      - "endpoints"
+      - "nodes"
+      - "namespaces"
+      - "persistentvolumes"
+      - "persistentvolumeclaims"
+      - "resourcequotas"
+      - "limitranges"
+    verbs: ["get", "list", "watch"]
+
+  # Apps resources for workload analysis
+  - apiGroups: ["apps"]
+    resources:
+      - "deployments"
+      - "replicasets"
+      - "statefulsets"
+      - "daemonsets"
+    verbs: ["get", "list", "watch"]
+
+  # Batch resources for job analysis
+  - apiGroups: ["batch"]
+    resources:
+      - "jobs"
+      - "cronjobs"
+    verbs: ["get", "list", "watch"]
+
+  # Autoscaling resources for VPA/HPA analysis
+  - apiGroups: ["autoscaling"]
+    resources:
+      - "horizontalpodautoscalers"
+    verbs: ["get", "list", "watch"]
+
+  # VPA resources if available
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources:
+      - "verticalpodautoscalers"
+    verbs: ["get", "list", "watch"]
+
+  # Metrics API access
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - "nodes"
+      - "pods"
+    verbs: ["get", "list"]
+
+  # Custom metrics if needed
+  - apiGroups: ["custom.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list"]
+
+  # External metrics if needed
+  - apiGroups: ["external.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list"]
+
+  # Policy resources for compliance
+  - apiGroups: ["policy"]
+    resources:
+      - "poddisruptionbudgets"
+      - "podsecuritypolicies"
+    verbs: ["get", "list", "watch"]
+
+  # Networking resources
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - "networkpolicies"
+      - "ingresses"
+    verbs: ["get", "list", "watch"]
+
+  # Storage resources
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - "storageclasses"
+      - "volumeattachments"
+    verbs: ["get", "list", "watch"]
+
+  # RBAC resources for security analysis
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - "roles"
+      - "rolebindings"
+      - "clusterroles"
+      - "clusterrolebindings"
+    verbs: ["get", "list", "watch"]
+
+  # Configuration and secrets (read-only for analysis)
+  - apiGroups: [""]
+    resources:
+      - "configmaps"
+      - "secrets"
+    verbs: ["get", "list", "watch"]
+
+  # Extensions for custom resources
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources:
+      - "customresourcedefinitions"
+    verbs: ["get", "list", "watch"]
+
+  # Events for troubleshooting
+  - apiGroups: [""]
+    resources:
+      - "events"
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: robusta-krr
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: robusta-krr
+subjects:
+  - kind: ServiceAccount
+    name: robusta-krr
+    namespace: observability
+---
+# Additional role for namespace-specific operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: robusta-krr-namespace
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+rules:
+  # Local namespace management
+  - apiGroups: [""]
+    resources:
+      - "pods/exec"
+      - "pods/portforward"
+    verbs: ["create", "get"]
+
+  # Service operations
+  - apiGroups: [""]
+    resources:
+      - "services"
+    verbs: ["create", "update", "patch", "delete"]
+
+  # Endpoint slice management
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - "endpointslices"
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: robusta-krr-namespace
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: robusta-krr-namespace
+subjects:
+  - kind: ServiceAccount
+    name: robusta-krr
+    namespace: observability

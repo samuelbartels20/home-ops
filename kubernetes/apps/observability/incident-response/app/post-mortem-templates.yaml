@@ -1,0 +1,953 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-mortem-templates
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: incident-response
+    app.kubernetes.io/component: post-mortem
+data:
+  post-mortem-template.md: |
+    # Post-Mortem: {incident_title}
+
+    **Incident ID**: {incident_id}
+    **Date**: {incident_date}
+    **Severity**: {severity_level}
+    **Duration**: {start_time} - {end_time} ({total_duration})
+    **Author**: {author_name}
+    **Reviewers**: {reviewer_list}
+    **Status**: {status}
+
+    ---
+
+    ## Executive Summary
+
+    {executive_summary}
+
+    **Impact**:
+    - **Users Affected**: {users_affected}
+    - **Services Impacted**: {services_impacted}
+    - **Revenue Impact**: {revenue_impact}
+    - **SLO Breach**: {slo_breach_details}
+
+    **Root Cause**: {root_cause_summary}
+
+    **Resolution**: {resolution_summary}
+
+    ---
+
+    ## Timeline (All times in UTC)
+
+    | Time | Event | Action Taken | Owner |
+    |------|-------|--------------|-------|
+    {timeline_entries}
+
+    ---
+
+    ## Impact Analysis
+
+    ### Customer Impact
+    - **Customer-Facing Impact**: {customer_impact}
+    - **Affected Regions**: {affected_regions}
+    - **User Experience**: {user_experience_impact}
+    - **Customer Communications**: {customer_communications}
+
+    ### Business Impact
+    - **Revenue Loss**: {revenue_loss}
+    - **Transaction Volume**: {transaction_impact}
+    - **SLA Credits**: {sla_credits}
+    - **Brand Impact**: {brand_impact}
+
+    ### Technical Impact
+    - **Systems Affected**: {systems_affected}
+    - **Data Integrity**: {data_integrity_impact}
+    - **Performance Degradation**: {performance_impact}
+    - **Dependencies**: {dependency_impact}
+
+    ### SLO/SLA Impact
+    - **SLOs Breached**: {slos_breached}
+    - **Error Budget Consumed**: {error_budget_consumed}
+    - **SLA Violations**: {sla_violations}
+    - **Availability Impact**: {availability_impact}
+
+    ---
+
+    ## Root Cause Analysis
+
+    ### What Happened
+    {detailed_what_happened}
+
+    ### Why It Happened
+    {detailed_why_happened}
+
+    ### How It Happened
+    {detailed_how_happened}
+
+    ### Contributing Factors
+    1. **Primary Factor**: {primary_factor}
+    2. **Secondary Factors**:
+       - {secondary_factor_1}
+       - {secondary_factor_2}
+       - {secondary_factor_3}
+
+    ### Root Cause Categorization
+    - **Category**: {root_cause_category}
+    - **Subcategory**: {root_cause_subcategory}
+    - **Preventability**: {preventability_assessment}
+
+    ---
+
+    ## Detection and Response
+
+    ### Detection
+    - **Detection Method**: {detection_method}
+    - **Detection Time**: {detection_time}
+    - **Time to Detection**: {time_to_detection}
+    - **Detection Quality**: {detection_quality}
+
+    ### Alert Performance
+    - **Alerts Fired**: {alerts_fired}
+    - **Alert Accuracy**: {alert_accuracy}
+    - **False Positives**: {false_positives}
+    - **Missing Alerts**: {missing_alerts}
+
+    ### Response Performance
+    - **Time to Acknowledgment**: {time_to_ack}
+    - **Time to Triage**: {time_to_triage}
+    - **Time to Mitigation**: {time_to_mitigation}
+    - **Time to Resolution**: {time_to_resolution}
+
+    ### Response Team
+    - **Incident Commander**: {incident_commander}
+    - **Technical Lead**: {technical_lead}
+    - **Communication Lead**: {communication_lead}
+    - **Subject Matter Experts**: {sme_list}
+
+    ---
+
+    ## Resolution and Mitigation
+
+    ### Immediate Actions
+    {immediate_actions}
+
+    ### Mitigation Steps
+    1. {mitigation_step_1}
+    2. {mitigation_step_2}
+    3. {mitigation_step_3}
+
+    ### Final Resolution
+    {final_resolution}
+
+    ### Verification
+    {verification_steps}
+
+    ---
+
+    ## Lessons Learned
+
+    ### What Went Well
+    - {positive_1}
+    - {positive_2}
+    - {positive_3}
+
+    ### What Didn't Go Well
+    - {negative_1}
+    - {negative_2}
+    - {negative_3}
+
+    ### Where We Got Lucky
+    - {lucky_1}
+    - {lucky_2}
+
+    ### Process Improvements
+    - {process_improvement_1}
+    - {process_improvement_2}
+    - {process_improvement_3}
+
+    ---
+
+    ## Action Items
+
+    ### Immediate (Complete within 1 week)
+    | Action Item | Owner | Priority | Due Date | Status | Tracking Link |
+    |-------------|-------|----------|----------|--------|---------------|
+    {immediate_action_items}
+
+    ### Short-term (Complete within 1 month)
+    | Action Item | Owner | Priority | Due Date | Status | Tracking Link |
+    |-------------|-------|----------|----------|--------|---------------|
+    {short_term_action_items}
+
+    ### Long-term (Complete within 1 quarter)
+    | Action Item | Owner | Priority | Due Date | Status | Tracking Link |
+    |-------------|-------|----------|----------|--------|---------------|
+    {long_term_action_items}
+
+    ---
+
+    ## Supporting Information
+
+    ### Relevant Dashboards
+    - **System Overview**: {system_dashboard_link}
+    - **Service Metrics**: {service_dashboard_link}
+    - **Error Rates**: {error_dashboard_link}
+    - **Performance**: {performance_dashboard_link}
+
+    ### Log Analysis
+    - **Error Logs**: {error_logs_link}
+    - **Application Logs**: {application_logs_link}
+    - **Infrastructure Logs**: {infrastructure_logs_link}
+
+    ### Related Incidents
+    - {related_incident_1}
+    - {related_incident_2}
+
+    ### External References
+    - {external_reference_1}
+    - {external_reference_2}
+
+    ---
+
+    ## Appendices
+
+    ### Appendix A: Detailed Timeline
+    {detailed_timeline}
+
+    ### Appendix B: Technical Details
+    {technical_details}
+
+    ### Appendix C: Communication Log
+    {communication_log}
+
+    ### Appendix D: Customer Impact Data
+    {customer_impact_data}
+
+    ---
+
+    **Document History**
+    - **Created**: {creation_date} by {author}
+    - **Last Updated**: {last_updated} by {last_updater}
+    - **Review Status**: {review_status}
+    - **Approved**: {approval_date} by {approver}
+
+  severity-templates.yaml: |
+    # Severity-Specific Post-Mortem Templates
+
+    critical_template_additions: |
+      ## Executive Notification
+      - **CEO Notified**: {ceo_notification_time}
+      - **Board Notification**: {board_notification_required}
+      - **Media Response**: {media_response_required}
+      - **Legal Review**: {legal_review_completed}
+
+      ## Regulatory Impact
+      - **Compliance Implications**: {compliance_implications}
+      - **Regulatory Reporting**: {regulatory_reporting_required}
+      - **Audit Trail**: {audit_trail_preserved}
+
+      ## Business Continuity
+      - **Disaster Recovery Activated**: {dr_activated}
+      - **Backup Systems Used**: {backup_systems}
+      - **Failover Procedures**: {failover_procedures}
+
+    high_template_additions: |
+      ## Service Impact
+      - **Service Degradation**: {service_degradation_details}
+      - **Performance Impact**: {performance_impact_metrics}
+      - **User Experience**: {user_experience_degradation}
+
+      ## Escalation Review
+      - **Escalation Path**: {escalation_path_followed}
+      - **Response Team**: {response_team_effectiveness}
+      - **Communication**: {communication_effectiveness}
+
+    medium_template_additions: |
+      ## Limited Impact Analysis
+      - **Scope of Impact**: {limited_scope_details}
+      - **Affected Components**: {affected_components}
+      - **Monitoring Gaps**: {monitoring_gap_analysis}
+
+    low_template_additions: |
+      ## Opportunity Analysis
+      - **Prevention Opportunity**: {prevention_opportunity}
+      - **Monitoring Enhancement**: {monitoring_enhancement}
+      - **Process Improvement**: {process_improvement_opportunity}
+
+  automation-config.yaml: |
+    # Post-Mortem Automation Configuration
+
+    automation:
+      enabled: true
+
+      trigger_conditions:
+        - severity: "critical"
+          auto_create: true
+          template: "critical"
+          deadline: "24 hours"
+
+        - severity: "high"
+          auto_create: true
+          template: "high"
+          deadline: "48 hours"
+
+        - severity: "medium"
+          auto_create: false
+          template: "medium"
+          deadline: "1 week"
+
+        - duration: "> 4 hours"
+          auto_create: true
+          template: "extended_outage"
+          deadline: "48 hours"
+
+        - error_budget_burn: "> 50%"
+          auto_create: true
+          template: "slo_breach"
+          deadline: "72 hours"
+
+      data_collection:
+        prometheus_queries:
+          - name: "error_rate_during_incident"
+            query: "rate(http_requests_total{status=~'5..'}[5m])"
+            time_range: "incident_duration + 1h"
+
+          - name: "response_time_impact"
+            query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+            time_range: "incident_duration + 1h"
+
+          - name: "service_availability"
+            query: "up{job=~'.*'}"
+            time_range: "incident_duration + 1h"
+
+        log_collection:
+          - service: "all"
+            log_level: "error"
+            time_range: "incident_duration + 30m"
+
+          - service: "incident_affected"
+            log_level: "warn"
+            time_range: "incident_duration + 1h"
+
+        trace_collection:
+          enabled: true
+          services: "incident_affected"
+          time_range: "incident_duration"
+          sample_rate: 100
+
+      template_population:
+        automatic_fields:
+          - "incident_id"
+          - "start_time"
+          - "end_time"
+          - "duration"
+          - "severity"
+          - "affected_services"
+          - "timeline_basic"
+          - "metrics_data"
+
+        manual_fields:
+          - "root_cause_analysis"
+          - "lessons_learned"
+          - "action_items"
+          - "executive_summary"
+
+      workflow:
+        creation:
+          - "extract_incident_data"
+          - "populate_template"
+          - "create_document"
+          - "assign_owner"
+          - "set_deadline"
+          - "notify_stakeholders"
+
+        review_process:
+          - reviewer_assignments:
+              technical: "incident_commander"
+              management: "engineering_manager"
+              executive: "vp_engineering"  # for critical
+
+          - review_deadlines:
+              technical: "3 days"
+              management: "5 days"
+              executive: "7 days"
+
+        follow_up:
+          - "track_action_items"
+          - "schedule_reviews"
+          - "measure_effectiveness"
+          - "update_processes"
+
+  quality-criteria.yaml: |
+    # Post-Mortem Quality Criteria and Standards
+
+    quality_standards:
+      completeness_requirements:
+        required_sections:
+          - "executive_summary"
+          - "timeline"
+          - "root_cause_analysis"
+          - "impact_analysis"
+          - "lessons_learned"
+          - "action_items"
+
+        minimum_detail_levels:
+          timeline: "5-minute granularity for critical incidents"
+          root_cause: "technical depth sufficient for prevention"
+          action_items: "specific, measurable, time-bound"
+
+      accuracy_requirements:
+        data_verification:
+          - "timeline verified by logs"
+          - "metrics data included"
+          - "impact numbers validated"
+          - "technical details reviewed"
+
+        review_requirements:
+          - "technical SME review"
+          - "management review"
+          - "affected team review"
+
+      objectivity_requirements:
+        blameless_culture:
+          - "focus on systems and processes"
+          - "avoid individual blame"
+          - "encourage honest reporting"
+          - "learn from near-misses"
+
+        constructive_tone:
+          - "improvement-focused"
+          - "specific recommendations"
+          - "realistic action items"
+          - "positive reinforcement"
+
+    metrics:
+      post_mortem_metrics:
+        - "time_to_post_mortem_creation"
+        - "time_to_post_mortem_completion"
+        - "action_item_completion_rate"
+        - "action_item_effectiveness"
+        - "repeat_incident_rate"
+
+      quality_metrics:
+        - "review_completion_rate"
+        - "stakeholder_satisfaction"
+        - "learning_effectiveness"
+        - "process_improvement_rate"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: post-mortem-automation
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: post-mortem-automation
+    app.kubernetes.io/component: automation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: post-mortem-automation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: post-mortem-automation
+        app.kubernetes.io/component: automation
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: automation
+        image: python:3.11-slim
+        command:
+        - python
+        - /app/post-mortem-automation.py
+        env:
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.observability:9090"
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: token
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: post-mortem-secrets
+              key: slack-bot-token
+        - name: JIRA_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: post-mortem-secrets
+              key: jira-api-token
+        volumeMounts:
+        - name: config
+          mountPath: /app
+        - name: templates
+          mountPath: /templates
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: post-mortem-scripts
+          items:
+          - key: post-mortem-automation.py
+            path: post-mortem-automation.py
+            mode: 0755
+      - name: templates
+        configMap:
+          name: post-mortem-templates
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-mortem-scripts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: post-mortem-automation
+    app.kubernetes.io/component: scripts
+data:
+  post-mortem-automation.py: |
+    #!/usr/bin/env python3
+    """
+    Post-Mortem Automation System
+    Automatically creates and manages post-mortem documents
+    """
+
+    import os
+    import json
+    import time
+    import logging
+    from datetime import datetime, timedelta
+    from dataclasses import dataclass
+    from typing import List, Dict, Optional
+
+    import requests
+    import yaml
+    from jinja2 import Template
+    from prometheus_api_client import PrometheusConnect
+
+    # Configure logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    @dataclass
+    class Incident:
+        id: str
+        title: str
+        severity: str
+        start_time: datetime
+        end_time: Optional[datetime]
+        affected_services: List[str]
+        status: str
+        commander: str
+        description: str
+        labels: Dict[str, str]
+
+    class PostMortemAutomation:
+        def __init__(self):
+            self.prometheus_url = os.getenv('PROMETHEUS_URL')
+            self.github_token = os.getenv('TOKEN')
+            self.slack_token = os.getenv('SLACK_BOT_TOKEN')
+            self.jira_token = os.getenv('JIRA_API_TOKEN')
+
+            self.prom = PrometheusConnect(url=self.prometheus_url)
+
+            # Load configuration
+            with open('/templates/automation-config.yaml', 'r') as f:
+                self.config = yaml.safe_load(f)
+
+            # Load templates
+            with open('/templates/post-mortem-template.md', 'r') as f:
+                self.base_template = Template(f.read())
+
+        def should_create_post_mortem(self, incident: Incident) -> bool:
+            """Determine if post-mortem should be created automatically"""
+
+            for condition in self.config['automation']['trigger_conditions']:
+                if 'severity' in condition and incident.severity == condition['severity']:
+                    return condition['auto_create']
+
+                if 'duration' in condition and incident.end_time:
+                    duration = incident.end_time - incident.start_time
+                    duration_hours = duration.total_seconds() / 3600
+
+                    if '>' in condition['duration']:
+                        threshold = float(condition['duration'].split('>')[1].strip().split()[0])
+                        if duration_hours > threshold:
+                            return condition['auto_create']
+
+                if 'error_budget_burn' in condition:
+                    # Check error budget consumption
+                    burn_rate = self.get_error_budget_burn(incident)
+                    threshold = float(condition['error_budget_burn'].split('>')[1].strip().rstrip('%'))
+
+                    if burn_rate > threshold:
+                        return condition['auto_create']
+
+            return False
+
+        def get_error_budget_burn(self, incident: Incident) -> float:
+            """Calculate error budget burn during incident"""
+            try:
+                service_map = {
+                    'mimir': 'slo:mimir_error_budget_burn_rate_5m',
+                    'loki': 'slo:loki_error_budget_burn_rate_5m',
+                    'clickhouse': 'slo:clickhouse_error_budget_burn_rate_5m'
+                }
+
+                total_burn = 0
+                for service in incident.affected_services:
+                    if service in service_map:
+                        query = service_map[service]
+                        result = self.prom.get_metric_range_data(
+                            metric_name=query,
+                            start_time=incident.start_time,
+                            end_time=incident.end_time or datetime.now()
+                        )
+                        if result:
+                            # Calculate average burn rate during incident
+                            values = [float(point[1]) for point in result[0]['values']]
+                            avg_burn = sum(values) / len(values) if values else 0
+                            total_burn += avg_burn
+
+                return total_burn
+
+            except Exception as e:
+                logger.error(f"Error calculating error budget burn: {e}")
+                return 0
+
+        def collect_incident_data(self, incident: Incident) -> Dict:
+            """Collect comprehensive data about the incident"""
+
+            data = {
+                'incident_id': incident.id,
+                'incident_title': incident.title,
+                'severity_level': incident.severity,
+                'start_time': incident.start_time.isoformat(),
+                'end_time': incident.end_time.isoformat() if incident.end_time else '',
+                'total_duration': self.format_duration(incident.end_time - incident.start_time) if incident.end_time else 'Ongoing',
+                'incident_commander': incident.commander,
+                'affected_services': ', '.join(incident.affected_services),
+                'description': incident.description
+            }
+
+            # Collect metrics data
+            metrics_data = self.collect_metrics_data(incident)
+            data.update(metrics_data)
+
+            # Collect timeline data
+            timeline_data = self.collect_timeline_data(incident)
+            data.update(timeline_data)
+
+            # Collect impact data
+            impact_data = self.collect_impact_data(incident)
+            data.update(impact_data)
+
+            return data
+
+        def collect_metrics_data(self, incident: Incident) -> Dict:
+            """Collect Prometheus metrics during incident"""
+
+            metrics = {}
+
+            try:
+                for query_config in self.config['automation']['data_collection']['prometheus_queries']:
+                    query_name = query_config['name']
+                    query = query_config['query']
+
+                    result = self.prom.get_metric_range_data(
+                        metric_name=query,
+                        start_time=incident.start_time,
+                        end_time=incident.end_time or datetime.now()
+                    )
+
+                    if result:
+                        # Process and store metrics
+                        metrics[query_name] = self.process_metric_result(result)
+
+            except Exception as e:
+                logger.error(f"Error collecting metrics data: {e}")
+
+            return metrics
+
+        def collect_timeline_data(self, incident: Incident) -> Dict:
+            """Collect timeline information from alerts and logs"""
+
+            timeline_entries = []
+
+            try:
+                # Get alert history
+                alerts = self.get_alert_history(incident)
+                for alert in alerts:
+                    timeline_entries.append({
+                        'time': alert['startsAt'],
+                        'event': f"Alert fired: {alert['alertname']}",
+                        'action': 'Investigation started',
+                        'owner': 'System'
+                    })
+
+                # Get manual timeline entries from incident management system
+                manual_entries = self.get_manual_timeline_entries(incident)
+                timeline_entries.extend(manual_entries)
+
+                # Sort by time
+                timeline_entries.sort(key=lambda x: x['time'])
+
+                # Format for template
+                timeline_table = self.format_timeline_table(timeline_entries)
+
+            except Exception as e:
+                logger.error(f"Error collecting timeline data: {e}")
+                timeline_table = "| Time | Event | Action | Owner |\n|------|-------|--------|-------|\n| TBD | TBD | TBD | TBD |"
+
+            return {'timeline_entries': timeline_table}
+
+        def collect_impact_data(self, incident: Incident) -> Dict:
+            """Collect impact metrics and customer data"""
+
+            impact_data = {
+                'users_affected': 'TBD',
+                'revenue_impact': 'TBD',
+                'customer_impact': 'TBD',
+                'slo_breach_details': 'TBD'
+            }
+
+            try:
+                # Calculate user impact based on service availability
+                if incident.affected_services:
+                    impact_data['users_affected'] = self.calculate_user_impact(incident)
+
+                # Calculate SLO impact
+                impact_data['slo_breach_details'] = self.calculate_slo_impact(incident)
+
+            except Exception as e:
+                logger.error(f"Error collecting impact data: {e}")
+
+            return impact_data
+
+        def create_post_mortem_document(self, incident: Incident) -> str:
+            """Create post-mortem document from template"""
+
+            # Collect all incident data
+            template_data = self.collect_incident_data(incident)
+
+            # Add empty sections for manual completion
+            template_data.update({
+                'executive_summary': 'TBD - To be completed by incident commander',
+                'root_cause_summary': 'TBD - To be completed after investigation',
+                'resolution_summary': 'TBD - To be completed after resolution',
+                'customer_communications': 'TBD',
+                'immediate_actions': 'TBD',
+                'lessons_learned': 'TBD',
+                'action_items': 'TBD',
+                'author_name': incident.commander,
+                'creation_date': datetime.now().isoformat(),
+                'status': 'Draft'
+            })
+
+            # Render template
+            document = self.base_template.render(**template_data)
+            return document
+
+        def create_github_issue(self, incident: Incident, document: str) -> str:
+            """Create GitHub issue for post-mortem"""
+
+            try:
+                headers = {
+                    'Authorization': f'token {self.github_token}',
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+
+                issue_data = {
+                    'title': f'Post-Mortem: {incident.title}',
+                    'body': document,
+                    'labels': ['post-mortem', f'severity-{incident.severity}'],
+                    'assignee': incident.commander
+                }
+
+                response = requests.post(
+                    'https://api.github.com/repos/company/post-mortems/issues',
+                    headers=headers,
+                    json=issue_data
+                )
+
+                if response.status_code == 201:
+                    issue_url = response.json()['html_url']
+                    logger.info(f"Created post-mortem issue: {issue_url}")
+                    return issue_url
+                else:
+                    logger.error(f"Failed to create GitHub issue: {response.text}")
+                    return ''
+
+            except Exception as e:
+                logger.error(f"Error creating GitHub issue: {e}")
+                return ''
+
+        def notify_stakeholders(self, incident: Incident, post_mortem_url: str):
+            """Notify stakeholders about post-mortem creation"""
+
+            try:
+                message = f"""
+                [DOC] **Post-Mortem Created**
+
+    **Incident**: {incident.title}
+    **Severity**: {incident.severity}
+    **Commander**: @{incident.commander}
+    **Document**: {post_mortem_url}
+
+    Please review and contribute to the post-mortem analysis.
+    """
+
+                # Send Slack notification
+                self.send_slack_message('#incidents', message)
+
+                # Email notification for critical incidents
+                if incident.severity == 'critical':
+                    self.send_email_notification(incident, post_mortem_url)
+
+            except Exception as e:
+                logger.error(f"Error notifying stakeholders: {e}")
+
+        def process_incident(self, incident: Incident):
+            """Process incident for post-mortem creation"""
+
+            if not self.should_create_post_mortem(incident):
+                logger.info(f"Post-mortem not required for incident {incident.id}")
+                return
+
+            logger.info(f"Creating post-mortem for incident {incident.id}")
+
+            # Create post-mortem document
+            document = self.create_post_mortem_document(incident)
+
+            # Create GitHub issue
+            post_mortem_url = self.create_github_issue(incident, document)
+
+            if post_mortem_url:
+                # Notify stakeholders
+                self.notify_stakeholders(incident, post_mortem_url)
+
+                # Track for follow-up
+                self.track_post_mortem(incident.id, post_mortem_url)
+
+        def run(self):
+            """Main automation loop"""
+            logger.info("Starting post-mortem automation")
+
+            while True:
+                try:
+                    # Get recent incidents
+                    incidents = self.get_recent_incidents()
+
+                    for incident in incidents:
+                        if self.needs_post_mortem(incident):
+                            self.process_incident(incident)
+
+                    time.sleep(300)  # Check every 5 minutes
+
+                except Exception as e:
+                    logger.error(f"Error in automation loop: {e}")
+                    time.sleep(60)
+
+        # Helper methods (simplified for brevity)
+        def format_duration(self, duration: timedelta) -> str:
+            total_seconds = int(duration.total_seconds())
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{hours}h {minutes}m {seconds}s"
+
+        def process_metric_result(self, result) -> Dict:
+            # Process Prometheus query result
+            return {'processed': True}
+
+        def get_alert_history(self, incident: Incident) -> List[Dict]:
+            # Get alert history from Alertmanager
+            return []
+
+        def get_manual_timeline_entries(self, incident: Incident) -> List[Dict]:
+            # Get manual timeline entries
+            return []
+
+        def format_timeline_table(self, entries: List[Dict]) -> str:
+            # Format timeline as markdown table
+            return "| Time | Event | Action | Owner |\n|------|-------|--------|-------|"
+
+        def calculate_user_impact(self, incident: Incident) -> str:
+            # Calculate user impact
+            return "TBD"
+
+        def calculate_slo_impact(self, incident: Incident) -> str:
+            # Calculate SLO impact
+            return "TBD"
+
+        def send_slack_message(self, channel: str, message: str):
+            # Send Slack message
+            pass
+
+        def send_email_notification(self, incident: Incident, url: str):
+            # Send email notification
+            pass
+
+        def track_post_mortem(self, incident_id: str, url: str):
+            # Track post-mortem for follow-up
+            pass
+
+        def get_recent_incidents(self) -> List[Incident]:
+            # Get recent incidents from incident management system
+            return []
+
+        def needs_post_mortem(self, incident: Incident) -> bool:
+            # Check if incident needs post-mortem
+            return False
+
+    if __name__ == "__main__":
+        automation = PostMortemAutomation()
+        automation.run()
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-token
+  namespace: observability
+type: Opaque
+data:
+  token: "{{ .token }}"
+
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: post-mortem-secrets
+  namespace: observability
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: post-mortem-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: token
+      remoteRef:
+        key: post-mortem-integration
+        property: token

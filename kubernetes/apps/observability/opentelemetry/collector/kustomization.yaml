@@ -1,0 +1,29 @@
+# OpenTelemetry Collector Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Resource Management
+resources:
+  - deployment.yaml
+  - service.yaml
+  - serviceaccount.yaml
+  - rbac.yaml
+
+# Security Components
+configMapGenerator:
+  - name: otel-collector-config
+    files:
+      - config.yaml
+
+# Common Labels
+commonLabels:
+  app.kubernetes.io/name: opentelemetry-collector
+  app.kubernetes.io/component: telemetry
+  app.kubernetes.io/part-of: observability
+
+# Label Transformers
+labels:
+  - pairs:
+      app.kubernetes.io/name: opentelemetry-collector
+      app.kubernetes.io/component: telemetry
+      app.kubernetes.io/part-of: observability

@@ -1,0 +1,324 @@
+---
+# Zero-Trust Network Policy for Alloy - Production Grade
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alloy-network-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: telemetry-collector
+    observability.samcloud.online/tier: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress Rules - What can connect TO Alloy
+  ingress:
+    # Allow cluster communication for clustering
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alloy
+              app.kubernetes.io/instance: alloy
+      ports:
+        - protocol: TCP
+          port: 12345  # HTTP clustering
+        - protocol: TCP
+          port: 12346  # gRPC clustering
+
+    # Allow Prometheus/Mimir to scrape metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 12345  # Metrics endpoint
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mimir
+      ports:
+        - protocol: TCP
+          port: 12345  # Metrics endpoint
+
+    # Allow OTLP trace ingestion from applications
+    - from:
+        - namespaceSelector: {}  # All namespaces
+      ports:
+        - protocol: TCP
+          port: 4317   # OTLP gRPC
+        - protocol: TCP
+          port: 4318   # OTLP HTTP
+
+    # Allow Jaeger trace ingestion
+    - from:
+        - namespaceSelector: {}  # All namespaces
+      ports:
+        - protocol: TCP
+          port: 14250  # Jaeger gRPC
+        - protocol: TCP
+          port: 14268  # Jaeger HTTP
+        - protocol: TCP
+          port: 14251  # Jaeger gRPC (Alloy traces)
+
+    # Allow Zipkin trace ingestion
+    - from:
+        - namespaceSelector: {}  # All namespaces
+      ports:
+        - protocol: TCP
+          port: 9411   # Zipkin HTTP
+
+    # Allow profiling data ingestion
+    - from:
+        - namespaceSelector: {}  # All namespaces
+      ports:
+        - protocol: TCP
+          port: 4040   # Pyroscope
+
+  # Egress Rules - What Alloy can connect TO
+  egress:
+    # DNS Resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Kubernetes API Server access for service discovery
+    - to: []  # Any destination (API server is usually outside cluster)
+      ports:
+        - protocol: TCP
+          port: 443   # HTTPS API server
+        - protocol: TCP
+          port: 6443  # Alternative HTTPS API server
+
+    # Node access for kubelet metrics and logs
+    - to: []  # Any destination (nodes)
+      ports:
+        - protocol: TCP
+          port: 10250  # Kubelet metrics
+
+    # Loki for log forwarding
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+      ports:
+        - protocol: TCP
+          port: 3100   # Loki push API
+
+    # Loki Gateway
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki-gateway
+      ports:
+        - protocol: TCP
+          port: 80     # Gateway HTTP
+
+    # Mimir for metrics forwarding
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mimir
+      ports:
+        - protocol: TCP
+          port: 8080   # Mimir components
+        - protocol: TCP
+          port: 9090   # Mimir query frontend
+
+    # Mimir Nginx Gateway
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mimir-nginx
+      ports:
+        - protocol: TCP
+          port: 80     # Nginx HTTP
+
+    # Tempo for trace forwarding
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tempo
+      ports:
+        - protocol: TCP
+          port: 4317   # OTLP gRPC
+        - protocol: TCP
+          port: 4318   # OTLP HTTP
+        - protocol: TCP
+          port: 14250  # Jaeger gRPC
+
+    # Tempo Distributor
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tempo-distributor
+      ports:
+        - protocol: TCP
+          port: 4317   # OTLP gRPC
+        - protocol: TCP
+          port: 4318   # OTLP HTTP
+
+    # Pyroscope for profiling data
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: pyroscope
+      ports:
+        - protocol: TCP
+          port: 4040   # Pyroscope push
+
+    # Service discovery endpoints across all namespaces
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080   # Common metrics port
+        - protocol: TCP
+          port: 8081   # Alternative metrics port
+        - protocol: TCP
+          port: 9090   # Prometheus metrics
+        - protocol: TCP
+          port: 9100   # Node exporter
+        - protocol: TCP
+          port: 9115   # Blackbox exporter
+        - protocol: TCP
+          port: 9187   # PostgreSQL exporter
+        - protocol: TCP
+          port: 9200   # Elasticsearch
+        - protocol: TCP
+          port: 3000   # Grafana
+        - protocol: TCP
+          port: 5432   # PostgreSQL
+        - protocol: TCP
+          port: 6379   # Redis
+
+    # Cluster communication between Alloy instances
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alloy
+              app.kubernetes.io/instance: alloy
+      ports:
+        - protocol: TCP
+          port: 12345  # HTTP clustering
+        - protocol: TCP
+          port: 12346  # gRPC clustering
+
+---
+# Additional Network Policy for Sensitive Security Logs
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alloy-security-logs-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: security-logs
+    observability.samcloud.online/tier: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  policyTypes:
+    - Egress
+
+  # Additional egress for security-related log collection
+  egress:
+    # Security namespace access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+
+    # External secrets access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-secrets-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Cert-manager access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cert-manager
+      ports:
+        - protocol: TCP
+          port: 9402   # Cert-manager metrics
+
+---
+# Network Policy for Journal Logs Access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alloy-host-access-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: host-access
+    observability.samcloud.online/tier: production
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  policyTypes:
+    - Egress
+
+  # Host access for log collection
+  egress:
+    # Host filesystem access (systemd journal, container logs)
+    - to: []  # Any destination (host network)
+      ports: []  # Any port (host filesystem access)

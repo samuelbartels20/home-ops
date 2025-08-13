@@ -1,0 +1,376 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: litmus
+  labels:
+    name: litmus
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litmus
+  namespace: litmus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: litmus
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "configmaps", "secrets", "nodes", "namespaces", "services", "endpoints"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["litmuschaos.io"]
+    resources: ["chaosengines", "chaosexperiments", "chaosresults", "workflows", "workflowtemplates", "chaoshubs", "chaosschedules"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "cronworkflows", "clusterworkflowtemplates"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: litmus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: litmus
+subjects:
+  - kind: ServiceAccount
+    name: litmus
+    namespace: litmus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-operator-ce
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/version: "3.8.0"
+    app.kubernetes.io/component: operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: chaos-operator
+  template:
+    metadata:
+      labels:
+        name: chaos-operator
+        app.kubernetes.io/name: litmus
+        app.kubernetes.io/instance: litmus
+        app.kubernetes.io/version: "3.8.0"
+        app.kubernetes.io/component: operator
+    spec:
+      serviceAccountName: litmus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        fsGroup: 2000
+      containers:
+        - name: chaos-operator
+          image: litmuschaos/chaos-operator:3.8.0
+          command:
+            - chaos-operator
+          args:
+            - -leader-elect=true
+          imagePullPolicy: Always
+          env:
+            - name: CHAOS_RUNNER_IMAGE
+              value: "litmuschaos/chaos-runner:3.8.0"
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "chaos-operator"
+          resources:
+            limits:
+              cpu: 200m
+              memory: 500Mi
+            requests:
+              cpu: 125m
+              memory: 300Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-operator-metrics
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/component: operator
+spec:
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    name: chaos-operator
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaos-operator
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/component: operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litmus
+      app.kubernetes.io/component: operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-controller
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/version: "3.8.0"
+    app.kubernetes.io/component: workflow-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workflow-controller
+  template:
+    metadata:
+      labels:
+        app: workflow-controller
+        app.kubernetes.io/name: litmus
+        app.kubernetes.io/instance: litmus
+        app.kubernetes.io/version: "3.8.0"
+        app.kubernetes.io/component: workflow-controller
+    spec:
+      serviceAccountName: litmus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 8737
+      containers:
+        - name: workflow-controller
+          image: argoproj/workflow-controller:v3.4.4
+          command:
+            - workflow-controller
+          args:
+            - --configmap=workflow-controller-configmap
+            - --executor-image=argoproj/argoexec:v3.4.4
+            - --namespaced
+          env:
+            - name: LEADER_ELECTION_IDENTITY
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 9090
+              name: metrics
+            - containerPort: 6060
+              name: telemetry
+          livenessProbe:
+            httpGet:
+              port: 6060
+              path: /healthz
+            failureThreshold: 3
+            initialDelaySeconds: 90
+            periodSeconds: 60
+            timeoutSeconds: 30
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: workflow-controller-configmap
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/component: workflow-controller
+data:
+  config: |
+    instanceID: litmus-workflow-controller
+    namespace: litmus
+    parallelism: 10
+    archiveLogs: true
+    persistence:
+      archive: true
+      postgresql:
+        host: postgres
+        port: 5432
+        database: workflow
+        tableName: argo_workflows
+        userNameSecret:
+          name: argo-postgres-config
+          key: username
+        passwordSecret:
+          name: argo-postgres-config
+          key: password
+    workflowDefaults:
+      spec:
+        ttlStrategy:
+          secondsAfterCompletion: 86400
+          secondsAfterSuccess: 86400
+          secondsAfterFailure: 604800
+    executor:
+      imagePullPolicy: IfNotPresent
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-controller-metrics
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/component: workflow-controller
+spec:
+  ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+  selector:
+    app: workflow-controller
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: workflow-controller
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+    app.kubernetes.io/component: workflow-controller
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: litmus
+      app.kubernetes.io/component: workflow-controller
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-postgres-config
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+type: Opaque
+data:
+  username: bGl0bXVz  # base64 encoded 'litmus'
+  password: bGl0bXVzUGFzcw==  # base64 encoded 'litmusPass'
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litmus-network-policy
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: litmus
+    app.kubernetes.io/instance: litmus
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+    - from:
+        - podSelector: {}
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

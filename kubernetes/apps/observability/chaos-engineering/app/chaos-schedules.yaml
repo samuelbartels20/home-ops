@@ -1,0 +1,476 @@
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: daily-mimir-chaos
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: mimir
+    chaos.target: mimir
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T02:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "24h"
+      instanceCount: "1"
+      includedDays: "mon,tue,wed,thu,fri"
+  engineTemplateSpec:
+    appinfo:
+      appns: observability
+      applabel: "app.kubernetes.io/name=mimir"
+      appkind: deployment
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: pod-delete
+        spec:
+          components:
+            env:
+              - name: TOTAL_CHAOS_DURATION
+                value: "30"
+              - name: CHAOS_INTERVAL
+                value: "10"
+              - name: FORCE
+                value: "false"
+              - name: PODS_AFFECTED_PERC
+                value: "25"
+              - name: TARGET_CONTAINER
+                value: "mimir"
+              - name: SEQUENCE
+                value: "parallel"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: weekly-clickhouse-chaos
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: clickhouse
+    chaos.target: clickhouse
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T03:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "168h"  # Weekly
+      instanceCount: "1"
+      includedDays: "sat"
+  engineTemplateSpec:
+    appinfo:
+      appns: data-science
+      applabel: "app.kubernetes.io/name=clickhouse"
+      appkind: statefulset
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: network-latency
+        spec:
+          components:
+            env:
+              - name: TARGET_CONTAINER
+                value: "clickhouse"
+              - name: NETWORK_INTERFACE
+                value: "eth0"
+              - name: NETWORK_LATENCY
+                value: "100"
+              - name: TOTAL_CHAOS_DURATION
+                value: "120"
+              - name: DESTINATION_IPS
+                value: ""
+              - name: DESTINATION_HOSTS
+                value: ""
+              - name: CONTAINER_RUNTIME
+                value: "containerd"
+              - name: SOCKET_PATH
+                value: "/run/containerd/containerd.sock"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: weekly-loki-storage-chaos
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: loki
+    chaos.target: loki
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T04:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "168h"  # Weekly
+      instanceCount: "1"
+      includedDays: "sun"
+  engineTemplateSpec:
+    appinfo:
+      appns: observability
+      applabel: "app.kubernetes.io/name=loki"
+      appkind: statefulset
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: disk-fill
+        spec:
+          components:
+            env:
+              - name: TARGET_CONTAINER
+                value: "loki"
+              - name: FILL_PERCENTAGE
+                value: "80"
+              - name: TOTAL_CHAOS_DURATION
+                value: "180"
+              - name: EPHEMERAL_STORAGE_MEBIBYTES
+                value: "1000"
+              - name: DATA_BLOCK_SIZE
+                value: "256"
+              - name: CONTAINER_RUNTIME
+                value: "containerd"
+              - name: SOCKET_PATH
+                value: "/run/containerd/containerd.sock"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: bi-weekly-druid-memory-chaos
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: druid
+    chaos.target: druid
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T05:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "336h"  # Bi-weekly
+      instanceCount: "1"
+      includedDays: "tue"
+  engineTemplateSpec:
+    appinfo:
+      appns: data-science
+      applabel: "app.kubernetes.io/name=druid"
+      appkind: deployment
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: container-kill
+        spec:
+          components:
+            env:
+              - name: TARGET_CONTAINER
+                value: "druid"
+              - name: CHAOS_INTERVAL
+                value: "10"
+              - name: TOTAL_CHAOS_DURATION
+                value: "60"
+              - name: CONTAINER_RUNTIME
+                value: "containerd"
+              - name: SOCKET_PATH
+                value: "/run/containerd/containerd.sock"
+              - name: SIGNAL
+                value: "SIGKILL"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: monthly-superset-http-chaos
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: superset
+    chaos.target: superset
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T06:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "720h"  # Monthly
+      instanceCount: "1"
+      includedDays: "wed"
+  engineTemplateSpec:
+    appinfo:
+      appns: data-science
+      applabel: "app.kubernetes.io/name=superset"
+      appkind: deployment
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: http-chaos
+        spec:
+          components:
+            env:
+              - name: TARGET_SERVICE_PORT
+                value: "8088"
+              - name: CHAOS_MONKEY_PORT
+                value: "8080"
+              - name: TOXICITY
+                value: "100"
+              - name: NETWORK_INTERFACE
+                value: "eth0"
+              - name: TOTAL_CHAOS_DURATION
+                value: "300"
+              - name: TARGET_PODS
+                value: ""
+              - name: PODS_AFFECTED_PERC
+                value: "100"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: quarterly-kubernetes-chaos
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: kubernetes
+    chaos.target: kubernetes-api
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T07:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "2160h"  # Quarterly (90 days)
+      instanceCount: "1"
+      includedDays: "fri"
+  engineTemplateSpec:
+    appinfo:
+      appns: kube-system
+      applabel: "component=kube-apiserver"
+      appkind: pod
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: node-drain
+        spec:
+          components:
+            env:
+              - name: TARGET_NODE
+                value: ""
+              - name: TOTAL_CHAOS_DURATION
+                value: "60"
+              - name: FORCE
+                value: "false"
+              - name: DELETE_EMPTYDIR_DATA
+                value: "true"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: weekly-ceph-storage-chaos
+  namespace: rook-ceph
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: ceph
+    chaos.target: ceph-storage
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T08:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "168h"  # Weekly
+      instanceCount: "1"
+      includedDays: "thu"
+  engineTemplateSpec:
+    appinfo:
+      appns: rook-ceph
+      applabel: "app=rook-ceph-osd"
+      appkind: deployment
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: pod-network-partition
+        spec:
+          components:
+            env:
+              - name: TARGET_CONTAINER
+                value: "osd"
+              - name: NETWORK_INTERFACE
+                value: "eth0"
+              - name: TOTAL_CHAOS_DURATION
+                value: "120"
+              - name: DESTINATION_IPS
+                value: "10.42.0.0/16"
+              - name: DESTINATION_HOSTS
+                value: ""
+              - name: CONTAINER_RUNTIME
+                value: "containerd"
+              - name: SOCKET_PATH
+                value: "/run/containerd/containerd.sock"
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: daily-network-chaos
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: network
+    chaos.target: networking
+spec:
+  schedule:
+    now: false
+    repeat:
+      timeZone: "UTC"
+      startTime: "2024-01-01T09:00:00Z"
+      endTime: "2025-12-31T23:59:59Z"
+      minChaosInterval: "24h"
+      instanceCount: "1"
+      includedDays: "mon,tue,wed,thu,fri"
+  engineTemplateSpec:
+    appinfo:
+      appns: kube-system
+      applabel: "k8s-app=kube-dns"
+      appkind: deployment
+    chaosServiceAccount: chaos-engineering-sa
+    jobCleanUpPolicy: retain
+    experiments:
+      - name: pod-network-loss
+        spec:
+          components:
+            env:
+              - name: TARGET_CONTAINER
+                value: "coredns"
+              - name: NETWORK_INTERFACE
+                value: "eth0"
+              - name: NETWORK_PACKET_LOSS_PERCENTAGE
+                value: "10"
+              - name: TOTAL_CHAOS_DURATION
+                value: "60"
+              - name: CONTAINER_RUNTIME
+                value: "containerd"
+              - name: SOCKET_PATH
+                value: "/run/containerd/containerd.sock"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-engineering-sa
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: service-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-engineering-role
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "configmaps", "secrets", "nodes", "services", "endpoints"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["litmuschaos.io"]
+    resources: ["chaosengines", "chaosexperiments", "chaosresults", "chaosschedules"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["create", "list", "get", "update", "patch", "delete", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-engineering-rolebinding
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chaos-engineering-role
+subjects:
+  - kind: ServiceAccount
+    name: chaos-engineering-sa
+    namespace: observability
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: chaos-schedule-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: chaos-schedules
+    app.kubernetes.io/component: alerts
+spec:
+  groups:
+    - name: chaos.schedules
+      interval: 30s
+      rules:
+        - alert: ChaosScheduleFailure
+          expr: |
+            increase(litmuschaos_chaos_experiment_failed_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            component: chaos-engineering
+            team: sre
+          annotations:
+            summary: "Chaos experiment failed"
+            description: "Chaos experiment {{ $labels.experiment_name }} in namespace {{ $labels.namespace }} has failed. This may indicate infrastructure issues or experiment misconfiguration."
+            runbook_url: "https://runbooks.company.io/chaos-engineering/experiment-failure"
+            dashboard_url: "https://grafana.company.io/d/chaos-engineering/chaos-experiments"
+
+        - alert: ChaosScheduleSkipped
+          expr: |
+            increase(litmuschaos_chaos_experiment_skipped_total[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+            component: chaos-engineering
+            team: sre
+          annotations:
+            summary: "Multiple chaos experiments skipped"
+            description: "More than 3 chaos experiments have been skipped in the last hour. This may indicate scheduling conflicts or resource constraints."
+            runbook_url: "https://runbooks.company.io/chaos-engineering/experiment-skipped"
+
+        - alert: ChaosEngineStuck
+          expr: |
+            time() - litmuschaos_chaos_engine_last_run_time > 259200  # 3 days
+          for: 10m
+          labels:
+            severity: critical
+            component: chaos-engineering
+            team: sre
+          annotations:
+            summary: "Chaos engine stuck"
+            description: "Chaos engine {{ $labels.engine_name }} in namespace {{ $labels.namespace }} has not run for more than 3 days. Manual intervention required."
+            runbook_url: "https://runbooks.company.io/chaos-engineering/engine-stuck"
+
+        - alert: HighChaosExperimentLatency
+          expr: |
+            histogram_quantile(0.95, rate(litmuschaos_chaos_experiment_duration_seconds_bucket[5m])) > 600
+          for: 5m
+          labels:
+            severity: warning
+            component: chaos-engineering
+            team: sre
+          annotations:
+            summary: "High chaos experiment latency"
+            description: "95th percentile chaos experiment duration is {{ $value }}s, which is above the 10-minute threshold."
+            runbook_url: "https://runbooks.company.io/chaos-engineering/high-latency"

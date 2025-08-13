@@ -1,0 +1,103 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: karma
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: karma
+    app.kubernetes.io/component: alert-dashboard
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: karma
+      version: 2.1.3
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    service:
+      main:
+        enabled: true
+        ports:
+          http:
+            port: 8080
+
+    ingress:
+      main:
+        enabled: true
+        className: nginx
+        annotations:
+          hajimari.io/enable: "true"
+          hajimari.io/icon: mdi:alert-circle-check
+        hosts:
+          - host: &host "karma.${SECRET_DOMAIN}"
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - *host
+
+    config:
+      alertmanager:
+        servers:
+          - name: alertmanager
+            uri: http://alertmanager-operated:9093
+            timeout: 10s
+            proxy: false
+
+      filters:
+        default:
+          - "@receiver=default"
+          - "@state=active"
+
+      grid:
+        sorting:
+          order: startsAt
+          reverse: true
+        groupLimit: 10
+
+      karma:
+        grid:
+          autoRefresh: true
+          refreshInterval: 30s
+
+      labels:
+        color:
+          static:
+            - severity
+          unique:
+            - alertname
+            - instance
+            - severity
+
+    monitoring:
+      enabled: true
+      serviceMonitor: true
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000

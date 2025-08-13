@@ -1,0 +1,426 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: zabbix
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: zabbix
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: zabbix
+      version: "7.0.12"
+      sourceRef:
+        kind: HelmRepository
+        name: zabbix
+        namespace: flux-system
+  install:
+    timeout: 15m
+    replace: true
+    crds: CreateReplace
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+    crds: CreateReplace
+  test:
+    enable: true
+  rollback:
+    recreate: true
+    force: true
+    cleanupOnFail: true
+  uninstall:
+    keepHistory: false
+  driftDetection:
+    mode: enabled
+  maxHistory: 3
+  values:
+    # Global Zabbix configuration based on official documentation
+    # https://www.zabbix.com/documentation/current/en/
+    zabbix_image_tag: "ubuntu-7.4.0"  # Latest LTS version
+
+    # Database configuration (PostgreSQL for production)
+    db_access:
+      db_server_host: "zabbix-postgresql"
+      db_server_port: "5432"
+      postgres_db: "zabbix"
+      postgres_user: "zabbix"
+      postgres_password: "zabbix-strong-password-123"
+      unified_secret_name: "zabbix-db-secret"
+      unified_secret_autocreate: true
+      use_unified_secret: true
+
+    # PostgreSQL Database - Production optimized
+    postgresql:
+      enabled: true
+      image:
+        repository: "postgres"
+        tag: 16
+        pullPolicy: IfNotPresent
+
+      # Production database persistence
+      persistence:
+        enabled: true
+        storage_size: 100Gi
+        existing_claim_name: false
+
+      # Production PostgreSQL configuration
+      extraRuntimeParameters:
+        max_connections: 500
+        shared_buffers: 2GB
+        effective_cache_size: 6GB
+        maintenance_work_mem: 512MB
+        checkpoint_completion_target: 0.9
+        wal_buffers: 16MB
+        default_statistics_target: 100
+        random_page_cost: 1.1
+        effective_io_concurrency: 200
+        work_mem: 8MB
+        min_wal_size: 1GB
+        max_wal_size: 4GB
+        max_worker_processes: 8
+        max_parallel_workers_per_gather: 4
+        max_parallel_workers: 8
+        max_parallel_maintenance_workers: 4
+
+      service:
+        type: ClusterIP
+        port: 5432
+        annotations: {}
+
+    # Zabbix Server - Core monitoring engine
+    zabbixserver:
+      enabled: true
+      replicaCount: 2  # HA mode (6.0+ supports HA)
+
+      image:
+        repository: "zabbix/zabbix-server-pgsql"
+        tag: "ubuntu-7.4.0"
+        pullPolicy: IfNotPresent
+
+      # Production resource allocation
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+      # Environment variables for Zabbix Server configuration
+      extraEnv:
+        - name: ZBX_CACHESIZE
+          value: "256M"
+        - name: ZBX_CACHEUPDATEFREQUENCY
+          value: "60"
+        - name: ZBX_STARTDBSYNCERS
+          value: "4"
+        - name: ZBX_HISTORYCACHESIZE
+          value: "512M"
+        - name: ZBX_HISTORYINDEXCACHESIZE
+          value: "256M"
+        - name: ZBX_TRENDCACHESIZE
+          value: "256M"
+        - name: ZBX_TRENDFUNCTIONCACHESIZE
+          value: "64M"
+        - name: ZBX_VALUECACHESIZE
+          value: "512M"
+        - name: ZBX_VMWARECACHESIZE
+          value: "128M"
+        - name: ZBX_VMWAREFREQUENCY
+          value: "60"
+        - name: ZBX_VMWAREPERFFREQUENCY
+          value: "60"
+        - name: ZBX_VMWARETIMEOUT
+          value: "10"
+        - name: ZBX_ENABLE_SNMP_TRAPS
+          value: "true"
+        - name: ZBX_STARTSNMPTRAPPER
+          value: "1"
+        - name: ZBX_LISTENIP
+          value: "0.0.0.0"
+        - name: ZBX_STARTPOLLERS
+          value: "20"
+        - name: ZBX_STARTPOLLERSUNREACHABLE
+          value: "5"
+        - name: ZBX_STARTTRAPPERS
+          value: "10"
+        - name: ZBX_STARTPINGERS
+          value: "5"
+        - name: ZBX_STARTDISCOVERERS
+          value: "5"
+        - name: ZBX_STARTHTTPPOLLERS
+          value: "5"
+        - name: ZBX_STARTTIMERS
+          value: "2"
+        - name: ZBX_STARTESCALATORS
+          value: "2"
+        - name: ZBX_STARTALERTERS
+          value: "5"
+
+      # Health checks
+      livenessProbe:
+        tcpSocket:
+          port: zabbix-trapper
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 6
+
+      readinessProbe:
+        tcpSocket:
+          port: zabbix-trapper
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      startupProbe:
+        tcpSocket:
+          port: zabbix-trapper
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        failureThreshold: 30
+
+      service:
+        type: ClusterIP
+        port: 10051
+        annotations: {}
+
+      # HA configuration for auto-cleanup
+      ha_nodes_autoclean:
+        enabled: true
+        schedule: "0 1 * * *"
+        delete_older_than_seconds: 3600
+
+    # Zabbix Web Frontend - Production ready UI
+    zabbixweb:
+      enabled: true
+      replicaCount: 2
+
+      image:
+        repository: "zabbix/zabbix-web-nginx-pgsql"
+        tag: "ubuntu-7.4.0"
+        pullPolicy: IfNotPresent
+
+      # Production resource allocation
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+      # Web server configuration
+      extraEnv:
+        - name: ZBX_SERVER_HOST
+          value: "zabbix-zabbix-server"
+        - name: ZBX_SERVER_PORT
+          value: "10051"
+        - name: PHP_TZ
+          value: "UTC"
+        - name: ZBX_MAXEXECUTIONTIME
+          value: "600"
+        - name: ZBX_MEMORYLIMIT
+          value: "512M"
+        - name: ZBX_POSTMAXSIZE
+          value: "64M"
+        - name: ZBX_UPLOADMAXFILESIZE
+          value: "16M"
+        - name: ZBX_MAXINPUTTIME
+          value: "300"
+        - name: ZBX_SESSION_NAME
+          value: "zbx_sessionid"
+        - name: ZBX_DENY_GUI_ACCESS
+          value: "false"
+        - name: ZBX_GUI_ACCESS_IP_RANGE
+          value: "0.0.0.0/0"
+
+      # Health checks
+      livenessProbe:
+        httpGet:
+          path: /
+          port: zabbix-web
+          scheme: HTTP
+        initialDelaySeconds: 30
+        timeoutSeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 6
+
+      readinessProbe:
+        httpGet:
+          path: /
+          port: zabbix-web
+          scheme: HTTP
+        initialDelaySeconds: 15
+        timeoutSeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        failureThreshold: 3
+
+      service:
+        type: ClusterIP
+        port: 80
+        annotations: {}
+
+    # Zabbix Agent - Monitor Kubernetes nodes
+    zabbixagent:
+      enabled: true
+
+      image:
+        repository: "zabbix/zabbix-agent2"
+        tag: "ubuntu-7.4.0"
+        pullPolicy: IfNotPresent
+
+      # Agent configuration
+      ZBX_SERVER_HOST: "zabbix-zabbix-server.observability.svc.cluster.local"
+      ZBX_SERVER_PORT: 10051
+      ZBX_PASSIVE_ALLOW: true
+      ZBX_ACTIVE_ALLOW: true
+      ZBX_PASSIVESERVERS: "zabbix-zabbix-server.observability.svc.cluster.local"
+      ZBX_VMWARECACHESIZE: "128M"
+      ZBX_JAVAGATEWAY_ENABLE: false
+
+      # Host system monitoring
+      volumes_host: true  # Mount host filesystems for monitoring
+
+      # Custom user parameters for Kubernetes monitoring
+      userparams:
+        kubernetes.conf: |
+          UserParameter=k8s.node.cpu_usage,kubectl top node --no-headers | awk '{sum+=$3} END {print sum}'
+          UserParameter=k8s.node.memory_usage,kubectl top node --no-headers | awk '{sum+=$5} END {print sum}'
+          UserParameter=k8s.pods.running,kubectl get pods --all-namespaces --field-selector=status.phase=Running --no-headers | wc -l
+          UserParameter=k8s.pods.failed,kubectl get pods --all-namespaces --field-selector=status.phase=Failed --no-headers | wc -l
+          UserParameter=k8s.namespace.count,kubectl get namespaces --no-headers | wc -l
+
+      # Resource allocation
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Security context
+      securityContext:
+        privileged: true  # Required for host monitoring
+        runAsUser: 0      # Required for host access
+
+      # Tolerations to run on all nodes
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+
+      service:
+        type: ClusterIP
+        port: 10050
+        annotations: {}
+
+    # Zabbix Proxy (optional - disabled by default)
+    zabbixproxy:
+      enabled: false
+      replicaCount: 1
+      ZBX_HOSTNAME: "zabbix-proxy"
+      ZBX_SERVER_HOST: "zabbix-zabbix-server"
+      ZBX_SERVER_PORT: 10051
+      ZBX_PROXYMODE: 0  # Active proxy
+
+    # Zabbix Web Service - For external integrations
+    zabbixwebservice:
+      enabled: true
+
+      image:
+        repository: "zabbix/zabbix-web-service"
+        tag: "ubuntu-7.4.0"
+        pullPolicy: IfNotPresent
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      extraEnv:
+        - name: ZBX_ALLOWEDIP
+          value: "zabbix-zabbix-server.observability.svc.cluster.local"
+        - name: ZBX_LISTENPORT
+          value: "10053"
+
+    # Java Gateway for JMX monitoring
+    zabbixjavagateway:
+      enabled: true
+
+      image:
+        repository: "zabbix/zabbix-java-gateway"
+        tag: "ubuntu-7.4.0"
+        pullPolicy: IfNotPresent
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+      extraEnv:
+        - name: ZBX_START_POLLERS
+          value: "5"
+        - name: ZBX_TIMEOUT
+          value: "3"
+
+    # Ingress configuration for web access
+    ingress:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        nginx.ingress.kubernetes.io/proxy-body-size: 64m
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+        cert-manager.io/cluster-issuer: letsencrypt-production
+        hajimari.io/icon: mdi:monitor-dashboard
+        hajimari.io/group: "Monitoring"
+      hosts:
+        - host: &host "zabbix.${SECRET_DOMAIN}"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - hosts:
+            - *host
+          secretName: zabbix-tls
+
+    # Security and scheduling
+    nodeSelector: {}
+
+    tolerations: []
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - zabbix
+              topologyKey: kubernetes.io/hostname

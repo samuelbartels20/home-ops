@@ -1,0 +1,398 @@
+---
+# Pod Security Policy for Alloy - Production Grade
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: alloy-psp
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: security-policy
+    observability.samcloud.online/tier: production
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_BIND_SERVICE  # For binding to privileged ports
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+    - 'hostPath'  # Required for log collection
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+  allowedHostPaths:
+    - pathPrefix: "/var/log"
+      readOnly: true
+    - pathPrefix: "/var/lib/docker/containers"
+      readOnly: true
+    - pathPrefix: "/etc/machine-id"
+      readOnly: true
+
+---
+# Service Account for Alloy with minimal permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: service-account
+    observability.samcloud.online/tier: production
+automountServiceAccountToken: true
+
+---
+# ClusterRole for Alloy with least-privilege access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: rbac
+    observability.samcloud.online/tier: production
+rules:
+  # Kubernetes service discovery
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - services
+      - endpoints
+      - pods
+      - namespaces
+    verbs: ["get", "list", "watch"]
+
+  # Service discovery for monitoring
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get", "list", "watch"]
+
+  # Required for kubelet metrics
+  - apiGroups: [""]
+    resources:
+      - nodes/metrics
+      - nodes/proxy
+    verbs: ["get", "list"]
+
+  # Non-resource URLs for API server metrics
+  - nonResourceURLs:
+      - "/metrics"
+      - "/metrics/cadvisor"
+      - "/api/v1/nodes/*/proxy/metrics"
+      - "/api/v1/nodes/*/proxy/metrics/cadvisor"
+    verbs: ["get"]
+
+  # Events for log collection
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["get", "list", "watch"]
+
+  # Pod Security Policy usage
+  - apiGroups: ["policy"]
+    resources:
+      - podsecuritypolicies
+    verbs: ["use"]
+    resourceNames:
+      - alloy-psp
+
+---
+# ClusterRoleBinding for Alloy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: rbac
+    observability.samcloud.online/tier: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy
+subjects:
+  - kind: ServiceAccount
+    name: alloy
+    namespace: observability
+
+---
+# Role for namespace-specific operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alloy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: rbac
+    observability.samcloud.online/tier: production
+rules:
+  # ConfigMap access for configuration
+  - apiGroups: [""]
+    resources:
+      - configmaps
+    verbs: ["get", "list", "watch"]
+
+  # Secret access for credentials
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list", "watch"]
+
+  # Pod information in observability namespace
+  - apiGroups: [""]
+    resources:
+      - pods
+      - services
+      - endpoints
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for namespace operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alloy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: rbac
+    observability.samcloud.online/tier: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: alloy
+subjects:
+  - kind: ServiceAccount
+    name: alloy
+    namespace: observability
+
+---
+# Security Context Constraints for OpenShift compatibility
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: alloy-scc
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: security
+    observability.samcloud.online/tier: production
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities:
+  - NET_BIND_SERVICE
+defaultAddCapabilities: []
+requiredDropCapabilities:
+  - ALL
+fsGroup:
+  type: RunAsAny
+runAsUser:
+  type: MustRunAsNonRoot
+seLinuxContext:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - hostPath
+  - persistentVolumeClaim
+  - projected
+  - secret
+users:
+  - system:serviceaccount:observability:alloy
+
+---
+# Pod Disruption Budget for High Availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: alloy-pdb
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: availability
+    observability.samcloud.online/tier: production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+
+---
+# Priority Class for Critical Workloads
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: alloy-priority
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: scheduling
+    observability.samcloud.online/tier: production
+value: 1000000
+globalDefault: false
+description: "Priority class for Alloy telemetry collector - critical observability infrastructure"
+
+---
+# Resource Quota for Alloy Namespace Protection
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: alloy-quota
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: resource-management
+    observability.samcloud.online/tier: production
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    limits.cpu: "20"
+    limits.memory: "40Gi"
+    pods: "20"
+    persistentvolumeclaims: "10"
+
+---
+# Network Policy for Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-security-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: security-config
+    observability.samcloud.online/tier: production
+data:
+  security-standards.yaml: |
+    # Pod Security Standards Configuration
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        # Pod Security Standards
+        pod-security.kubernetes.io/enforce: "restricted"
+        pod-security.kubernetes.io/audit: "restricted"
+        pod-security.kubernetes.io/warn: "restricted"
+
+        # Security scanning
+        trivy-scanner/scan: "true"
+        falco-security/monitor: "true"
+
+        # Compliance
+        compliance.security.io/cis: "true"
+        compliance.security.io/nist: "true"
+        compliance.security.io/soc2: "true"
+    spec:
+      securityContext:
+        # Required by Pod Security Standards
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+      - name: alloy
+        securityContext:
+          # Restricted security context
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_BIND_SERVICE
+          seccompProfile:
+            type: RuntimeDefault
+
+        # Resource limits for security
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 12345
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 12345
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+---
+# Secret for Alloy Configuration (template)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alloy-secrets
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: secrets
+    observability.samcloud.online/tier: production
+type: Opaque
+stringData:
+  # Mimir credentials
+  mimir-tenant-id: "home-ops"
+  mimir-auth-token: ""  # Add actual token
+
+  # Loki credentials
+  loki-tenant-id: "home-ops"
+  loki-auth-token: ""  # Add actual token
+
+  # Tempo credentials
+  tempo-tenant-id: "home-ops"
+  tempo-auth-token: ""  # Add actual token
+
+  # External endpoints (if needed)
+  external-loki-endpoint: ""
+  external-mimir-endpoint: ""
+  external-tempo-endpoint: ""

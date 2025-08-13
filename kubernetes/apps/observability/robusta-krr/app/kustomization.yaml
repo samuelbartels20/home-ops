@@ -1,0 +1,21 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+metadata:
+  name: robusta-krr
+  annotations:
+    config.kubernetes.io/local-config: "true"
+resources:
+  - ./helmrelease.yaml
+  - ./httproute.yaml
+  - ./rbac.yaml
+  - ./externalsecret.yaml
+  - ./configmap.yaml
+  - ./networkpolicy.yaml
+commonLabels:
+  app.kubernetes.io/name: robusta-krr
+  app.kubernetes.io/component: cost-optimization
+  app.kubernetes.io/part-of: observability
+  app.kubernetes.io/managed-by: kustomize

@@ -1,0 +1,122 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: robusta-krr-netpol
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: robusta-krr
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress rules - allow traffic to KRR service
+  ingress:
+    # Allow traffic from Gateway API
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cilium-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow health checks from within namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  # Egress rules - allow necessary outbound traffic
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow access to Kubernetes API server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+
+    # Allow access to Mimir in observability namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mimir
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9009
+
+    # Allow access to Prometheus/metrics endpoints
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3100
+        - protocol: TCP
+          port: 8080
+
+    # Allow access to metrics-server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: metrics-server
+      ports:
+        - protocol: TCP
+          port: 10250
+        - protocol: TCP
+          port: 4443
+
+    # Allow HTTPS traffic for external integrations (Robusta SaaS, webhooks)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

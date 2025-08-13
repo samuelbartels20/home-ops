@@ -1,0 +1,120 @@
+---
+# Production ServiceMonitor for Kromgo Metrics Badge Service
+# Comprehensive monitoring for kromgo performance, health, and operational metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kromgo
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: observability-infrastructure
+    monitoring: prometheus
+    production-grade: "true"
+  annotations:
+    prometheus.io/description: "ServiceMonitor for kromgo metrics badge service"
+    monitoring.samcloud.online/tier: "production"
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  # Service selector
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kromgo
+
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  # Monitoring endpoints
+  endpoints:
+
+  # Application metrics endpoint
+  - port: metrics
+    scheme: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 15s
+
+    # Metric relabeling for production
+    metricRelabelings:
+    # Keep kromgo-specific metrics
+    - sourceLabels: [__name__]
+      regex: '^kromgo_.*'
+      action: keep
+
+    # Add service-level labels
+    - targetLabel: service
+      replacement: kromgo
+    - targetLabel: component
+      replacement: metrics-exposure
+
+    # Relabel instance to be more descriptive
+    - sourceLabels: [__address__]
+      targetLabel: instance
+      regex: '([^:]+).*'
+      replacement: 'kromgo-${1}'
+
+  # Health check metrics endpoint
+  - port: health
+    scheme: http
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+
+    # Focus on health and performance metrics
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '^(up|kromgo_health_.*|kromgo_request_.*|kromgo_cache_.*)'
+      action: keep
+
+    # Add health-specific labels
+    - targetLabel: endpoint_type
+      replacement: health
+    - targetLabel: service
+      replacement: kromgo
+
+---
+# Production PodMonitor for additional kromgo pod-level metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kromgo-pods
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: pod-monitoring
+    production-grade: "true"
+spec:
+  # Pod selector
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kromgo
+
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  # Pod endpoints
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 15s
+
+    # Pod-level metric relabeling
+    metricRelabelings:
+    # Keep Go runtime and process metrics
+    - sourceLabels: [__name__]
+      regex: '^(go_.*|process_.*|promhttp_.*)'
+      action: keep
+
+    # Add pod-specific labels
+    - targetLabel: monitor_type
+      replacement: pod
+    - targetLabel: service
+      replacement: kromgo

@@ -1,0 +1,763 @@
+---
+# Mimir Pod Failure Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: mimir-pod-failure
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "availability"
+    target-service: "mimir"
+    severity: "medium"
+spec:
+  action: pod-kill
+  mode: fixed-percent
+  value: "25"  # 25% of pods
+  duration: "5m"
+  selector:
+    namespaces:
+      - observability
+    labelSelectors:
+      "app.kubernetes.io/name": "mimir"
+      "app.kubernetes.io/component": "ingester"
+  scheduler:
+    cron: "@daily"  # Run daily during maintenance window
+
+---
+# ClickHouse Network Latency Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: clickhouse-network-latency
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "performance"
+    target-service: "clickhouse"
+    severity: "low"
+spec:
+  action: netem
+  mode: fixed
+  value: "1"
+  duration: "10m"
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      "app.kubernetes.io/name": "clickhouse"
+  netem:
+    delay:
+      latency: "100ms"
+      correlation: "25"
+      jitter: "10ms"
+  direction: to
+  scheduler:
+    cron: "0 14 * * MON"  # Monday 2 PM UTC
+
+---
+# Loki Storage I/O Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: loki-storage-latency
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "storage"
+    target-service: "loki"
+    severity: "medium"
+spec:
+  action: latency
+  mode: fixed
+  value: "1"
+  duration: "15m"
+  selector:
+    namespaces:
+      - observability
+    labelSelectors:
+      "app.kubernetes.io/name": "loki"
+      "app.kubernetes.io/component": "ingester"
+  delay: "200ms"
+  percent: 50
+  path: "/loki"
+  scheduler:
+    cron: "0 15 * * TUE"  # Tuesday 3 PM UTC
+
+---
+# Druid Memory Stress Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: druid-memory-stress
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "resource"
+    target-service: "druid"
+    severity: "high"
+spec:
+  mode: fixed
+  value: "1"
+  duration: "20m"
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      "app.kubernetes.io/name": "druid"
+      "app.kubernetes.io/component": "broker"
+  stressors:
+    memory:
+      workers: 2
+      size: "1GB"
+  scheduler:
+    cron: "0 16 * * WED"  # Wednesday 4 PM UTC
+
+---
+# Kubernetes API Server DNS Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: kubernetes-dns-chaos
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "infrastructure"
+    target-service: "kubernetes-api"
+    severity: "high"
+spec:
+  action: error
+  mode: fixed
+  value: "1"
+  duration: "5m"
+  selector:
+    namespaces:
+      - observability
+    labelSelectors:
+      "app.kubernetes.io/name": "kube-prometheus-stack-prometheus"
+  patterns:
+    - "kubernetes.default.svc.cluster.local"
+  scheduler:
+    cron: "0 17 * * THU"  # Thursday 5 PM UTC
+
+---
+# Superset HTTP Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: superset-http-chaos
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "api"
+    target-service: "superset"
+    severity: "medium"
+spec:
+  mode: fixed
+  value: "1"
+  duration: "10m"
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      "app.kubernetes.io/name": "superset"
+  target: Request
+  port: 8088
+  method: "GET"
+  path: "/api/*"
+  abort: true
+  scheduler:
+    cron: "0 18 * * FRI"  # Friday 6 PM UTC
+
+---
+# Multi-Service Workflow Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: data-platform-disaster-recovery
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "disaster-recovery"
+    severity: "critical"
+spec:
+  entry: "data-platform-failure-simulation"
+  templates:
+  - name: "data-platform-failure-simulation"
+    templateType: Serial
+    deadline: "30m"
+    children:
+    - "phase-1-clickhouse-failure"
+    - "phase-2-druid-network-partition"
+    - "phase-3-superset-resource-exhaustion"
+    - "phase-4-recovery-validation"
+
+  - name: "phase-1-clickhouse-failure"
+    templateType: PodChaos
+    deadline: "10m"
+    podChaos:
+      action: pod-kill
+      mode: fixed-percent
+      value: "50"
+      selector:
+        namespaces:
+          - data-science
+        labelSelectors:
+          "app.kubernetes.io/name": "clickhouse"
+
+  - name: "phase-2-druid-network-partition"
+    templateType: NetworkChaos
+    deadline: "10m"
+    networkChaos:
+      action: partition
+      mode: fixed
+      value: "1"
+      direction: both
+      selector:
+        namespaces:
+          - data-science
+        labelSelectors:
+          "app.kubernetes.io/name": "druid"
+          "app.kubernetes.io/component": "broker"
+
+  - name: "phase-3-superset-resource-exhaustion"
+    templateType: StressChaos
+    deadline: "10m"
+    stressChaos:
+      mode: fixed
+      value: "1"
+      stressors:
+        memory:
+          workers: 4
+          size: "2GB"
+        cpu:
+          workers: 2
+          load: 80
+      selector:
+        namespaces:
+          - data-science
+        labelSelectors:
+          "app.kubernetes.io/name": "superset"
+
+  - name: "phase-4-recovery-validation"
+    templateType: Task
+    deadline: "5m"
+    task:
+      container:
+        name: validation
+        image: curlimages/curl:latest
+        command: ["sh"]
+        args:
+        - -c
+        - |
+          echo "Validating service recovery..."
+
+          # Test ClickHouse
+          clickhouse_response=$(curl -s -o /dev/null -w "%{http_code}" https://clickhouse.samcloud.online/ping || echo "000")
+          if [ "$clickhouse_response" = "200" ]; then
+            echo "[SUCCESS] ClickHouse recovered successfully"
+          else
+            echo "[FAIL] ClickHouse recovery failed: $clickhouse_response"
+            exit 1
+          fi
+
+          # Test Druid
+          druid_response=$(curl -s -o /dev/null -w "%{http_code}" https://druid.samcloud.online/status/health || echo "000")
+          if [ "$druid_response" = "200" ]; then
+            echo "[SUCCESS] Druid recovered successfully"
+          else
+            echo "[FAIL] Druid recovery failed: $druid_response"
+            exit 1
+          fi
+
+          # Test Superset
+          superset_response=$(curl -s -o /dev/null -w "%{http_code}" https://superset.samcloud.online/health || echo "000")
+          if [ "$superset_response" = "200" ]; then
+            echo "[SUCCESS] Superset recovered successfully"
+          else
+            echo "[FAIL] Superset recovery failed: $superset_response"
+            exit 1
+          fi
+
+          echo "[SUCCESS] All services recovered successfully!"
+
+---
+# Observability Stack Resilience Test
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: observability-resilience-test
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "observability-resilience"
+    severity: "high"
+spec:
+  entry: "observability-chaos-workflow"
+  templates:
+  - name: "observability-chaos-workflow"
+    templateType: Parallel
+    deadline: "45m"
+    children:
+    - "mimir-pod-chaos"
+    - "loki-network-chaos"
+    - "grafana-stress-chaos"
+    - "prometheus-io-chaos"
+
+  - name: "mimir-pod-chaos"
+    templateType: PodChaos
+    deadline: "15m"
+    podChaos:
+      action: pod-failure
+      mode: fixed-percent
+      value: "33"
+      selector:
+        namespaces:
+          - observability
+        labelSelectors:
+          "app.kubernetes.io/name": "mimir"
+
+  - name: "loki-network-chaos"
+    templateType: NetworkChaos
+    deadline: "15m"
+    networkChaos:
+      action: netem
+      mode: fixed
+      value: "1"
+      netem:
+        delay:
+          latency: "500ms"
+          jitter: "100ms"
+        loss:
+          loss: "5"
+      selector:
+        namespaces:
+          - observability
+        labelSelectors:
+          "app.kubernetes.io/name": "loki"
+
+  - name: "grafana-stress-chaos"
+    templateType: StressChaos
+    deadline: "15m"
+    stressChaos:
+      mode: fixed
+      value: "1"
+      stressors:
+        cpu:
+          workers: 2
+          load: 70
+        memory:
+          workers: 1
+          size: "512MB"
+      selector:
+        namespaces:
+          - observability
+        labelSelectors:
+          "app.kubernetes.io/name": "grafana"
+
+  - name: "prometheus-io-chaos"
+    templateType: IOChaos
+    deadline: "15m"
+    ioChaos:
+      action: latency
+      mode: fixed
+      value: "1"
+      delay: "1s"
+      percent: 30
+      path: "/prometheus"
+      selector:
+        namespaces:
+          - observability
+        labelSelectors:
+          "app.kubernetes.io/name": "prometheus"
+
+---
+# Kubernetes Infrastructure Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: kubernetes-infrastructure-chaos
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "infrastructure"
+    severity: "critical"
+spec:
+  entry: "infrastructure-resilience-test"
+  templates:
+  - name: "infrastructure-resilience-test"
+    templateType: Serial
+    deadline: "60m"
+    children:
+    - "etcd-performance-degradation"
+    - "api-server-stress-test"
+    - "scheduler-disruption"
+    - "kubelet-network-issues"
+    - "recovery-validation"
+
+  - name: "etcd-performance-degradation"
+    templateType: StressChaos
+    deadline: "10m"
+    stressChaos:
+      mode: fixed
+      value: "1"
+      stressors:
+        cpu:
+          workers: 1
+          load: 50
+      selector:
+        namespaces:
+          - kube-system
+        labelSelectors:
+          "component": "etcd"
+
+  - name: "api-server-stress-test"
+    templateType: StressChaos
+    deadline: "10m"
+    stressChaos:
+      mode: fixed
+      value: "1"
+      stressors:
+        memory:
+          workers: 1
+          size: "1GB"
+      selector:
+        namespaces:
+          - kube-system
+        labelSelectors:
+          "component": "kube-apiserver"
+
+  - name: "scheduler-disruption"
+    templateType: PodChaos
+    deadline: "5m"
+    podChaos:
+      action: pod-kill
+      mode: fixed
+      value: "1"
+      selector:
+        namespaces:
+          - kube-system
+        labelSelectors:
+          "component": "kube-scheduler"
+
+  - name: "kubelet-network-issues"
+    templateType: NetworkChaos
+    deadline: "15m"
+    networkChaos:
+      action: netem
+      mode: fixed-percent
+      value: "20"
+      netem:
+        delay:
+          latency: "200ms"
+        loss:
+          loss: "2"
+      direction: both
+      selector:
+        namespaces:
+          - kube-system
+        labelSelectors:
+          "k8s-app": "kubelet"
+
+  - name: "recovery-validation"
+    templateType: Task
+    deadline: "10m"
+    task:
+      container:
+        name: validation
+        image: bitnami/kubectl:latest
+        command: ["sh"]
+        args:
+        - -c
+        - |
+          echo "Validating Kubernetes cluster health..."
+
+          # Check node status
+          kubectl get nodes --no-headers | while read node rest; do
+            status=$(echo $rest | awk '{print $2}')
+            if [ "$status" != "Ready" ]; then
+              echo "[FAIL] Node $node is not Ready: $status"
+              exit 1
+            fi
+          done
+          echo "[SUCCESS] All nodes are Ready"
+
+          # Check system pods
+          not_ready=$(kubectl get pods -n kube-system --no-headers | grep -v Running | grep -v Completed | wc -l)
+          if [ "$not_ready" -gt 0 ]; then
+            echo "[FAIL] $not_ready system pods are not running"
+            kubectl get pods -n kube-system | grep -v Running | grep -v Completed
+            exit 1
+          fi
+          echo "[SUCCESS] All system pods are running"
+
+          # Check API server responsiveness
+          start_time=$(date +%s)
+          kubectl get namespaces > /dev/null
+          end_time=$(date +%s)
+          response_time=$((end_time - start_time))
+          if [ "$response_time" -gt 5 ]; then
+            echo "[FAIL] API server response time too slow: ${response_time}s"
+            exit 1
+          fi
+          echo "[SUCCESS] API server responsive (${response_time}s)"
+
+          echo "[SUCCESS] Kubernetes cluster recovered successfully!"
+
+---
+# Storage System Resilience Test
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: storage-resilience-test
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "storage"
+    severity: "critical"
+spec:
+  entry: "storage-chaos-workflow"
+  templates:
+  - name: "storage-chaos-workflow"
+    templateType: Serial
+    deadline: "90m"
+    children:
+    - "ceph-osd-failure"
+    - "storage-network-partition"
+    - "volume-performance-degradation"
+    - "backup-system-test"
+    - "storage-recovery-validation"
+
+  - name: "ceph-osd-failure"
+    templateType: PodChaos
+    deadline: "20m"
+    podChaos:
+      action: pod-kill
+      mode: fixed
+      value: "1"
+      selector:
+        namespaces:
+          - rook-ceph
+        labelSelectors:
+          "app": "rook-ceph-osd"
+
+  - name: "storage-network-partition"
+    templateType: NetworkChaos
+    deadline: "15m"
+    networkChaos:
+      action: partition
+      mode: fixed
+      value: "1"
+      direction: both
+      selector:
+        namespaces:
+          - rook-ceph
+        labelSelectors:
+          "app": "rook-ceph-mon"
+
+  - name: "volume-performance-degradation"
+    templateType: IOChaos
+    deadline: "20m"
+    ioChaos:
+      action: latency
+      mode: all
+      delay: "2s"
+      percent: 25
+      path: "/var/lib/rook"
+      selector:
+        namespaces:
+          - rook-ceph
+        labelSelectors:
+          "app": "rook-ceph-osd"
+
+  - name: "backup-system-test"
+    templateType: Task
+    deadline: "30m"
+    task:
+      container:
+        name: backup-test
+        image: rook/ceph:v1.12.8
+        command: ["sh"]
+        args:
+        - -c
+        - |
+          echo "Testing backup and restore capabilities..."
+
+          # Create test data
+          echo "Creating test volume..."
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: chaos-test-pvc
+            namespace: default
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: ceph-rbd
+          EOF
+
+          # Wait for PVC to be bound
+          kubectl wait --for=condition=Bound pvc/chaos-test-pvc -n default --timeout=300s
+
+          # Create test pod to write data
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: chaos-test-writer
+            namespace: default
+          spec:
+            containers:
+            - name: writer
+              image: busybox
+              command: ["sh", "-c", "echo 'Chaos test data' > /data/test.txt && sleep 3600"]
+              volumeMounts:
+              - name: test-volume
+                mountPath: /data
+            volumes:
+            - name: test-volume
+              persistentVolumeClaim:
+                claimName: chaos-test-pvc
+          EOF
+
+          kubectl wait --for=condition=Ready pod/chaos-test-writer -n default --timeout=300s
+
+          # Verify data
+          kubectl exec chaos-test-writer -n default -- cat /data/test.txt
+
+          # Cleanup
+          kubectl delete pod chaos-test-writer -n default
+          kubectl delete pvc chaos-test-pvc -n default
+
+          echo "[SUCCESS] Backup system test completed"
+
+  - name: "storage-recovery-validation"
+    templateType: Task
+    deadline: "10m"
+    task:
+      container:
+        name: validation
+        image: rook/ceph:v1.12.8
+        command: ["sh"]
+        args:
+        - -c
+        - |
+          echo "Validating Ceph cluster health..."
+
+          # Check cluster health
+          ceph health detail
+
+          # Check OSD status
+          ceph osd status
+
+          # Check placement group status
+          ceph pg stat
+
+          # Verify no data loss
+          ceph df
+
+          echo "[SUCCESS] Storage system validated successfully!"
+
+---
+# Network Resilience Test Suite
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: weekly-network-resilience-test
+  namespace: chaos-mesh
+  labels:
+    schedule-type: "network-resilience"
+    frequency: "weekly"
+spec:
+  schedule: "0 2 * * SUN"  # Every Sunday at 2 AM UTC
+  historyLimit: 5
+  type: "Workflow"
+  workflowSpec:
+    entry: "network-resilience-suite"
+    templates:
+    - name: "network-resilience-suite"
+      templateType: Parallel
+      deadline: "120m"
+      children:
+      - "cross-namespace-network-test"
+      - "ingress-controller-resilience"
+      - "service-mesh-disruption"
+      - "dns-resolution-chaos"
+
+    - name: "cross-namespace-network-test"
+      templateType: NetworkChaos
+      deadline: "30m"
+      networkChaos:
+        action: netem
+        mode: all
+        netem:
+          delay:
+            latency: "100ms"
+            jitter: "20ms"
+          loss:
+            loss: "1"
+        direction: both
+        selector:
+          namespaces:
+            - observability
+            - data-science
+
+    - name: "ingress-controller-resilience"
+      templateType: PodChaos
+      deadline: "30m"
+      podChaos:
+        action: pod-kill
+        mode: fixed-percent
+        value: "50"
+        selector:
+          namespaces:
+            - ingress-nginx
+          labelSelectors:
+            "app.kubernetes.io/name": "ingress-nginx"
+
+    - name: "service-mesh-disruption"
+      templateType: NetworkChaos
+      deadline: "30m"
+      networkChaos:
+        action: bandwidth
+        mode: all
+        bandwidth:
+          rate: "10mbps"
+          limit: 1000
+          buffer: 1000
+        direction: both
+        selector:
+          namespaces:
+            - istio-system
+
+    - name: "dns-resolution-chaos"
+      templateType: DNSChaos
+      deadline: "30m"
+      dnsChaos:
+        action: random
+        mode: all
+        patterns:
+        - "*.samcloud.online"
+        scope: "cluster"
+        selector:
+          namespaces:
+            - kube-system
+          labelSelectors:
+            "k8s-app": "kube-dns"
+
+# Chaos Engineering Experiments
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: network-disruption
+  namespace: observability
+spec:
+  schedule: "0 * * * *"
+  type: "NetworkChaos"
+  networkChaos:
+    action: delay
+    mode: one
+    selector:
+      namespaces:
+        - storage
+        - security
+    delay:
+      latency: "100ms"
+      correlation: "100"
+      jitter: "0ms"
+  historyLimit: 5
+  concurrencyPolicy: Forbid

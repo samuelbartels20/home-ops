@@ -1,0 +1,22 @@
+# Enterprise OpenTelemetry Monitoring Rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: opentelemetry-enterprise-rules
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  groups:
+    - name: opentelemetry.enterprise.rules
+      rules:
+        - alert: OpenTelemetryHighMemory
+          expr: container_memory_usage_bytes{container="opentelemetry-collector"} / container_spec_memory_limit_bytes{container="opentelemetry-collector"} > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenTelemetry Collector high memory usage"
+            description: "OpenTelemetry Collector memory usage is above 90%"

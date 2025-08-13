@@ -1,0 +1,176 @@
+---
+# ServiceMonitor for Zabbix Server
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zabbix-server
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: zabbix
+    app.kubernetes.io/component: server-observability
+    app.kubernetes.io/part-of: observability
+    monitoring: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zabbix-server
+      app.kubernetes.io/component: server
+
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  endpoints:
+  - port: metrics
+    scheme: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 15s
+
+    metricRelabelings:
+    # Keep Zabbix server specific metrics
+    - sourceLabels: [__name__]
+      regex: '^(zabbix_server_.*|up|process_.*)'
+      action: keep
+
+    # Add service-level labels
+    - targetLabel: service
+      replacement: zabbix-server
+    - targetLabel: component
+      replacement: monitoring-backend
+
+---
+# ServiceMonitor for Zabbix Web
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zabbix-web
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: zabbix
+    app.kubernetes.io/component: web-observability
+    app.kubernetes.io/part-of: observability
+    monitoring: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zabbix-web
+      app.kubernetes.io/component: web
+
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  endpoints:
+  - port: http
+    scheme: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 15s
+
+    metricRelabelings:
+    # Keep Zabbix web specific metrics
+    - sourceLabels: [__name__]
+      regex: '^(zabbix_web_.*|nginx_.*|php_.*|up)'
+      action: keep
+
+    # Add service-level labels
+    - targetLabel: service
+      replacement: zabbix-web
+    - targetLabel: component
+      replacement: web-frontend
+
+---
+# ServiceMonitor for Zabbix Agent (if metrics are exposed)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zabbix-agent
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: zabbix
+    app.kubernetes.io/component: agent-observability
+    app.kubernetes.io/part-of: observability
+    monitoring: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zabbix-agent
+      app.kubernetes.io/component: agent
+
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  endpoints:
+  - port: metrics
+    scheme: http
+    path: /metrics
+    interval: 60s
+    scrapeTimeout: 30s
+
+    metricRelabelings:
+    # Keep Zabbix agent specific metrics
+    - sourceLabels: [__name__]
+      regex: '^(zabbix_agent_.*|node_.*|up)'
+      action: keep
+
+    # Add service-level labels
+    - targetLabel: service
+      replacement: zabbix-agent
+    - targetLabel: component
+      replacement: monitoring-agent
+
+---
+# ServiceMonitor for PostgreSQL database
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zabbix-postgresql
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: zabbix
+    app.kubernetes.io/component: database-observability
+    app.kubernetes.io/part-of: observability
+    monitoring: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zabbix-postgresql
+      app.kubernetes.io/component: database
+
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  endpoints:
+  - port: metrics
+    scheme: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 15s
+
+    metricRelabelings:
+    # Keep PostgreSQL specific metrics
+    - sourceLabels: [__name__]
+      regex: '^(pg_.*|postgres_.*|up)'
+      action: keep
+
+    # Add service-level labels
+    - targetLabel: service
+      replacement: zabbix-postgresql
+    - targetLabel: component
+      replacement: database
+
+    # Filter to only Zabbix database
+    - sourceLabels: [datname]
+      regex: 'zabbix'
+      action: keep

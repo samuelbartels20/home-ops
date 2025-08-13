@@ -1,0 +1,236 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: opentelemetry-operator
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-operator
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: opentelemetry-operator
+      version: 0.47.0
+      sourceRef:
+        kind: HelmRepository
+        name: opentelemetry
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    manager:
+      image:
+        repository: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
+        tag: v0.127.0
+      collectorImage:
+        repository: "otel/opentelemetry-collector-contrib"
+        tag: 0.128.0
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    admissionWebhooks:
+      enabled: true
+      certManager:
+        enabled: true
+        issuerRef:
+          kind: Issuer
+          name: selfsigned-issuer
+      failurePolicy: Fail
+      timeoutSeconds: 10
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+          - ALL
+
+    prometheus:
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+
+    featureGates:
+      operator.autoinstrumentation.go: true
+      operator.autoinstrumentation.nginx: true
+      operator.autoinstrumentation.multi-instrumentation: true
+      instrumentation: true
+      podInstrumentation: true
+      targetAllocator: false
+
+    kubeRBACProxy:
+      enabled: false
+
+    replicaCount: 3
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 2
+        memory: 1Gi
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - opentelemetry-operator
+            topologyKey: kubernetes.io/hostname
+
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        monitoring: "opentelemetry-operator"
+      relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_name]
+        targetLabel: pod
+      - sourceLabels: [__meta_kubernetes_pod_container_name]
+        targetLabel: container
+
+    prometheusRule:
+      enabled: true
+      defaultRules:
+        enabled: true
+      additionalRuleLabels:
+        component: "opentelemetry-operator"
+        severity: "critical"
+      groups:
+      - name: opentelemetry-operator.critical
+        rules:
+        - alert: OpenTelemetryOperatorDown
+          expr: up{job=~".*opentelemetry-operator.*"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: opentelemetry-operator
+          annotations:
+            summary: "OpenTelemetry Operator is down"
+            description: "OpenTelemetry Operator has been down for more than 2 minutes"
+            runbook_url: "https://github.com/samuelbartels20/home-ops/blob/main/docs/troubleshooting.md"
+        - alert: OpenTelemetryOperatorHighMemory
+          expr: container_memory_usage_bytes{container="manager"} / container_spec_memory_limit_bytes > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            component: opentelemetry-operator
+          annotations:
+            summary: "OpenTelemetry Operator high memory usage"
+            description: "OpenTelemetry Operator memory usage is above 80% for more than 5 minutes"
+        - alert: OpenTelemetryOperatorHighCPU
+          expr: rate(container_cpu_usage_seconds_total{container="manager"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            component: opentelemetry-operator
+          annotations:
+            summary: "OpenTelemetry Operator high CPU usage"
+            description: "OpenTelemetry Operator CPU usage is above 80% for more than 5 minutes"
+        - alert: OpenTelemetryOperatorReconcileErrors
+          expr: increase(controller_runtime_reconcile_errors_total[5m]) > 5
+          for: 2m
+          labels:
+            severity: critical
+            component: opentelemetry-operator
+          annotations:
+            summary: "OpenTelemetry Operator reconcile errors"
+            description: "OpenTelemetry Operator has more than 5 reconcile errors in 5 minutes"
+        - alert: OpenTelemetryCollectorCreationFailures
+          expr: increase(opentelemetry_operator_collector_create_errors_total[10m]) > 3
+          for: 1m
+          labels:
+            severity: critical
+            component: opentelemetry-operator
+          annotations:
+            summary: "OpenTelemetry Collector creation failures"
+            description: "OpenTelemetry Operator failed to create collectors more than 3 times in 10 minutes"
+
+    rbac:
+      create: true
+
+    serviceAccount:
+      create: true
+      annotations:
+        eks.amazonaws.com/role-arn: ""
+
+    nodeSelector:
+      kubernetes.io/os: linux
+
+    tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+
+    priorityClassName: "system-cluster-critical"
+
+    env:
+    - name: OTEL_RESOURCE_ATTRIBUTES
+      value: "service.name=opentelemetry-operator,service.version=v0.127.0,deployment.environment=production"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://alloy.observability.svc.cluster.local:4317"
+    - name: GOMAXPROCS
+      valueFrom:
+        resourceFieldRef:
+          resource: limits.cpu
+
+    instrumentationJobImage: "ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-go:v0.15.0-alpha"
+
+    enableLeaderElection: true
+    leaderElectionNamespace: observability

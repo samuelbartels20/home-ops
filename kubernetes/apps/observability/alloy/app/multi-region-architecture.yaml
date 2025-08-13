@@ -1,0 +1,585 @@
+---
+# Multi-Region Architecture for Alloy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-multi-region
+  namespace: observability
+data:
+  architecture.yaml: |
+    regions:
+      - name: primary
+        components:
+          - service: alloy-api
+            replicas: 3
+          - service: alloy-worker
+            replicas: 2
+          - service: alloy-cache
+            replicas: 3
+
+      - name: secondary
+        components:
+          - service: alloy-api
+            replicas: 2
+          - service: alloy-worker
+            replicas: 2
+          - service: alloy-cache
+            replicas: 2
+
+    storage:
+      type: distributed
+      replication: 3
+      backup: enabled
+
+    networking:
+      load_balancing: global
+      failover: automatic
+      latency_optimization: enabled
+
+  regions.yaml: |
+    # Multi-Region Configuration
+    regions:
+      primary:
+        name: "us-west-2"
+        clusters:
+          - "home-ops-production-west"
+        weight: 70
+        priority: 1
+        endpoints:
+          alloy: "alloy.us-west-2.samcloud.online"
+          mimir: "mimir.us-west-2.samcloud.online"
+          loki: "loki.us-west-2.samcloud.online"
+          tempo: "tempo.us-west-2.samcloud.online"
+
+      secondary:
+        name: "us-east-1"
+        clusters:
+          - "home-ops-production-east"
+        weight: 30
+        priority: 2
+        endpoints:
+          alloy: "alloy.us-east-1.samcloud.online"
+          mimir: "mimir.us-east-1.samcloud.online"
+          loki: "loki.us-east-1.samcloud.online"
+          tempo: "tempo.us-east-1.samcloud.online"
+
+      disaster_recovery:
+        name: "eu-west-1"
+        clusters:
+          - "home-ops-dr-europe"
+        weight: 0  # Standby only
+        priority: 3
+        endpoints:
+          alloy: "alloy.eu-west-1.samcloud.online"
+          mimir: "mimir.eu-west-1.samcloud.online"
+          loki: "loki.eu-west-1.samcloud.online"
+          tempo: "tempo.eu-west-1.samcloud.online"
+
+    # Failover configuration
+    failover:
+      health_check_interval: "30s"
+      health_check_timeout: "10s"
+      failure_threshold: 3
+      recovery_threshold: 2
+      automatic_failover: true
+      manual_override: true
+
+      # RTO/RPO targets
+      rto_minutes: 5    # Recovery Time Objective: 5 minutes
+      rpo_minutes: 15   # Recovery Point Objective: 15 minutes
+
+    # Data replication settings
+    replication:
+      mode: "async"  # async for performance, sync for consistency
+      batch_size: 10000
+      flush_interval: "30s"
+      compression: true
+      encryption: true
+
+      # Cross-region bandwidth limits
+      bandwidth_limit_mbps: 1000
+      burst_limit_mbps: 2000
+
+  global-load-balancer.yaml: |
+    # Global Load Balancer Configuration
+    global_lb:
+      # Health-based routing
+      routing_policy: "health_weighted"
+
+      # Region weights (can be dynamically adjusted)
+      weights:
+        us-west-2: 70
+        us-east-1: 30
+        eu-west-1: 0  # Standby
+
+      # Health check configuration
+      health_checks:
+        - name: "alloy-health"
+          path: "/-/healthy"
+          port: 12345
+          interval: "10s"
+          timeout: "5s"
+          healthy_threshold: 2
+          unhealthy_threshold: 3
+
+        - name: "alloy-ready"
+          path: "/-/ready"
+          port: 12345
+          interval: "5s"
+          timeout: "3s"
+          healthy_threshold: 2
+          unhealthy_threshold: 2
+
+      # Geographic routing
+      geo_routing:
+        enabled: true
+        rules:
+          - source_regions: ["us-west-*", "us-central-*"]
+            target_region: "us-west-2"
+          - source_regions: ["us-east-*", "ca-*"]
+            target_region: "us-east-1"
+          - source_regions: ["eu-*", "af-*", "me-*"]
+            target_region: "eu-west-1"
+
+      # Latency-based routing
+      latency_routing:
+        enabled: true
+        measure_interval: "60s"
+        routing_threshold_ms: 100
+
+---
+# HelmRelease for Primary Region (us-west-2)
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy-primary
+  namespace: observability
+  labels:
+    observability.samcloud.online/tier: production
+    observability.samcloud.online/region: us-west-2
+    observability.samcloud.online/role: primary
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: alloy
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    fullnameOverride: alloy-primary
+
+    # Enhanced replica count for primary region
+    replicaCount: 5
+
+    # Multi-AZ deployment
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: alloy
+            app.kubernetes.io/instance: alloy-primary
+      - maxSkew: 2
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: alloy
+            app.kubernetes.io/instance: alloy-primary
+
+    # Enhanced resource allocation for primary
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 4
+        memory: 8Gi
+
+    # Cross-region configuration
+    alloy:
+      extraEnv:
+        - name: ALLOY_REGION
+          value: "us-west-2"
+        - name: ALLOY_ROLE
+          value: "primary"
+        - name: ALLOY_CLUSTER_NAME
+          value: "home-ops-production-west"
+        - name: CROSS_REGION_REPLICATION
+          value: "true"
+        - name: REPLICATION_TARGETS
+          value: "alloy-secondary.us-east-1.samcloud.online:12345,alloy-dr.eu-west-1.samcloud.online:12345"
+
+      extraArgs:
+        - "--enable-feature=cross-region-replication"
+        - "--replication.mode=async"
+        - "--replication.batch-size=10000"
+        - "--replication.flush-interval=30s"
+
+    # Service with external access
+    service:
+      enabled: true
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+        external-dns.alpha.kubernetes.io/hostname: "alloy.us-west-2.samcloud.online"
+      ports:
+        http:
+          port: 12345
+          targetPort: 12345
+        grpc:
+          port: 12346
+          targetPort: 12346
+        replication:
+          port: 12347
+          targetPort: 12347
+
+    # Autoscaling for primary region
+    autoscaling:
+      enabled: true
+      minReplicas: 5
+      maxReplicas: 20
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 70
+
+---
+# HelmRelease for Secondary Region (us-east-1)
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy-secondary
+  namespace: observability
+  labels:
+    observability.samcloud.online/tier: production
+    observability.samcloud.online/region: us-east-1
+    observability.samcloud.online/role: secondary
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: alloy
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    fullnameOverride: alloy-secondary
+
+    # Smaller replica count for secondary
+    replicaCount: 3
+
+    # Resource allocation for secondary
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+
+    # Cross-region configuration
+    alloy:
+      extraEnv:
+        - name: ALLOY_REGION
+          value: "us-east-1"
+        - name: ALLOY_ROLE
+          value: "secondary"
+        - name: ALLOY_CLUSTER_NAME
+          value: "home-ops-production-east"
+        - name: PRIMARY_REGION_ENDPOINT
+          value: "alloy-primary.us-west-2.samcloud.online:12345"
+        - name: REPLICATION_MODE
+          value: "receive"
+
+      extraArgs:
+        - "--enable-feature=cross-region-replication"
+        - "--replication.mode=receive"
+        - "--replication.primary=alloy-primary.us-west-2.samcloud.online:12347"
+
+    # Service configuration
+    service:
+      enabled: true
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        external-dns.alpha.kubernetes.io/hostname: "alloy.us-east-1.samcloud.online"
+
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 15
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 70
+
+---
+# CronJob for Multi-Region Health Monitoring
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alloy-region-health-monitor
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: multi-region-health
+    observability.samcloud.online/tier: production
+spec:
+  schedule: "* * * * *"  # Every minute
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: alloy-health-monitor
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: alloy-multi-region
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: health-monitor
+            image: curlimages/curl:8.4.0
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            env:
+            - name: PRIMARY_ENDPOINT
+              value: "http://alloy-primary.observability.svc.cluster.local:12345"
+            - name: SECONDARY_ENDPOINT
+              value: "http://alloy.us-east-1.samcloud.online:12345"
+            - name: DR_ENDPOINT
+              value: "http://alloy.eu-west-1.samcloud.online:12345"
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: alloy-alerts
+                  key: slack-webhook-url
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting multi-region health check..."
+
+              # Check primary region health
+              PRIMARY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${PRIMARY_ENDPOINT}/-/healthy" || echo "000")
+              PRIMARY_READY=$(curl -s -o /dev/null -w "%{http_code}" "${PRIMARY_ENDPOINT}/-/ready" || echo "000")
+
+              # Check secondary region health
+              SECONDARY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_ENDPOINT}/-/healthy" || echo "000")
+              SECONDARY_READY=$(curl -s -o /dev/null -w "%{http_code}" "${SECONDARY_ENDPOINT}/-/ready" || echo "000")
+
+              # Check DR region health
+              DR_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${DR_ENDPOINT}/-/healthy" || echo "000")
+
+              echo "Health Status:"
+              echo "Primary (us-west-2): Health=${PRIMARY_STATUS}, Ready=${PRIMARY_READY}"
+              echo "Secondary (us-east-1): Health=${SECONDARY_STATUS}, Ready=${SECONDARY_READY}"
+              echo "DR (eu-west-1): Health=${DR_STATUS}"
+
+              # Determine overall health
+              HEALTHY_REGIONS=0
+
+              if [ "${PRIMARY_STATUS}" = "200" ] && [ "${PRIMARY_READY}" = "200" ]; then
+                HEALTHY_REGIONS=$((HEALTHY_REGIONS + 1))
+                echo "[PASS] Primary region is healthy"
+              else
+                echo "[FAIL] Primary region is unhealthy"
+                if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+                  curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"[ALERT] CRITICAL: Primary Alloy region (us-west-2) is unhealthy!"}' \
+                    "${SLACK_WEBHOOK_URL}"
+                fi
+              fi
+
+              if [ "${SECONDARY_STATUS}" = "200" ] && [ "${SECONDARY_READY}" = "200" ]; then
+                HEALTHY_REGIONS=$((HEALTHY_REGIONS + 1))
+                echo "[PASS] Secondary region is healthy"
+              else
+                echo "[WARNING] Secondary region is unhealthy"
+                if [ "${PRIMARY_STATUS}" != "200" ] && [ -n "${SLACK_WEBHOOK_URL}" ]; then
+                  curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"[ALERT] DISASTER: Both primary and secondary Alloy regions are down! Activating DR procedures."}' \
+                    "${SLACK_WEBHOOK_URL}"
+                fi
+              fi
+
+              # Update global load balancer weights based on health
+              if [ "${PRIMARY_STATUS}" = "200" ] && [ "${SECONDARY_STATUS}" = "200" ]; then
+                echo "Both regions healthy - maintaining normal traffic distribution"
+                kubectl patch configmap alloy-global-lb-weights -n observability \
+                  --patch '{"data":{"us-west-2":"70","us-east-1":"30","eu-west-1":"0"}}'
+              elif [ "${PRIMARY_STATUS}" = "200" ] && [ "${SECONDARY_STATUS}" != "200" ]; then
+                echo "Primary healthy, secondary unhealthy - routing all traffic to primary"
+                kubectl patch configmap alloy-global-lb-weights -n observability \
+                  --patch '{"data":{"us-west-2":"100","us-east-1":"0","eu-west-1":"0"}}'
+              elif [ "${PRIMARY_STATUS}" != "200" ] && [ "${SECONDARY_STATUS}" = "200" ]; then
+                echo "Primary unhealthy, secondary healthy - failing over to secondary"
+                kubectl patch configmap alloy-global-lb-weights -n observability \
+                  --patch '{"data":{"us-west-2":"0","us-east-1":"100","eu-west-1":"0"}}'
+              else
+                echo "Both regions unhealthy - activating DR region"
+                kubectl patch configmap alloy-global-lb-weights -n observability \
+                  --patch '{"data":{"us-west-2":"0","us-east-1":"0","eu-west-1":"100"}}'
+              fi
+
+              # Store health metrics
+              cat > /tmp/region_health_metrics.txt << EOF
+              # HELP alloy_region_health Health status of Alloy regions (1=healthy, 0=unhealthy)
+              # TYPE alloy_region_health gauge
+              alloy_region_health{region="us-west-2",role="primary"} $([ "${PRIMARY_STATUS}" = "200" ] && echo "1" || echo "0")
+              alloy_region_health{region="us-east-1",role="secondary"} $([ "${SECONDARY_STATUS}" = "200" ] && echo "1" || echo "0")
+              alloy_region_health{region="eu-west-1",role="dr"} $([ "${DR_STATUS}" = "200" ] && echo "1" || echo "0")
+              EOF
+
+              echo "Multi-region health check completed. Healthy regions: ${HEALTHY_REGIONS}"
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          volumes:
+          - name: tmp
+            emptyDir: {}
+
+---
+# ServiceAccount for Multi-Region Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy-multi-region
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: multi-region
+automountServiceAccountToken: true
+
+---
+# ClusterRole for Multi-Region Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-multi-region
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: multi-region
+rules:
+- apiGroups: [""]
+  resources:
+    - configmaps
+    - services
+    - endpoints
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["helm.toolkit.fluxcd.io"]
+  resources:
+    - helmreleases
+  verbs: ["get", "list", "watch", "update", "patch"]
+
+---
+# ClusterRoleBinding for Multi-Region Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-multi-region
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-multi-region
+subjects:
+- kind: ServiceAccount
+  name: alloy-multi-region
+  namespace: observability
+
+---
+# ConfigMap for Global Load Balancer Weights
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-global-lb-weights
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: global-lb
+data:
+  us-west-2: "70"
+  us-east-1: "30"
+  eu-west-1: "0"
+
+# Distributed Observability Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-distributed-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: observability
+data:
+  distributed.yaml: |
+    regions:
+      - name: primary
+        components:
+          - service: metrics-api
+            replicas: 3
+          - service: metrics-worker
+            replicas: 2
+
+      - name: secondary
+        components:
+          - service: metrics-api
+            replicas: 2
+          - service: metrics-worker
+            replicas: 2
+
+    storage:
+      type: distributed
+      replication: 3
+      backup: enabled
+
+    networking:
+      load_balancing: global
+      failover: automatic
+      latency_threshold: 100ms
+
+    monitoring:
+      metrics:
+        - "Query latency"
+        - "Error rates"
+        - "Resource usage"
+      alerts:
+        - "High latency"
+        - "Error spikes"
+        - "Sync delays"

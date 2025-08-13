@@ -1,0 +1,44 @@
+---
+# Kromgo configuration
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - helmrelease.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - service.yaml
+  - pod-disruption-budget.yaml
+  - prometheus-rules.yaml
+commonLabels:
+  app.kubernetes.io/name: kromgo
+  app.kubernetes.io/instance: kromgo
+  app.kubernetes.io/component: monitoring
+  app.kubernetes.io/part-of: observability
+
+# Target namespace for all resources
+namespace: observability
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: kromgo
+  app.kubernetes.io/part-of: observability-infrastructure
+  production-grade: "true"
+
+# Common annotations applied to all resources
+commonAnnotations:
+  config.kubernetes.io/production: "true"
+  monitoring.samcloud.online/tier: "production"
+
+# Configuration management
+configMapGenerator:
+  - name: kromgo-config
+    files:
+      - config.yaml
+
+# Generator options
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    config.kubernetes.io/managed-by: "kustomize"
+    production-grade: "true"

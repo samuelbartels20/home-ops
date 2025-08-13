@@ -1,0 +1,579 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chaos-mesh
+  labels:
+    chaos-mesh.org/inject: "enabled"
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: infrastructure
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-controller-manager
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-controller-manager
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "events", "configmaps", "secrets", "services", "endpoints"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["chaos-mesh.org"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-controller-manager
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chaos-controller-manager
+subjects:
+- kind: ServiceAccount
+  name: chaos-controller-manager
+  namespace: chaos-mesh
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-controller-manager
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-mesh
+      app.kubernetes.io/component: controller-manager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chaos-mesh
+        app.kubernetes.io/component: controller-manager
+    spec:
+      serviceAccountName: chaos-controller-manager
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chaos-mesh
+                  app.kubernetes.io/component: controller-manager
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: manager
+        image: chaosmeshtorg/chaos-mesh:v2.6.2
+        imagePullPolicy: IfNotPresent
+        command:
+        - /manager
+        args:
+        - --config=/etc/chaos-mesh/config.yaml
+        - --metrics-addr=0.0.0.0:8080
+        - --enable-leader-election
+        - --leader-election-namespace=chaos-mesh
+        - --chaos-daemon-service-port=31767
+        - --bpfki-port=50051
+        - --runtime=containerd
+        - --runtime-socket=/run/containerd/containerd.sock
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: ALLOW_HOST_NETWORK_TESTING
+          value: "false"
+        - name: TARGET_NAMESPACE
+          value: "observability,data-science,default"
+        - name: CLUSTER_SCOPED
+          value: "true"
+        - name: SECURITY_MODE
+          value: "true"
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        - name: webhook
+          containerPort: 9443
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/chaos-mesh
+        - name: webhook-certs
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: chaos-mesh-config
+      - name: webhook-certs
+        secret:
+          secretName: chaos-mesh-webhook-certs
+      terminationGracePeriodSeconds: 10
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: chaos-daemon
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-mesh
+      app.kubernetes.io/component: chaos-daemon
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chaos-mesh
+        app.kubernetes.io/component: chaos-daemon
+    spec:
+      serviceAccountName: chaos-daemon
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+      containers:
+      - name: chaos-daemon
+        image: chaosmeshtorg/chaos-daemon:v2.6.2
+        imagePullPolicy: IfNotPresent
+        command:
+        - /usr/local/bin/chaos-daemon
+        args:
+        - --bind=0.0.0.0
+        - --port=31767
+        - --metrics-port=31766
+        - --runtime=containerd
+        - --runtime-socket=/run/containerd/containerd.sock
+        env:
+        - name: RUST_BACKTRACE
+          value: "1"
+        ports:
+        - name: grpc
+          containerPort: 31767
+          protocol: TCP
+        - name: http
+          containerPort: 31766
+          protocol: TCP
+        volumeMounts:
+        - name: socket-path
+          mountPath: /run/containerd
+        - name: sys-path
+          mountPath: /sys
+        - name: dev-path
+          mountPath: /dev
+        - name: proc-path
+          mountPath: /proc
+        - name: boot-path
+          mountPath: /boot
+          readOnly: true
+        - name: lib-modules
+          mountPath: /lib/modules
+          readOnly: true
+        - name: usr-src
+          mountPath: /usr/src
+          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - SYS_PTRACE
+            - NET_ADMIN
+            - SYS_ADMIN
+            - SYS_BOOT
+            - SYS_TIME
+            - KILL
+        livenessProbe:
+          httpGet:
+            path: /api/ping
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/ping
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: socket-path
+        hostPath:
+          path: /run/containerd
+      - name: sys-path
+        hostPath:
+          path: /sys
+      - name: dev-path
+        hostPath:
+          path: /dev
+      - name: proc-path
+        hostPath:
+          path: /proc
+      - name: boot-path
+        hostPath:
+          path: /boot
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+      - name: usr-src
+        hostPath:
+          path: /usr/src
+      tolerations:
+      - operator: Exists
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chaos-daemon
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chaos-daemon
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chaos-daemon
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: chaos-daemon
+subjects:
+- kind: ServiceAccount
+  name: chaos-daemon
+  namespace: chaos-mesh
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-daemon
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 31767
+    targetPort: grpc
+    protocol: TCP
+  - name: http
+    port: 31766
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: chaos-daemon
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-controller-manager-metrics
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: controller-manager
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-mesh-config
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    # Chaos Mesh Configuration
+    # Production-grade chaos engineering settings
+
+    # Security settings
+    security:
+      enabled: true
+
+    # Chaos engineering scope
+    targetNamespaces:
+      - "observability"
+      - "data-science"
+      - "default"
+
+    # Experiment limits
+    limits:
+      maxConcurrentExperiments: 20
+      maxExperimentDuration: "24h"
+
+    # Monitoring and metrics
+    metrics:
+      enabled: true
+      port: 8080
+
+    # Webhook configuration
+    webhook:
+      enabled: true
+      port: 9443
+
+    # Scheduler settings
+    scheduler:
+      enabled: true
+      schedule:
+        timezone: "UTC"
+
+    # Experiment types configuration
+    experiments:
+      podChaos:
+        enabled: true
+        actions: ["pod-kill", "pod-failure", "container-kill"]
+
+      networkChaos:
+        enabled: true
+        actions: ["netem", "partition", "bandwidth"]
+
+      ioChaos:
+        enabled: true
+        actions: ["latency", "errno", "attrOverride"]
+
+      timeChaos:
+        enabled: true
+
+      stressChaos:
+        enabled: true
+
+      dnsChaos:
+        enabled: true
+
+      httpChaos:
+        enabled: true
+
+      kernelChaos:
+        enabled: false  # Disabled for production safety
+
+    # Default experiment parameters
+    defaults:
+      duration: "5m"
+      mode: "one"  # Start with one pod
+
+    # Safety settings
+    safety:
+      # Prevent experiments on critical namespaces
+      protectedNamespaces:
+        - "kube-system"
+        - "kube-public"
+        - "kube-node-lease"
+        - "flux-system"
+        - "cert-manager"
+        - "ingress-nginx"
+
+      # Require manual approval for destructive experiments
+      requireApproval:
+        - "pod-kill"
+        - "network-partition"
+        - "stress-memory"
+
+      # Maximum impact limits
+      maxImpact:
+        percentage: 25  # Max 25% of pods affected
+        absolute: 10    # Max 10 pods affected
+
+    # Notification settings
+    notifications:
+      slack:
+        enabled: true
+        webhook: "https://hooks.slack.com/services/xxx/yyy/zzz"
+        channel: "#chaos-engineering"
+
+      email:
+        enabled: true
+        recipients: ["sre-team@company.com"]
+
+    # Audit and compliance
+    audit:
+      enabled: true
+      retention: "90d"
+
+    # Dashboard integration
+    dashboard:
+      enabled: true
+      grafanaUrl: "https://grafana.samcloud.online"
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaos-mesh
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-mesh
+      app.kubernetes.io/component: controller-manager
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chaos-daemon
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: daemon-monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chaos-mesh
+      app.kubernetes.io/component: chaos-daemon
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: chaos-mesh-network-policy
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: chaos-mesh
+    app.kubernetes.io/component: security
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: observability
+    - namespaceSelector:
+        matchLabels:
+          name: chaos-mesh
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9443
+    - protocol: TCP
+      port: 31767
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: UDP
+      port: 53
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 6443

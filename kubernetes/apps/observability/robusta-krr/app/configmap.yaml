@@ -1,0 +1,215 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: robusta-krr-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+    app.kubernetes.io/part-of: observability
+data:
+  # Default KRR configuration
+  krr-config.yaml: |
+    prometheus:
+      url: "http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+      ssl_enabled: false
+      custom_labels:
+        cluster: "kubernetes"
+
+    strategy:
+      cpu:
+        percentile: 95
+        buffer_ratio: 0.15
+      memory:
+        buffer_ratio: 0.15
+        history_duration: "7d"
+
+    output:
+      format: "table"
+      export_prometheus_metrics: true
+
+    scanning:
+      exclude_namespaces:
+        - "kube-system"
+        - "kube-public"
+        - "flux-system"
+        - "default"
+        - "cattle-system"
+        - "longhorn-system"
+      include_resources:
+        - "Deployment"
+        - "StatefulSet"
+        - "DaemonSet"
+        - "Job"
+        - "CronJob"
+
+  # Production scanning script
+  scan-production.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Starting KRR production scan at $(date)"
+
+    # Set Prometheus URL
+    export PROMETHEUS_URL="http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+
+    # Run KRR scan for all production namespaces
+    NAMESPACES=(
+      "observability"
+      "services"
+      "data-science"
+      "storage"
+      "network"
+      "security"
+      "finops"
+    )
+
+    for namespace in "${NAMESPACES[@]}"; do
+      echo "Scanning namespace: $namespace"
+
+      krr simple \
+        --prometheus-url="$PROMETHEUS_URL" \
+        --namespace="$namespace" \
+        --format=json \
+        --output="/tmp/krr-recommendations-$namespace.json" \
+        --logtostderr || echo "Warning: Failed to scan $namespace"
+    done
+
+    # Generate consolidated report
+    echo "Generating consolidated report..."
+    krr simple \
+      --prometheus-url="$PROMETHEUS_URL" \
+      --format=table \
+      --output="/tmp/krr-recommendations-all.txt" \
+      --logtostderr
+
+    echo "KRR scan completed at $(date)"
+
+  # High-impact workloads scanning
+  scan-high-impact.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Starting high-impact workloads scan..."
+
+    export PROMETHEUS_URL="http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+
+    # Focus on resource-intensive namespaces
+    krr simple \
+      --prometheus-url="$PROMETHEUS_URL" \
+      --namespace="data-science" \
+      --namespace="observability" \
+      --namespace="storage" \
+      --format=json \
+      --output="/tmp/krr-high-impact.json" \
+      --cpu-percentile=90 \
+      --memory-buffer-percentage=10 \
+      --logtostderr
+
+    echo "High-impact scan completed"
+
+  # Cost optimization recommendations script
+  cost-optimization.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Generating cost optimization recommendations..."
+
+    export PROMETHEUS_URL="http://mimir-gateway.observability.svc.cluster.local:80/prometheus"
+
+    # Generate recommendations with cost focus
+    krr simple \
+      --prometheus-url="$PROMETHEUS_URL" \
+      --format=csv \
+      --output="/tmp/cost-optimization.csv" \
+      --show-empty-requests \
+      --logtostderr
+
+    # Calculate potential savings
+    echo "Cost analysis completed. Check /tmp/cost-optimization.csv for details."
+
+  # Health check script
+  healthcheck.sh: |
+    #!/bin/bash
+    set -e
+
+    # Check if Prometheus is accessible
+    if curl -s "http://mimir-gateway.observability.svc.cluster.local:80/prometheus/api/v1/query?query=up" > /dev/null; then
+      echo "Prometheus connection: OK"
+    else
+      echo "Prometheus connection: FAILED"
+      exit 1
+    fi
+
+    # Check KRR binary
+    if command -v krr >/dev/null 2>&1; then
+      echo "KRR binary: OK"
+    else
+      echo "KRR binary: NOT FOUND"
+      exit 1
+    fi
+
+    echo "Health check passed"
+
+  # Prometheus queries for KRR metrics
+  prometheus-queries.yaml: |
+    # CPU usage metrics
+    cpu_usage_rate: 'rate(container_cpu_usage_seconds_total{container!="POD",container!=""}[5m])'
+    cpu_requests: 'kube_pod_container_resource_requests{resource="cpu",container!="POD",container!=""}'
+    cpu_limits: 'kube_pod_container_resource_limits{resource="cpu",container!="POD",container!=""}'
+
+    # Memory usage metrics
+    memory_usage: 'container_memory_working_set_bytes{container!="POD",container!=""}'
+    memory_requests: 'kube_pod_container_resource_requests{resource="memory",container!="POD",container!=""}'
+    memory_limits: 'kube_pod_container_resource_limits{resource="memory",container!="POD",container!=""}'
+
+    # Pod and container info
+    pod_info: 'kube_pod_info'
+    container_info: 'kube_pod_container_info'
+
+    # Node metrics
+    node_cpu_capacity: 'kube_node_status_capacity{resource="cpu"}'
+    node_memory_capacity: 'kube_node_status_capacity{resource="memory"}'
+
+  # Grafana dashboard configuration
+  grafana-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "KRR Resource Recommendations",
+        "tags": ["kubernetes", "resources", "cost", "finops"],
+        "panels": [
+          {
+            "title": "Resource Recommendations Overview",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "krr_recommendations_total",
+                "legendFormat": "Total Recommendations"
+              }
+            ]
+          },
+          {
+            "title": "Potential CPU Savings",
+            "type": "gauge",
+            "targets": [
+              {
+                "expr": "sum(krr_cpu_savings_cores)",
+                "legendFormat": "CPU Cores"
+              }
+            ]
+          },
+          {
+            "title": "Potential Memory Savings",
+            "type": "gauge",
+            "targets": [
+              {
+                "expr": "sum(krr_memory_savings_bytes) / 1024 / 1024 / 1024",
+                "legendFormat": "Memory GB"
+              }
+            ]
+          }
+        ]
+      }
+    }

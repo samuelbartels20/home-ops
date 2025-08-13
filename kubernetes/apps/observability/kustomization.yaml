@@ -1,0 +1,30 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+components:
+  - ../../components/common
+# All observability resources disabled until Prometheus CRDs are ready
+# resources:
+#   - ./gatus/ks.yaml
+
+#   - ./loki/ks.yaml
+#   - ./blackbox-exporter/ks.yaml
+#   - ./kromgo/ks.yaml
+#   - ./keda/ks.yaml
+#   - ./silence-operator/ks.yaml
+#   - ./snmp-exporter/ks.yaml
+#   - ./smartctl-exporter/ks.yaml
+#   - ./grafana/ks.yaml
+#   - ./alloy/ks.yaml
+#   - ./opentelemetry/ks.yaml
+#   - ./graphite-exporter/ks.yaml
+#   - ./vector/ks.yaml
+#   - ./kepler/ks.yaml
+#   - ./karma/ks.yaml
+#   - ./gotify/ks.yaml
+#   - ./zabbix/ks.yaml
+
+
+
+

@@ -1,0 +1,75 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: opentelemetry-psp
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+
+  allowedHostPaths: []
+
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+  hostPorts:
+    - min: 0
+      max: 0  # No host ports allowed
+
+  runAsUser:
+    rule: MustRunAsNonRoot
+    ranges:
+      - min: 1000
+        max: 65535
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  readOnlyRootFilesystem: true
+
+  seLinux:
+    rule: RunAsAny
+
+  allowedFlexVolumes: []
+
+  allowedUnsafeSysctls: []
+
+  forbiddenSysctls:
+    - '*'

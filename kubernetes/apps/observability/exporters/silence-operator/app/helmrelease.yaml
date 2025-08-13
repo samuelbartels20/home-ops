@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: silence-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 0.16.1
+  url: oci://ghcr.io/home-operations/charts-mirror/silence-operator
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: silence-operator
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: silence-operator
+    app.kubernetes.io/component: alert-management
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: silence-operator
+      version: 0.8.0
+      sourceRef:
+        kind: HelmRepository
+        name: mittwald
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+
+    alertmanager:
+      url: http://alertmanager-operated:9093
+
+    metrics:
+      enabled: true
+      port: 8080
+
+    rbac:
+      create: true
+
+    silences:
+      - name: maintenance-window
+        matchers:
+          - name: severity
+            value: warning
+            isRegex: false
+        startsAt: "2024-01-01T00:00:00Z"
+        endsAt: "2024-01-01T02:00:00Z"
+        createdBy: "silence-operator"
+        comment: "Maintenance window silence"

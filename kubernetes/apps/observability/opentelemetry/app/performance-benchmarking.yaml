@@ -1,0 +1,773 @@
+# Enterprise Production: Performance Testing & Benchmarking for OpenTelemetry
+---
+# Performance Testing Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-performance
+  labels:
+    app.kubernetes.io/name: opentelemetry-performance
+    app.kubernetes.io/component: testing
+---
+# Load Testing Infrastructure
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-load-generator
+  namespace: otel-performance
+  labels:
+    app.kubernetes.io/name: opentelemetry-load-generator
+    app.kubernetes.io/component: testing
+spec:
+  replicas: 20  # Scale for high load
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-load-generator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opentelemetry-load-generator
+    spec:
+      containers:
+      - name: load-generator
+        image: grafana/k6:latest
+        env:
+        - name: OTEL_ENDPOINT
+          value: "http://otel-enterprise-gateway.observability:4318"
+        - name: TARGET_RPS
+          value: "10000"  # 10K requests per second
+        - name: TEST_DURATION
+          value: "1800s"  # 30 minutes
+        - name: RAMP_DURATION
+          value: "300s"   # 5 minute ramp
+        command:
+        - /bin/sh
+        - -c
+        - |
+          cat > /tmp/load-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate, Counter, Trend } from 'k6/metrics';
+
+          // Custom metrics
+          const errorRate = new Rate('error_rate');
+          const throughput = new Counter('throughput');
+          const latency = new Trend('latency');
+
+          export let options = {
+            stages: [
+              { duration: __ENV.RAMP_DURATION, target: __ENV.TARGET_RPS },
+              { duration: __ENV.TEST_DURATION, target: __ENV.TARGET_RPS },
+              { duration: '300s', target: 0 },
+            ],
+            thresholds: {
+              'http_req_duration': ['p(99)<500'], // 99% under 500ms
+              'error_rate': ['rate<0.001'],        // Error rate under 0.1%
+              'http_req_failed': ['rate<0.001'],   // Failure rate under 0.1%
+            },
+          };
+
+          // Generate realistic trace data
+          function generateTrace() {
+            const traceId = Math.random().toString(16).slice(2, 34).padEnd(32, '0');
+            const spanId = Math.random().toString(16).slice(2, 18).padEnd(16, '0');
+            const parentSpanId = Math.random().toString(16).slice(2, 18).padEnd(16, '0');
+
+            return {
+              resourceSpans: [{
+                resource: {
+                  attributes: [
+                    { key: "service.name", value: { stringValue: "load-test-service" } },
+                    { key: "service.version", value: { stringValue: "1.0.0" } },
+                    { key: "deployment.environment", value: { stringValue: "performance-test" } },
+                    { key: "host.name", value: { stringValue: `host-${Math.floor(Math.random() * 100)}` } },
+                    { key: "k8s.pod.name", value: { stringValue: `pod-${Math.floor(Math.random() * 1000)}` } },
+                  ]
+                },
+                scopeSpans: [{
+                  scope: {
+                    name: "load-test-instrumentation",
+                    version: "1.0.0"
+                  },
+                  spans: [{
+                    traceId: traceId,
+                    spanId: spanId,
+                    parentSpanId: parentSpanId,
+                    name: "http_request",
+                    kind: 3, // CLIENT
+                    startTimeUnixNano: String(Date.now() * 1000000),
+                    endTimeUnixNano: String((Date.now() + Math.floor(Math.random() * 1000)) * 1000000),
+                    attributes: [
+                      { key: "http.method", value: { stringValue: "GET" } },
+                      { key: "http.url", value: { stringValue: "https://api.example.com/endpoint" } },
+                      { key: "http.status_code", value: { intValue: 200 } },
+                      { key: "http.user_agent", value: { stringValue: "k6-load-test/1.0" } },
+                      { key: "custom.business_metric", value: { doubleValue: Math.random() * 100 } },
+                    ],
+                    events: [{
+                      timeUnixNano: String(Date.now() * 1000000),
+                      name: "request_processed",
+                      attributes: [
+                        { key: "processed_items", value: { intValue: Math.floor(Math.random() * 50) } }
+                      ]
+                    }]
+                  }]
+                }]
+              }]
+            };
+          }
+
+          export default function() {
+            const startTime = Date.now();
+            const payload = JSON.stringify(generateTrace());
+
+            const response = http.post(`${__ENV.OTEL_ENDPOINT}/v1/traces`, payload, {
+              headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'k6-opentelemetry-load-test'
+              },
+            });
+
+            const duration = Date.now() - startTime;
+
+            // Record metrics
+            throughput.add(1);
+            latency.add(duration);
+            errorRate.add(response.status !== 200);
+
+            // Validate response
+            check(response, {
+              'status is 200': (r) => r.status === 200,
+              'response time < 500ms': (r) => r.timings.duration < 500,
+            });
+
+            // Add some randomness to simulate real-world traffic
+            sleep(Math.random() * 0.1);
+          }
+          EOF
+
+          # Run the load test
+          k6 run /tmp/load-test.js --out json=/tmp/results.json
+        volumeMounts:
+        - name: results
+          mountPath: /tmp/results
+        resources:
+          requests:
+            cpu: 1
+            memory: 2Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+      volumes:
+      - name: results
+        emptyDir: {}
+---
+# Performance Monitoring & Metrics Collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-monitoring
+  namespace: otel-performance
+  labels:
+    app.kubernetes.io/name: opentelemetry-performance
+    app.kubernetes.io/component: monitoring
+data:
+  monitor-performance.py: |
+    #!/usr/bin/env python3
+    import requests
+    import time
+    import json
+    import psutil
+    import threading
+    from datetime import datetime, timedelta
+
+    class PerformanceMonitor:
+        def __init__(self):
+            self.metrics = {}
+            self.running = False
+
+        def start_monitoring(self):
+            self.running = True
+            threads = [
+                threading.Thread(target=self.monitor_throughput),
+                threading.Thread(target=self.monitor_latency),
+                threading.Thread(target=self.monitor_resources),
+                threading.Thread(target=self.monitor_errors),
+            ]
+
+            for thread in threads:
+                thread.start()
+
+            return threads
+
+        def monitor_throughput(self):
+            """Monitor request throughput"""
+            prometheus_url = "http://prometheus.observability:9090/api/v1/query"
+
+            while self.running:
+                try:
+                    # Query OTLP receiver metrics
+                    query = "rate(otelcol_receiver_accepted_spans_total[1m])"
+                    response = requests.get(prometheus_url, params={"query": query})
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data["data"]["result"]:
+                            throughput = sum(float(result["value"][1])
+                                           for result in data["data"]["result"])
+                            self.metrics["spans_per_second"] = throughput
+                            print(f"Throughput: {throughput:.2f} spans/sec")
+
+                    time.sleep(5)
+                except Exception as e:
+                    print(f"Throughput monitoring error: {e}")
+                    time.sleep(10)
+
+        def monitor_latency(self):
+            """Monitor processing latency"""
+            prometheus_url = "http://prometheus.observability:9090/api/v1/query"
+
+            while self.running:
+                try:
+                    # Query processing duration metrics
+                    queries = {
+                        "p50": "histogram_quantile(0.5, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))",
+                        "p95": "histogram_quantile(0.95, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))",
+                        "p99": "histogram_quantile(0.99, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))"
+                    }
+
+                    for percentile, query in queries.items():
+                        response = requests.get(prometheus_url, params={"query": query})
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data["data"]["result"]:
+                                value = float(data["data"]["result"][0]["value"][1])
+                                self.metrics[f"latency_{percentile}"] = value
+                                print(f"Latency {percentile}: {value:.2f}ms")
+
+                    time.sleep(10)
+                except Exception as e:
+                    print(f"Latency monitoring error: {e}")
+                    time.sleep(15)
+
+        def monitor_resources(self):
+            """Monitor system resources"""
+            while self.running:
+                try:
+                    # CPU and Memory usage
+                    cpu_percent = psutil.cpu_percent(interval=1)
+                    memory = psutil.virtual_memory()
+
+                    self.metrics["cpu_usage"] = cpu_percent
+                    self.metrics["memory_usage"] = memory.percent
+                    self.metrics["memory_available"] = memory.available / (1024**3)  # GB
+
+                    print(f"Resources - CPU: {cpu_percent}%, Memory: {memory.percent}%")
+
+                    time.sleep(5)
+                except Exception as e:
+                    print(f"Resource monitoring error: {e}")
+                    time.sleep(10)
+
+        def monitor_errors(self):
+            """Monitor error rates"""
+            prometheus_url = "http://prometheus.observability:9090/api/v1/query"
+
+            while self.running:
+                try:
+                    # Query error metrics
+                    error_query = "rate(otelcol_receiver_refused_spans_total[1m])"
+                    response = requests.get(prometheus_url, params={"query": error_query})
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data["data"]["result"]:
+                            error_rate = sum(float(result["value"][1])
+                                           for result in data["data"]["result"])
+                            self.metrics["error_rate"] = error_rate
+                            print(f"Error rate: {error_rate:.4f} errors/sec")
+
+                    time.sleep(5)
+                except Exception as e:
+                    print(f"Error monitoring error: {e}")
+                    time.sleep(10)
+
+        def generate_report(self):
+            """Generate performance report"""
+            report = {
+                "timestamp": datetime.now().isoformat(),
+                "test_duration": "30_minutes",
+                "metrics": self.metrics,
+                "performance_analysis": self.analyze_performance(),
+                "recommendations": self.generate_recommendations()
+            }
+
+            return report
+
+        def analyze_performance(self):
+            """Analyze performance against benchmarks"""
+            analysis = {}
+
+            # Throughput analysis
+            target_throughput = 100000  # 100K spans/sec
+            actual_throughput = self.metrics.get("spans_per_second", 0)
+            analysis["throughput_achievement"] = (actual_throughput / target_throughput) * 100
+
+            # Latency analysis
+            p99_latency = self.metrics.get("latency_p99", float('inf'))
+            target_p99 = 500  # 500ms
+            analysis["latency_compliance"] = p99_latency <= target_p99
+
+            # Resource utilization
+            cpu_usage = self.metrics.get("cpu_usage", 0)
+            memory_usage = self.metrics.get("memory_usage", 0)
+            analysis["resource_efficiency"] = {
+                "cpu_optimal": 50 <= cpu_usage <= 80,
+                "memory_optimal": memory_usage <= 80
+            }
+
+            return analysis
+
+        def generate_recommendations(self):
+            """Generate optimization recommendations"""
+            recommendations = []
+
+            throughput = self.metrics.get("spans_per_second", 0)
+            cpu_usage = self.metrics.get("cpu_usage", 0)
+            memory_usage = self.metrics.get("memory_usage", 0)
+
+            if throughput < 50000:
+                recommendations.append("Increase collector replicas or CPU allocation")
+
+            if cpu_usage > 85:
+                recommendations.append("Scale horizontally or increase CPU limits")
+
+            if memory_usage > 85:
+                recommendations.append("Increase memory limits or optimize batch sizes")
+
+            p99_latency = self.metrics.get("latency_p99", 0)
+            if p99_latency > 1000:
+                recommendations.append("Optimize batch processing and queue configurations")
+
+            return recommendations
+
+    if __name__ == "__main__":
+        monitor = PerformanceMonitor()
+        print("Starting performance monitoring...")
+
+        threads = monitor.start_monitoring()
+
+        # Run for 30 minutes
+        time.sleep(1800)
+
+        monitor.running = False
+        for thread in threads:
+            thread.join()
+
+        # Generate final report
+        report = monitor.generate_report()
+        print(json.dumps(report, indent=2))
+
+        # Save report
+        with open("/tmp/performance_report.json", "w") as f:
+            json.dump(report, f, indent=2)
+
+  capacity-planning.py: |
+    #!/usr/bin/env python3
+    import json
+    import math
+    from datetime import datetime, timedelta
+
+    class CapacityPlanner:
+        def __init__(self):
+            self.current_metrics = {}
+            self.projections = {}
+
+        def load_current_metrics(self, metrics_file):
+            """Load current performance metrics"""
+            with open(metrics_file, 'r') as f:
+                data = json.load(f)
+                self.current_metrics = data.get("metrics", {})
+
+        def project_capacity_needs(self, growth_rates):
+            """Project future capacity needs based on growth rates"""
+
+            # Current baseline
+            current_throughput = self.current_metrics.get("spans_per_second", 0)
+            current_cpu = self.current_metrics.get("cpu_usage", 0)
+            current_memory = self.current_metrics.get("memory_usage", 0)
+
+            projections = {}
+
+            for months in [3, 6, 12]:
+                # Apply growth rate
+                monthly_growth = growth_rates.get("monthly_growth", 0.2)  # 20% monthly
+                growth_factor = (1 + monthly_growth) ** months
+
+                projected_throughput = current_throughput * growth_factor
+
+                # Estimate resource needs (linear scaling approximation)
+                cpu_factor = projected_throughput / max(current_throughput, 1)
+                memory_factor = projected_throughput / max(current_throughput, 1)
+
+                projected_cpu = current_cpu * cpu_factor
+                projected_memory = current_memory * memory_factor
+
+                # Calculate required infrastructure
+                required_replicas = math.ceil(projected_throughput / 10000)  # 10K spans per replica
+                required_cpu_cores = math.ceil(projected_cpu / 100 * required_replicas)
+                required_memory_gb = math.ceil(projected_memory / 100 * required_replicas * 4)  # 4GB per replica
+
+                projections[f"{months}_months"] = {
+                    "projected_throughput": projected_throughput,
+                    "required_replicas": required_replicas,
+                    "required_cpu_cores": required_cpu_cores,
+                    "required_memory_gb": required_memory_gb,
+                    "estimated_cost_usd": self.estimate_cost(required_replicas, required_cpu_cores, required_memory_gb)
+                }
+
+            self.projections = projections
+            return projections
+
+        def estimate_cost(self, replicas, cpu_cores, memory_gb):
+            """Estimate monthly infrastructure cost"""
+            # AWS pricing estimates (adjust for your cloud provider)
+            cpu_cost_per_core_month = 25  # $25 per vCPU per month
+            memory_cost_per_gb_month = 3   # $3 per GB per month
+            storage_cost_per_gb_month = 0.1 # $0.1 per GB storage per month
+
+            storage_gb = replicas * 100  # 100GB per replica
+
+            monthly_cost = (
+                cpu_cores * cpu_cost_per_core_month +
+                memory_gb * memory_cost_per_gb_month +
+                storage_gb * storage_cost_per_gb_month
+            )
+
+            return monthly_cost
+
+        def generate_scaling_recommendations(self):
+            """Generate scaling recommendations"""
+            recommendations = {
+                "immediate_actions": [],
+                "short_term": [],
+                "long_term": []
+            }
+
+            current_throughput = self.current_metrics.get("spans_per_second", 0)
+
+            # Immediate actions (current bottlenecks)
+            if self.current_metrics.get("cpu_usage", 0) > 80:
+                recommendations["immediate_actions"].append({
+                    "action": "Scale CPU",
+                    "details": "Current CPU usage is high, increase CPU limits or add replicas",
+                    "priority": "HIGH"
+                })
+
+            if self.current_metrics.get("memory_usage", 0) > 80:
+                recommendations["immediate_actions"].append({
+                    "action": "Scale Memory",
+                    "details": "Current memory usage is high, increase memory limits",
+                    "priority": "HIGH"
+                })
+
+            # Short-term (3-6 months)
+            six_month_projection = self.projections.get("6_months", {})
+            if six_month_projection.get("required_replicas", 0) > 12:
+                recommendations["short_term"].append({
+                    "action": "Horizontal Scaling",
+                    "details": f"Plan to scale to {six_month_projection['required_replicas']} replicas",
+                    "timeline": "3-6 months"
+                })
+
+            # Long-term (12+ months)
+            yearly_projection = self.projections.get("12_months", {})
+            if yearly_projection.get("estimated_cost_usd", 0) > 10000:
+                recommendations["long_term"].append({
+                    "action": "Architecture Review",
+                    "details": "High projected costs suggest need for architecture optimization",
+                    "timeline": "6-12 months"
+                })
+
+            return recommendations
+
+        def generate_capacity_report(self):
+            """Generate comprehensive capacity planning report"""
+            report = {
+                "timestamp": datetime.now().isoformat(),
+                "current_state": {
+                    "throughput_spans_per_sec": self.current_metrics.get("spans_per_second", 0),
+                    "cpu_usage_percent": self.current_metrics.get("cpu_usage", 0),
+                    "memory_usage_percent": self.current_metrics.get("memory_usage", 0),
+                    "error_rate": self.current_metrics.get("error_rate", 0)
+                },
+                "capacity_projections": self.projections,
+                "scaling_recommendations": self.generate_scaling_recommendations(),
+                "cost_analysis": {
+                    "current_monthly_cost": self.estimate_cost(6, 24, 96),  # Current baseline
+                    "projected_costs": {
+                        period: projection["estimated_cost_usd"]
+                        for period, projection in self.projections.items()
+                    }
+                }
+            }
+
+            return report
+
+    # Example usage
+    if __name__ == "__main__":
+        planner = CapacityPlanner()
+
+        # Load metrics from performance test
+        planner.load_current_metrics("/tmp/performance_report.json")
+
+        # Project capacity with 30% monthly growth
+        planner.project_capacity_needs({"monthly_growth": 0.3})
+
+        # Generate report
+        report = planner.generate_capacity_report()
+        print(json.dumps(report, indent=2))
+
+        with open("/tmp/capacity_plan.json", "w") as f:
+            json.dump(report, f, indent=2)
+---
+# Performance Test Execution Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: performance-benchmark
+  namespace: otel-performance
+  labels:
+    app.kubernetes.io/name: opentelemetry-benchmark
+    app.kubernetes.io/component: testing
+spec:
+  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: performance-benchmark
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: benchmark-runner
+            image: python:3.11-slim
+            env:
+            - name: BENCHMARK_DURATION
+              value: "1800"  # 30 minutes
+            - name: TARGET_THROUGHPUT
+              value: "100000"  # 100K spans/sec
+            - name: RESULTS_BUCKET
+              value: "s3://performance-results"
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              # Install dependencies
+              apt-get update && apt-get install -y curl jq
+              pip install --no-cache-dir requests psutil boto3
+
+              echo "Starting OpenTelemetry Performance Benchmark..."
+
+              # Run performance monitoring
+              python3 /scripts/monitor-performance.py &
+              MONITOR_PID=$!
+
+              # Trigger load test
+              kubectl create job --from=deployment/otel-load-generator load-test-$(date +%s) -n otel-performance
+
+              # Wait for test completion
+              sleep $BENCHMARK_DURATION
+
+              # Stop monitoring
+              kill $MONITOR_PID 2>/dev/null || true
+
+              # Generate capacity planning report
+              python3 /scripts/capacity-planning.py
+
+              # Upload results to S3 (if configured)
+              if [ ! -z "$RESULTS_BUCKET" ]; then
+                aws s3 cp /tmp/performance_report.json "$RESULTS_BUCKET/$(date +%Y/%m/%d)/"
+                aws s3 cp /tmp/capacity_plan.json "$RESULTS_BUCKET/$(date +%Y/%m/%d)/"
+              fi
+
+              echo "Performance benchmark completed successfully"
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: results
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2
+                memory: 4Gi
+          volumes:
+          - name: scripts
+            configMap:
+              name: performance-monitoring
+              defaultMode: 0755
+          - name: results
+            emptyDir: {}
+---
+# Performance Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: performance-alerts
+  namespace: otel-performance
+  labels:
+    app.kubernetes.io/name: opentelemetry-performance
+    app.kubernetes.io/component: alerting
+spec:
+  groups:
+  - name: opentelemetry.performance
+    interval: 30s
+    rules:
+    # Throughput Alerts
+    - alert: OpenTelemetryLowThroughput
+      expr: rate(otelcol_receiver_accepted_spans_total[5m]) < 50000
+      for: 2m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "OpenTelemetry throughput below target"
+        description: "Current throughput {{ $value }} spans/sec is below target of 50K spans/sec"
+
+    - alert: OpenTelemetryThroughputCritical
+      expr: rate(otelcol_receiver_accepted_spans_total[5m]) < 10000
+      for: 1m
+      labels:
+        severity: critical
+        component: performance
+      annotations:
+        summary: "OpenTelemetry throughput critically low"
+        description: "Current throughput {{ $value }} spans/sec is critically low"
+
+    # Latency Alerts
+    - alert: OpenTelemetryHighLatency
+      expr: histogram_quantile(0.95, rate(otelcol_processor_batch_batch_send_size_bucket[5m])) > 1000
+      for: 5m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "OpenTelemetry high processing latency"
+        description: "95th percentile latency is {{ $value }}ms, above 1000ms threshold"
+
+    # Resource Alerts
+    - alert: OpenTelemetryHighCPUUsage
+      expr: rate(container_cpu_usage_seconds_total{pod=~"otel-.*"}[5m]) * 100 > 85
+      for: 3m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "OpenTelemetry high CPU usage"
+        description: "CPU usage is {{ $value }}%, above 85% threshold"
+
+    - alert: OpenTelemetryHighMemoryUsage
+      expr: (container_memory_usage_bytes{pod=~"otel-.*"} / container_spec_memory_limit_bytes{pod=~"otel-.*"}) * 100 > 85
+      for: 3m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "OpenTelemetry high memory usage"
+        description: "Memory usage is {{ $value }}%, above 85% threshold"
+
+    # Performance Regression Detection
+    - alert: OpenTelemetryPerformanceRegression
+      expr: (rate(otelcol_receiver_accepted_spans_total[1h]) / rate(otelcol_receiver_accepted_spans_total[1h] offset 24h)) < 0.8
+      for: 10m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "OpenTelemetry performance regression detected"
+        description: "Current throughput is {{ $value }}% of yesterday's performance"
+---
+# Performance Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-dashboard
+  namespace: otel-performance
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: opentelemetry-performance
+data:
+  performance-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "OpenTelemetry Performance Benchmarks",
+        "tags": ["opentelemetry", "performance", "benchmarks"],
+        "panels": [
+          {
+            "title": "Throughput (spans/sec)",
+            "type": "stat",
+            "targets": [{
+              "expr": "rate(otelcol_receiver_accepted_spans_total[5m])",
+              "legendFormat": "{{instance}}"
+            }],
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 50000},
+                {"color": "green", "value": 100000}
+              ]
+            }
+          },
+          {
+            "title": "Processing Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))",
+                "legendFormat": "p50"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))",
+                "legendFormat": "p95"
+              },
+              {
+                "expr": "histogram_quantile(0.99, rate(otelcol_processor_batch_batch_send_size_bucket[5m]))",
+                "legendFormat": "p99"
+              }
+            ]
+          },
+          {
+            "title": "Resource Utilization",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"otel-.*\"}[5m]) * 100",
+                "legendFormat": "CPU %"
+              },
+              {
+                "expr": "(container_memory_usage_bytes{pod=~\"otel-.*\"} / container_spec_memory_limit_bytes{pod=~\"otel-.*\"}) * 100",
+                "legendFormat": "Memory %"
+              }
+            ]
+          },
+          {
+            "title": "Error Rates",
+            "type": "graph",
+            "targets": [{
+              "expr": "rate(otelcol_receiver_refused_spans_total[5m])",
+              "legendFormat": "Refused spans/sec"
+            }]
+          }
+        ]
+      }
+    }

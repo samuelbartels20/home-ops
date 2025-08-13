@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: node-exporter
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: node-exporter
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: prometheus-node-exporter
+      version: 4.24.0
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    prometheus:
+      monitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+        jobLabel: node-exporter
+
+    extraArgs:
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+      - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
+      - --collector.netclass.ignored-devices=^(veth.*|[a-f0-9]{15})$
+      - --collector.netdev.device-exclude=^(veth.*|[a-f0-9]{15})$
+
+    service:
+      type: ClusterIP
+      port: 9100
+
+    hostNetwork: true
+    hostPID: true
+
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+
+    collectors:
+      enabled:
+        - cpu
+        - cpufreq
+        - diskstats
+        - filesystem
+        - loadavg
+        - meminfo
+        - netdev
+        - netstat
+        - stat
+        - time
+        - uname
+        - vmstat

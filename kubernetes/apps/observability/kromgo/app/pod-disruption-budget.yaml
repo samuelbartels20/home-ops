@@ -1,0 +1,39 @@
+---
+# Production PodDisruptionBudget for Kromgo Metrics Badge Service
+# Ensures high availability during cluster maintenance and updates
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kromgo
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: availability
+    app.kubernetes.io/part-of: observability-infrastructure
+    production-grade: "true"
+  annotations:
+    policy.kubernetes.io/description: "PodDisruptionBudget for kromgo high availability"
+spec:
+  # Ensure at least 1 pod remains available during disruptions
+  minAvailable: 1
+
+  # Target kromgo pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kromgo
+
+---
+# Priority Class for Kromgo to ensure scheduling priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kromgo-priority
+  labels:
+    app.kubernetes.io/name: kromgo
+    app.kubernetes.io/component: scheduling
+    production-grade: "true"
+  annotations:
+    scheduling.kubernetes.io/description: "High priority class for kromgo metrics service"
+value: 1000
+globalDefault: false
+description: "Priority class for kromgo metrics badge service - high priority observability component"

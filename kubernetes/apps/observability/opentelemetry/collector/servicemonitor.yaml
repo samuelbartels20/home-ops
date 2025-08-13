@@ -1,0 +1,272 @@
+# OpenTelemetry ServiceMonitor Configuration
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: opentelemetry-collector-base
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/component: monitoring-base
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# Production-Grade OpenTelemetry ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: opentelemetry-collector-prod
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/component: monitoring-prod
+    app.kubernetes.io/version: "0.128.0"
+    app.kubernetes.io/managed-by: opentelemetry-operator
+    monitoring: "opentelemetry"
+spec:
+  # Enhanced Service Selection
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+      app.kubernetes.io/component: opentelemetry-collector
+
+  # Namespace Targeting
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  # Multiple Endpoint Monitoring
+  endpoints:
+
+  # Primary Metrics Endpoint
+  - port: metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    scheme: http
+    honorLabels: true
+
+    # Advanced Relabeling
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_pod_container_name]
+      targetLabel: container
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_service_name]
+      targetLabel: service
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_pod_node_name]
+      targetLabel: node
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_pod_host_ip]
+      targetLabel: host_ip
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_pod_uid]
+      targetLabel: pod_uid
+      action: replace
+
+    # Environment Labels
+    - targetLabel: environment
+      replacement: production
+      action: replace
+
+    - targetLabel: cluster
+      replacement: kubernetes
+      action: replace
+
+    - targetLabel: component
+      replacement: opentelemetry-collector
+      action: replace
+
+    # Metric Relabeling for Data Quality
+    metricRelabelings:
+    # Add deployment environment to all metrics
+    - sourceLabels: [__name__]
+      targetLabel: deployment_environment
+      replacement: production
+      action: replace
+
+    # Add cluster name to all metrics
+    - sourceLabels: [__name__]
+      targetLabel: k8s_cluster_name
+      replacement: kubernetes
+      action: replace
+
+    # Drop high-cardinality debug metrics in production
+    - sourceLabels: [__name__]
+      regex: 'otelcol_processor_.*_debug_.*'
+      action: drop
+
+    # Normalize metric names for consistency
+    - sourceLabels: [__name__]
+      regex: 'otelcol_(.+)'
+      targetLabel: __name__
+      replacement: 'opentelemetry_collector_${1}'
+      action: replace
+
+    # Add job type label
+    - targetLabel: job_type
+      replacement: observability-collector
+      action: replace
+
+    # TLS Configuration (if enabled)
+    tlsConfig:
+      serverName: opentelemetry-collector.observability.svc.cluster.local
+      insecureSkipVerify: false
+      caFile: /etc/prometheus/secrets/otel-collector-ca/ca.crt
+      certFile: /etc/prometheus/secrets/otel-collector-cert/tls.crt
+      keyFile: /etc/prometheus/secrets/otel-collector-cert/tls.key
+
+  # Health Check Endpoint
+  - port: health
+    interval: 15s
+    scrapeTimeout: 5s
+    path: /
+    scheme: http
+
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+      action: replace
+
+    - targetLabel: endpoint_type
+      replacement: health
+      action: replace
+
+    - targetLabel: environment
+      replacement: production
+      action: replace
+
+    metricRelabelings:
+    # Only keep health metrics
+    - sourceLabels: [__name__]
+      regex: 'up|probe_.*'
+      action: keep
+
+    # Add health check context
+    - targetLabel: check_type
+      replacement: opentelemetry_health
+      action: replace
+
+  # Sampling Configuration for High-Scale
+  sampleLimit: 100000
+  targetLimit: 1000
+  labelLimit: 100
+  labelNameLengthLimit: 200
+  labelValueLengthLimit: 200
+
+---
+# Additional ServiceMonitor for Operator Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: opentelemetry-operator
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-operator
+    app.kubernetes.io/component: monitoring-operator
+    app.kubernetes.io/version: "v0.127.0"
+    monitoring: "opentelemetry-operator"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-operator
+      control-plane: controller-manager
+
+  namespaceSelector:
+    matchNames:
+    - observability
+
+  endpoints:
+  - port: metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    scheme: http
+    honorLabels: true
+
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+      action: replace
+
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+      action: replace
+
+    - targetLabel: component
+      replacement: opentelemetry-operator
+      action: replace
+
+    - targetLabel: environment
+      replacement: production
+      action: replace
+
+    metricRelabelings:
+    # Add operator-specific context
+    - targetLabel: operator_type
+      replacement: opentelemetry
+      action: replace
+
+    # Keep only relevant controller-runtime metrics
+    - sourceLabels: [__name__]
+      regex: 'controller_runtime_.*|workqueue_.*|process_.*|go_.*'
+      action: keep
+
+    # Drop debug metrics
+    - sourceLabels: [__name__]
+      regex: '.*_debug_.*'
+      action: drop
+
+---
+# PodMonitor for Direct Pod Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: opentelemetry-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-collector
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+
+# Pod Selection
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+
+# Pod Endpoint Configuration
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Pod-Level Relabeling
+  namespaceSelector:
+    matchNames:
+    - observability
+
+# Add runtime information
+  podTargetLabels:
+  - app.kubernetes.io/name
+  - app.kubernetes.io/component
+  - app.kubernetes.io/part-of

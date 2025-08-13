@@ -1,0 +1,89 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: vector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/component: logging
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: vector
+      version: 0.28.1
+      sourceRef:
+        kind: HelmRepository
+        name: vector
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    role: Aggregator
+
+    customConfig:
+      data_dir: /vector-data-dir
+      api:
+        enabled: true
+        address: 0.0.0.0:8686
+        playground: false
+
+      sources:
+        kubernetes_logs:
+          type: kubernetes_logs
+          pod_annotation_fields:
+            container_image: container_image
+            container_name: container_name
+            pod_labels: pod_labels
+            pod_name: pod_name
+            namespace: namespace
+
+      transforms:
+        remap_kubernetes:
+          type: remap
+          inputs: [kubernetes_logs]
+          source: |
+            structured = parse_json!(.message) ?? .message
+            . = merge(., structured)
+            .timestamp = parse_timestamp!(.timestamp, format: "%+")
+            .level = .level ?? "info"
+
+      sinks:
+        loki:
+          type: loki
+          inputs: [remap_kubernetes]
+          endpoint: http://loki-gateway.observability.svc.cluster.local:80
+          encoding:
+            codec: json
+          labels:
+            namespace: "{{ namespace }}"
+            app: "{{ pod_labels.app }}"
+            container: "{{ container_name }}"
+
+        prometheus:
+          type: prometheus_exporter
+          inputs: [remap_kubernetes]
+          address: 0.0.0.0:9090
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: openebs-hostpath

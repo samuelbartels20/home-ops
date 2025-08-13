@@ -1,0 +1,451 @@
+---
+# ServiceMonitor for Alloy Metrics Collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alloy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: monitoring
+    observability.samcloud.online/tier: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  endpoints:
+  - port: http
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    metricRelabelings:
+      # Keep only Alloy-specific metrics
+      - sourceLabels: [__name__]
+        regex: 'alloy_.*|prometheus_.*|loki_.*|otelcol_.*|pyroscope_.*'
+        action: keep
+
+      # Add cluster label
+      - targetLabel: cluster
+        replacement: home-ops-production
+
+      # Add tier label
+      - targetLabel: tier
+        replacement: production
+
+---
+# PrometheusRule for Alloy Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alloy-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: alerting
+    observability.samcloud.online/tier: production
+spec:
+  groups:
+  - name: alloy.rules
+    interval: 30s
+    rules:
+
+    # Alloy Instance Down
+    - alert: AlloyInstanceDown
+      expr: up{job=~".*alloy.*"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: alloy
+        tier: production
+      annotations:
+        summary: "Alloy instance is down"
+        description: "Alloy instance {{ $labels.instance }} has been down for more than 1 minute"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # High Memory Usage
+    - alert: AlloyHighMemoryUsage
+      expr: (process_resident_memory_bytes{job=~".*alloy.*"} / 1024 / 1024 / 1024) > 3
+      for: 5m
+      labels:
+        severity: warning
+        component: alloy
+        tier: production
+      annotations:
+        summary: "Alloy high memory usage"
+        description: "Alloy instance {{ $labels.instance }} is using {{ $value }}GB of memory"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # High CPU Usage
+    - alert: AlloyHighCPUUsage
+      expr: rate(process_cpu_seconds_total{job=~".*alloy.*"}[5m]) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+        component: alloy
+        tier: production
+      annotations:
+        summary: "Alloy high CPU usage"
+        description: "Alloy instance {{ $labels.instance }} is using {{ $value }}% CPU"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # WAL Errors
+    - alert: AlloyWALErrors
+      expr: increase(alloy_wal_errors_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        component: alloy
+        tier: production
+      annotations:
+        summary: "Alloy WAL errors detected"
+        description: "Alloy instance {{ $labels.instance }} has {{ $value }} WAL errors in the last 5 minutes"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Component Failures
+    - alert: AlloyComponentFailures
+      expr: increase(alloy_component_evaluation_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        component: alloy
+        tier: production
+      annotations:
+        summary: "Alloy component failures"
+        description: "Alloy component {{ $labels.component_name }} on instance {{ $labels.instance }} has {{ $value }} failures"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Loki Push Errors
+    - alert: AlloyLokiPushErrors
+      expr: increase(loki_write_dropped_entries_total[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+        component: alloy-loki
+        tier: production
+      annotations:
+        summary: "Alloy Loki push errors"
+        description: "Alloy is dropping log entries for Loki: {{ $value }} entries dropped in 5 minutes"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Prometheus Remote Write Errors
+    - alert: AlloyPrometheusRemoteWriteErrors
+      expr: increase(prometheus_remote_write_failed_samples_total[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+        component: alloy-prometheus
+        tier: production
+      annotations:
+        summary: "Alloy Prometheus remote write errors"
+        description: "Alloy is failing to write metrics to Prometheus/Mimir: {{ $value }} failed samples in 5 minutes"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # OTLP Receiver Errors
+    - alert: AlloyOTLPReceiverErrors
+      expr: increase(otelcol_receiver_refused_spans_total[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+        component: alloy-otlp
+        tier: production
+      annotations:
+        summary: "Alloy OTLP receiver errors"
+        description: "Alloy OTLP receiver is refusing spans: {{ $value }} spans refused in 5 minutes"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # File Too Large Errors
+    - alert: AlloyFileTooLarge
+      expr: increase(loki_source_kubernetes_file_too_large_total[5m]) > 0
+      for: 5m
+      labels:
+        severity: info
+        component: alloy-logs
+        tier: production
+      annotations:
+        summary: "Alloy encountering large log files"
+        description: "Alloy is skipping large log files: {{ $value }} files too large in 5 minutes"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Clustering Issues
+    - alert: AlloyCluseteringIssues
+      expr: alloy_cluster_node_gossip_health_score < 0.5
+      for: 2m
+      labels:
+        severity: warning
+        component: alloy-cluster
+        tier: production
+      annotations:
+        summary: "Alloy clustering health issues"
+        description: "Alloy cluster node {{ $labels.instance }} has poor gossip health score: {{ $value }}"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Configuration Reload Failures
+    - alert: AlloyConfigReloadFailure
+      expr: increase(alloy_config_reload_failures_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        component: alloy-config
+        tier: production
+      annotations:
+        summary: "Alloy configuration reload failure"
+        description: "Alloy instance {{ $labels.instance }} failed to reload configuration {{ $value }} times"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+  - name: alloy.performance
+    interval: 30s
+    rules:
+
+    # High Latency
+    - alert: AlloyHighLatency
+      expr: histogram_quantile(0.95, rate(alloy_http_request_duration_seconds_bucket[5m])) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        component: alloy-performance
+        tier: production
+      annotations:
+        summary: "Alloy high request latency"
+        description: "Alloy 95th percentile latency is {{ $value }}s"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+    # Queue Full
+    - alert: AlloyQueueFull
+      expr: prometheus_remote_write_pending_samples > 10000
+      for: 1m
+      labels:
+        severity: critical
+        component: alloy-queue
+        tier: production
+      annotations:
+        summary: "Alloy remote write queue full"
+        description: "Alloy has {{ $value }} pending samples in remote write queue"
+        runbook_url: "https://grafana.com/docs/alloy/latest/troubleshooting/"
+
+---
+# Grafana Dashboard ConfigMap for Alloy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: dashboard
+    observability.samcloud.online/tier: production
+data:
+  alloy-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Alloy Observability Agent",
+        "tags": ["alloy", "observability", "telemetry"],
+        "style": "dark",
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "title": "Alloy Instances",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "count(up{job=~\".*alloy.*\"})",
+                "legendFormat": "Total Instances"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "thresholds"},
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "green", "value": 3}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Healthy Instances",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(up{job=~\".*alloy.*\"})",
+                "legendFormat": "Healthy"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "thresholds"},
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "green", "value": 3}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Memory Usage",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+            "targets": [
+              {
+                "expr": "process_resident_memory_bytes{job=~\".*alloy.*\"} / 1024 / 1024 / 1024",
+                "legendFormat": "{{ instance }} Memory (GB)"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes",
+                "custom": {"drawStyle": "line"}
+              }
+            }
+          },
+          {
+            "title": "CPU Usage",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+            "targets": [
+              {
+                "expr": "rate(process_cpu_seconds_total{job=~\".*alloy.*\"}[5m]) * 100",
+                "legendFormat": "{{ instance }} CPU (%)"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percent",
+                "custom": {"drawStyle": "line"}
+              }
+            }
+          },
+          {
+            "title": "Log Entries Processed",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+            "targets": [
+              {
+                "expr": "rate(loki_write_sent_entries_total[5m])",
+                "legendFormat": "{{ instance }} Logs/sec"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "rps",
+                "custom": {"drawStyle": "line"}
+              }
+            }
+          },
+          {
+            "title": "Metrics Scraped",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+            "targets": [
+              {
+                "expr": "rate(prometheus_remote_write_samples_total[5m])",
+                "legendFormat": "{{ instance }} Metrics/sec"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "rps",
+                "custom": {"drawStyle": "line"}
+              }
+            }
+          },
+          {
+            "title": "Traces Processed",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+            "targets": [
+              {
+                "expr": "rate(otelcol_receiver_accepted_spans_total[5m])",
+                "legendFormat": "{{ instance }} Spans/sec"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "rps",
+                "custom": {"drawStyle": "line"}
+              }
+            }
+          },
+          {
+            "title": "Component Health",
+            "type": "table",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+            "targets": [
+              {
+                "expr": "alloy_component_controller_evaluating",
+                "format": "table",
+                "legendFormat": "{{ component_name }}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "custom": {"align": "center"}
+              }
+            }
+          }
+        ]
+      }
+    }
+
+---
+# Service for Alloy Metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy-metrics
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: metrics
+    observability.samcloud.online/tier: production
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 12345
+    targetPort: 12345
+    protocol: TCP
+  - name: grpc
+    port: 12346
+    targetPort: 12346
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/instance: alloy
+
+---
+# PodMonitor for direct pod monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: alloy-pods
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: pod-monitoring
+    observability.samcloud.online/tier: production
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+      app.kubernetes.io/instance: alloy
+  podMetricsEndpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

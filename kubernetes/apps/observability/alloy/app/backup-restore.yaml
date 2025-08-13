@@ -1,0 +1,528 @@
+---
+# Backup Configuration for Alloy - Production Grade
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-backup-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup
+    observability.samcloud.online/tier: production
+data:
+  backup-policy.yaml: |
+    # Alloy Backup and Disaster Recovery Policy
+    apiVersion: v1
+    kind: Policy
+    metadata:
+      name: alloy-backup-policy
+    spec:
+      # Configuration Backup
+      configuration:
+        frequency: "daily"
+        retention: "30d"
+        encryption: true
+        compression: true
+
+      # WAL Backup
+      wal:
+        frequency: "hourly"
+        retention: "7d"
+        encryption: true
+        compression: true
+
+      # State Backup
+      state:
+        frequency: "daily"
+        retention: "14d"
+        encryption: true
+
+      # Recovery Targets
+      rto: "15m"  # Recovery Time Objective
+      rpo: "1h"   # Recovery Point Objective
+
+---
+# CronJob for Configuration Backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alloy-config-backup
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup
+    observability.samcloud.online/tier: production
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: alloy-backup
+            app.kubernetes.io/component: config-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: alloy-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: backup
+            image: registry.k8s.io/kubectl:v1.28.0
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            env:
+            - name: BACKUP_DATE
+              value: "$(date +%Y%m%d-%H%M%S)"
+            - name: NAMESPACE
+              value: "observability"
+            - name: S3_BUCKET
+              value: "alloy-backups"
+            - name: AWS_REGION
+              value: "us-west-2"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting Alloy configuration backup..."
+
+              # Create backup directory
+              mkdir -p /tmp/backup
+              cd /tmp/backup
+
+              # Backup ConfigMaps
+              kubectl get configmap alloy-configmap -n ${NAMESPACE} -o yaml > alloy-config.yaml
+              kubectl get configmap alloy-backup-config -n ${NAMESPACE} -o yaml > alloy-backup-config.yaml
+
+              # Backup Secrets
+              kubectl get secret alloy-secrets -n ${NAMESPACE} -o yaml > alloy-secrets.yaml
+
+              # Backup HelmRelease
+              kubectl get helmrelease alloy -n ${NAMESPACE} -o yaml > alloy-helmrelease.yaml
+
+              # Backup ServiceMonitor and PrometheusRules
+              kubectl get servicemonitor alloy -n ${NAMESPACE} -o yaml > alloy-servicemonitor.yaml
+              kubectl get prometheusrule alloy-alerts -n ${NAMESPACE} -o yaml > alloy-prometheusrules.yaml
+
+              # Backup Network Policies
+              kubectl get networkpolicy alloy-network-policy -n ${NAMESPACE} -o yaml > alloy-networkpolicy.yaml
+
+              # Create manifest
+              cat > backup-manifest.yaml << EOF
+              apiVersion: v1
+              kind: BackupManifest
+              metadata:
+                name: alloy-config-backup-${BACKUP_DATE}
+                namespace: ${NAMESPACE}
+                timestamp: $(date -Iseconds)
+              spec:
+                type: configuration
+                source: alloy
+                files:
+                  - alloy-config.yaml
+                  - alloy-backup-config.yaml
+                  - alloy-secrets.yaml
+                  - alloy-helmrelease.yaml
+                  - alloy-servicemonitor.yaml
+                  - alloy-prometheusrules.yaml
+                  - alloy-networkpolicy.yaml
+                checksum: $(find . -type f -name "*.yaml" -exec sha256sum {} \; | sha256sum | cut -d' ' -f1)
+              EOF
+
+              # Compress backup
+              tar -czf alloy-config-backup-${BACKUP_DATE}.tar.gz *.yaml
+
+              # Upload to S3 (if configured)
+              if command -v aws >/dev/null 2>&1; then
+                echo "Uploading backup to S3..."
+                aws s3 cp alloy-config-backup-${BACKUP_DATE}.tar.gz s3://${S3_BUCKET}/config/
+                echo "Backup uploaded successfully"
+              else
+                echo "AWS CLI not available, storing locally"
+                cp alloy-config-backup-${BACKUP_DATE}.tar.gz /backup/
+              fi
+
+              echo "Configuration backup completed: alloy-config-backup-${BACKUP_DATE}.tar.gz"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: alloy-backup-pvc
+          - name: tmp
+            emptyDir: {}
+
+---
+# CronJob for WAL Backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alloy-wal-backup
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: wal-backup
+    observability.samcloud.online/tier: production
+spec:
+  schedule: "0 */2 * * *"  # Every 2 hours
+  successfulJobsHistoryLimit: 12
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: alloy-backup
+            app.kubernetes.io/component: wal-backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: alloy-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+          - name: wal-backup
+            image: alpine:3.18
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            env:
+            - name: BACKUP_DATE
+              value: "$(date +%Y%m%d-%H%M%S)"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting WAL backup..."
+
+              # Create backup directory
+              mkdir -p /tmp/wal-backup
+
+              # Find and backup WAL files from all Alloy pods
+              for pod in $(kubectl get pods -n observability -l app.kubernetes.io/name=alloy -o name); do
+                pod_name=$(echo $pod | cut -d'/' -f2)
+                echo "Backing up WAL from $pod_name..."
+
+                # Copy WAL files
+                kubectl cp observability/$pod_name:/tmp/alloy/wal /tmp/wal-backup/$pod_name-wal/ || echo "No WAL found in $pod_name"
+              done
+
+              # Compress backup
+              cd /tmp/wal-backup
+              tar -czf alloy-wal-backup-${BACKUP_DATE}.tar.gz *
+
+              # Store backup
+              mv alloy-wal-backup-${BACKUP_DATE}.tar.gz /backup/wal/
+
+              echo "WAL backup completed: alloy-wal-backup-${BACKUP_DATE}.tar.gz"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: alloy-backup-pvc
+          - name: tmp
+            emptyDir: {}
+
+---
+# PersistentVolumeClaim for Backup Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alloy-backup-pvc
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup-storage
+    observability.samcloud.online/tier: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn  # Use appropriate storage class
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# ServiceAccount for Backup Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy-backup
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup
+    observability.samcloud.online/tier: production
+automountServiceAccountToken: true
+
+---
+# ClusterRole for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-backup
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup
+    observability.samcloud.online/tier: production
+rules:
+- apiGroups: [""]
+  resources:
+    - configmaps
+    - secrets
+    - pods
+    - pods/exec
+  verbs: ["get", "list", "create"]
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+  verbs: ["get", "list"]
+- apiGroups: ["helm.toolkit.fluxcd.io"]
+  resources:
+    - helmreleases
+  verbs: ["get", "list"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources:
+    - servicemonitors
+    - prometheusrules
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"]
+  resources:
+    - networkpolicies
+  verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-backup
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup
+    observability.samcloud.online/tier: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-backup
+subjects:
+- kind: ServiceAccount
+  name: alloy-backup
+  namespace: observability
+
+---
+# Disaster Recovery Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: alloy-disaster-recovery
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: disaster-recovery
+    observability.samcloud.online/tier: production
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alloy-recovery
+        app.kubernetes.io/component: disaster-recovery
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: alloy-backup
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+      containers:
+      - name: recovery
+        image: registry.k8s.io/kubectl:v1.28.0
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        env:
+        - name: RECOVERY_DATE
+          value: ""  # Set during emergency
+        - name: NAMESPACE
+          value: "observability"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Starting Alloy disaster recovery..."
+
+          if [ -z "$RECOVERY_DATE" ]; then
+            echo "ERROR: RECOVERY_DATE environment variable must be set"
+            exit 1
+          fi
+
+          # Create recovery directory
+          mkdir -p /tmp/recovery
+          cd /tmp/recovery
+
+          # Download backup
+          echo "Downloading backup: alloy-config-backup-${RECOVERY_DATE}.tar.gz"
+          cp /backup/alloy-config-backup-${RECOVERY_DATE}.tar.gz .
+
+          # Extract backup
+          tar -xzf alloy-config-backup-${RECOVERY_DATE}.tar.gz
+
+          # Validate backup integrity
+          if [ ! -f backup-manifest.yaml ]; then
+            echo "ERROR: Invalid backup - manifest not found"
+            exit 1
+          fi
+
+          # Restore configuration
+          echo "Restoring Alloy configuration..."
+
+          # Apply in order
+          kubectl apply -f alloy-secrets.yaml
+          kubectl apply -f alloy-config.yaml
+          kubectl apply -f alloy-networkpolicy.yaml
+          kubectl apply -f alloy-servicemonitor.yaml
+          kubectl apply -f alloy-prometheusrules.yaml
+          kubectl apply -f alloy-helmrelease.yaml
+
+          # Wait for deployment
+          echo "Waiting for Alloy deployment to be ready..."
+          kubectl wait --for=condition=available deployment/alloy -n ${NAMESPACE} --timeout=300s
+
+          # Verify health
+          echo "Verifying Alloy health..."
+          for i in $(seq 1 10); do
+            if kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=alloy | grep -q Running; then
+              echo "Alloy recovery successful!"
+              exit 0
+            fi
+            echo "Waiting for pods to be ready... ($i/10)"
+            sleep 30
+          done
+
+          echo "ERROR: Recovery verification failed"
+          exit 1
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backup
+        - name: tmp
+          mountPath: /tmp
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: alloy-backup-pvc
+      - name: tmp
+        emptyDir: {}
+
+---
+# PrometheusRule for Backup Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alloy-backup-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: backup-monitoring
+    observability.samcloud.online/tier: production
+
+spec:
+  groups:
+  - name: alloy.backup
+    interval: 5m
+    rules:
+
+    # Backup Job Failure
+    - alert: AlloyBackupJobFailure
+      expr: kube_job_status_failed{job_name=~"alloy-.*-backup"} > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: alloy-backup
+        tier: production
+      annotations:
+        summary: "Alloy backup job failed"
+        description: "Alloy backup job {{ $labels.job_name }} has failed"
+        runbook_url: "https://docs.alloy.com/backup-recovery/"
+
+    # Backup Too Old
+    - alert: AlloyBackupTooOld
+      expr: (time() - kube_job_status_completion_time{job_name=~"alloy-config-backup"}) > 86400 * 2
+      for: 1m
+      labels:
+        severity: warning
+        component: alloy-backup
+        tier: production
+      annotations:
+        summary: "Alloy backup is too old"
+        description: "Alloy configuration backup is {{ $value | humanizeDuration }} old"
+        runbook_url: "https://docs.alloy.com/backup-recovery/"
+
+    # WAL Backup Too Old
+    - alert: AlloyWALBackupTooOld
+      expr: (time() - kube_job_status_completion_time{job_name=~"alloy-wal-backup"}) > 3600 * 4
+      for: 1m
+      labels:
+        severity: warning
+        component: alloy-backup
+        tier: production
+      annotations:
+        summary: "Alloy WAL backup is too old"
+        description: "Alloy WAL backup is {{ $value | humanizeDuration }} old"
+        runbook_url: "https://docs.alloy.com/backup-recovery/"

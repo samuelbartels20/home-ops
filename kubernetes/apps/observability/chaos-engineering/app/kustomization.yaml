@@ -1,0 +1,16 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - ./chaos-mesh.yaml
+  - ./litmus.yaml
+  - ./chaos-experiments.yaml
+  - ./chaos-schedules.yaml
+  - ./disaster-recovery-tests.yaml
+  - ./performance-tests.yaml
+  - ./resilience-tests.yaml
+commonLabels:
+  app.kubernetes.io/name: chaos-engineering
+  app.kubernetes.io/managed-by: flux
+  app.kubernetes.io/part-of: observability-platform

@@ -1,0 +1,110 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: alloy
+  namespace: flux-system
+spec:
+  interval: 5m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 1.4.0  # Latest production version
+  url: oci://ghcr.io/grafana/helm-charts/alloy
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: telemetry-correlation
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: alloy
+      version: 0.9.0
+      sourceRef:
+        kind: HelmRepository
+        name: alloy
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+
+    config:
+      telemetry:
+        logs:
+          enabled: true
+          source: loki
+          address: http://loki-gateway
+        metrics:
+          enabled: true
+          source: prometheus
+          address: http://prometheus-operated:9090
+        traces:
+          enabled: true
+          source: tempo
+          address: http://tempo:3200
+      correlation:
+        enabled: true
+        timeRange: 1h
+        maxResults: 1000
+      retention:
+        logs: 7d
+        metrics: 7d
+        traces: 7d
+
+    service:
+      main:
+        enabled: true
+        ports:
+          http:
+            port: 8080
+
+    ingress:
+      main:
+        enabled: true
+        className: nginx
+        hosts:
+          - host: &host "alloy.${SECRET_DOMAIN}"
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - *host
+
+    api:
+      enabled: true
+      cors:
+        enabled: true
+        allowOrigins:
+          - https://grafana.${SECRET_DOMAIN}

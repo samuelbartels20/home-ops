@@ -1,0 +1,90 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lgtm-assessment
+  namespace: observability
+data:
+  assessment.type: production-standards
+  assessment.yaml: |
+    # Observability Infrastructure Assessment
+
+    infrastructure:
+      loki:
+        storage: "Object Storage"
+        retention: "30 days"
+        replication: "3x"
+        compression: "enabled"
+
+      grafana:
+        ha: "enabled"
+        sso: "enabled"
+        rbac: "enabled"
+
+      tempo:
+        storage: "Object Storage"
+        retention: "15 days"
+        sampling: "dynamic"
+
+      mimir:
+        storage: "Object Storage"
+        retention: "90 days"
+        replication: "3x"
+        deduplication: "enabled"
+
+    compliance:
+      metrics:
+        - "[PASS] Object storage"
+        - "[PASS] High availability"
+        - "[PASS] Data retention"
+
+      logs:
+        - "[PASS] Object storage"
+        - "[PASS] Log aggregation"
+        - "[PASS] Log retention"
+
+      traces:
+        - "[PASS] Trace storage"
+        - "[PASS] Trace sampling"
+        - "[PASS] Trace retention"
+
+    overall_compliance: "COMPLIANT"
+
+    next_steps:
+      - "[METRICS] Add custom dashboards"
+      - "[LOGS] Enable log analytics"
+      - "[TRACES] Optimize sampling"
+
+  recommendations.yaml: |
+    # [TARGET] PRODUCTION DEPLOYMENT RECOMMENDATIONS
+
+    immediate_actions:
+      priority_1_critical:
+        - "[CONFIG] Deploy to production namespace"
+        - "[SECURITY] Configure production secrets in 1Password"
+        - "[METRICS] Validate data source connectivity"
+        - "[ALERT] Test alerting channels"
+
+      priority_2_important:
+        - "[METRICS] Import production dashboards"
+        - "[CHECK] Configure log retention policies"
+        - "[MOBILE] Set up mobile notifications"
+        - "[SYNC] Schedule backup verification"
+
+    performance_tuning:
+      - "[PERF] Adjust cache sizes based on workload"
+      - "[METRICS] Fine-tune query parallelism limits"
+      - "[STORAGE] Optimize storage compaction intervals"
+      - "[SYNC] Configure auto-scaling triggers"
+
+    security_hardening:
+      - "[SECURITY] Enable TLS between all components"
+      - "[SECURITY] Implement network segmentation"
+      - "[AUDIT] Set up audit logging"
+      - "[SECURITY] Rotate secrets regularly"
+
+    operational_excellence:
+      - "[DOC] Create runbooks for common scenarios"
+      - "[TARGET] Define SLIs and SLOs"
+      - "[ALERT] Set up escalation procedures"
+      - "[METRICS] Implement capacity planning automation"

@@ -1,0 +1,123 @@
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: keda-backup
+  namespace: observability
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  template:
+    includedNamespaces:
+      - observability
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: keda
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+      - dr-region
+    ttl: 720h # 30 days
+    hooks:
+      pre:
+        - exec:
+            container: keda-operator
+            command:
+              - /bin/sh
+              - -c
+              - |
+                # Verify KEDA components are healthy
+                if ! kubectl get scaledobjects --no-headers | grep -v "Healthy"; then
+                  echo "All ScaledObjects are healthy"
+                  exit 0
+                else
+                  echo "Found unhealthy ScaledObjects"
+                  exit 1
+                fi
+      post:
+        - exec:
+            container: keda-operator
+            command:
+              - /bin/sh
+              - -c
+              - |
+                # Validate backup
+                if ! velero backup describe $(velero backup get --output json | jq -r '.items[0].metadata.name') | grep "Phase:  Completed"; then
+                  echo "Backup validation failed"
+                  exit 1
+                fi
+    replication:
+      enabled: true
+      destinations:
+        - storageLocation: backup-dr
+          region: eu-west-1
+          schedule: "0 */12 * * *"
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: keda-backup-hourly
+  namespace: observability
+spec:
+  schedule: "0 * * * *"  # Every hour
+  template:
+    includedNamespaces:
+      - observability
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: keda
+    includedResources:
+      - scaledobjects
+      - scaledjobs
+      - triggerauthentications
+    storageLocation: default
+    ttl: 168h # 7 days
+    hooks:
+      pre:
+        - exec:
+            container: keda-operator
+            command:
+              - /bin/sh
+              - -c
+              - "kubectl get scaledobjects -o json | jq -r '.items[].status.conditions[] | select(.type==\"Ready\" and .status==\"True\")' | wc -l"
+---
+# Backup Validation Schedule
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: keda-backup-validation
+  namespace: observability
+spec:
+  schedule: "30 */6 * * *"  # 30 minutes after each backup
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backup-validator
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Get latest backup
+                  BACKUP=$(velero backup get --output json | jq -r '.items[0].metadata.name')
+
+                  # Check backup status
+                  if ! velero backup describe $BACKUP | grep "Phase:  Completed"; then
+                    echo "Backup validation failed"
+                    exit 1
+                  fi
+
+                  # Check backup contents
+                  if ! velero backup describe $BACKUP | grep "Total items to be backed up:"; then
+                    echo "Backup content validation failed"
+                    exit 1
+                  fi
+
+                  # Verify backup can be restored
+                  velero restore create --from-backup $BACKUP \
+                    --namespace-mappings observability:backup-validation \
+                    --include-namespaces observability \
+                    --wait
+          restartPolicy: OnFailure

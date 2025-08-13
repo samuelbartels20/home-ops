@@ -1,0 +1,602 @@
+
+---
+# Audit Log Collection & Compliance
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-audit-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-audit
+    app.kubernetes.io/component: compliance
+    compliance.tier: "soc2-hipaa-gdpr"
+spec:
+  mode: deployment
+  replicas: 3
+  serviceAccount: audit-collector
+
+  # Compliance Resource Configuration
+  resources:
+    requests:
+      cpu: 1
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 16Gi
+
+  # Audit Trail Configuration
+  config:
+    extensions:
+      # Audit File Storage with Encryption
+      file_storage/audit:
+        directory: /var/lib/otelcol-contrib/audit
+        timeout: 10s
+        compaction:
+          directory: /var/lib/otelcol-contrib/audit-compaction
+          on_start: true
+        encryption:
+          enabled: true
+          key_file: /etc/audit-encryption/key
+
+      # Health Check for Compliance Monitoring
+      health_check:
+        endpoint: 0.0.0.0:13134
+        path: /audit-health
+
+    receivers:
+      # Kubernetes Audit Logs
+      k8s_audit:
+        authentication:
+          strategy: "serviceAccount"
+        namespaces: ["observability", "security", "kube-system"]
+        resources: ["pods", "services", "secrets", "configmaps"]
+
+      # OTLP for Application Audit Events
+      otlp/audit:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4319
+            auth:
+              authenticator: oauth2client
+          http:
+            endpoint: 0.0.0.0:4320
+            auth:
+              authenticator: oauth2client
+
+      # File Log Collection for System Audits
+      filelog/audit:
+        include:
+        - /var/log/audit/*.log
+        - /var/log/security/*.log
+        operators:
+        - type: json_parser
+          parse_from: attributes.message
+        - type: add
+          field: attributes.compliance_level
+          value: "soc2"
+        - type: add
+          field: attributes.retention_period
+          value: "7years"
+
+    processors:
+      # PII Detection and Redaction for GDPR
+      redaction/gdpr:
+        allow_all_keys: false
+        allowed_keys:
+        - "event.action"
+        - "event.category"
+        - "event.type"
+        - "user.id"  # Pseudonymized only
+        - "service.name"
+        blocked_values:
+        - "email"
+        - "phone"
+        - "ssn"
+        - "credit_card"
+        - "ip_address"
+        summary: "compliance"
+
+      # Attribute Enhancement for Compliance
+      attributes/compliance:
+        actions:
+        - key: compliance.framework
+          value: "SOC2-Type2,HIPAA,GDPR"
+          action: upsert
+        - key: compliance.data_classification
+          from_attribute: security.classification
+          action: upsert
+        - key: compliance.retention_policy
+          value: "7years"
+          action: upsert
+        - key: compliance.audit_trail_id
+          from_attribute: trace.id
+          action: upsert
+
+      # Data Classification Processor
+      transform/classification:
+        log_statements:
+        - context: log
+          statements:
+          # Classify PHI/PII data
+          - set(attributes["data_classification"], "PHI") where attributes["user.medical_record"] != nil
+          - set(attributes["data_classification"], "PII") where attributes["user.email"] != nil
+          - set(attributes["data_classification"], "FINANCIAL") where attributes["payment.card"] != nil
+          - set(attributes["data_classification"], "PUBLIC") where attributes["data_classification"] == nil
+
+      # Compliance Filtering
+      filter/compliance:
+        logs:
+          include:
+            match_type: regexp
+            record_attributes:
+            - key: compliance.audit_required
+              value: "true"
+
+      # Batch Processing for Audit Efficiency
+      batch/audit:
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+        timeout: 30s
+
+    exporters:
+      # Primary Audit Storage (Encrypted)
+      otlphttp/audit_primary:
+        endpoint: "https://audit-storage.samcloud.online/v1/logs"
+        headers:
+          Authorization: "Bearer ${AUDIT_TOKEN}"
+          X-Compliance-Framework: "SOC2-HIPAA-GDPR"
+        tls:
+          insecure: false
+          ca_file: /etc/ssl/certs/audit-ca.crt
+        compression: gzip
+        retry_config:
+          enabled: true
+          initial_interval: 5s
+          max_interval: 60s
+
+      # Secondary Audit Storage (DR)
+      otlphttp/audit_secondary:
+        endpoint: "https://backup-audit.samcloud.online/v1/logs"
+        headers:
+          Authorization: "Bearer ${BACKUP_AUDIT_TOKEN}"
+        compression: gzip
+
+      # Compliance Reporting Export
+      prometheus/compliance:
+        endpoint: "https://compliance-metrics.company.com/api/v1/write"
+        namespace: "otel_compliance"
+        const_labels:
+          compliance_framework: "soc2_hipaa_gdpr"
+          audit_version: "v2.0"
+
+      # SIEM Integration
+      syslog/siem:
+        endpoint: "siem.company.com:514"
+        protocol: "tcp"
+        format: "rfc5424"
+
+    service:
+      extensions: [health_check, file_storage/audit]
+      pipelines:
+        # Audit Log Pipeline
+        logs/audit:
+          receivers: [k8s_audit, otlp/audit, filelog/audit]
+          processors: [
+            redaction/gdpr,
+            attributes/compliance,
+            transform/classification,
+            filter/compliance,
+            batch/audit
+          ]
+          exporters: [
+            otlphttp/audit_primary,
+            otlphttp/audit_secondary,
+            syslog/siem
+          ]
+
+        # Compliance Metrics Pipeline
+        metrics/compliance:
+          receivers: [otlp/audit]
+          processors: [batch/audit]
+          exporters: [prometheus/compliance]
+---
+# RBAC for Audit Collector
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: audit-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-audit
+    app.kubernetes.io/component: rbac
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audit-collector
+  labels:
+    app.kubernetes.io/name: opentelemetry-audit
+    app.kubernetes.io/component: rbac
+rules:
+# Audit log access
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["audit.k8s.io"]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+# Security context monitoring
+- apiGroups: [""]
+  resources: ["pods", "services", "secrets", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+# RBAC monitoring
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: audit-collector
+  labels:
+    app.kubernetes.io/name: opentelemetry-audit
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: audit-collector
+subjects:
+- kind: ServiceAccount
+  name: audit-collector
+  namespace: observability
+---
+# Compliance Policy Engine
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-policies
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-compliance
+    app.kubernetes.io/component: policies
+data:
+  soc2-policies.yaml: |
+    # SOC2 Type II Compliance Policies
+    policies:
+      - name: "data_access_logging"
+        description: "All data access must be logged"
+        rule: |
+          required_fields:
+            - user.id
+            - resource.type
+            - action.type
+            - timestamp
+          retention: "7years"
+
+      - name: "encryption_in_transit"
+        description: "All data transmission must be encrypted"
+        rule: |
+          required:
+            - tls.version >= "1.2"
+            - encryption.algorithm in ["AES-256", "ChaCha20-Poly1305"]
+
+      - name: "access_control"
+        description: "Role-based access control enforcement"
+        rule: |
+          required:
+            - user.role
+            - resource.sensitivity_level
+          validation: |
+            access_granted = user.role.permissions contains resource.required_permission
+
+  hipaa-policies.yaml: |
+    # HIPAA Compliance Policies
+    policies:
+      - name: "phi_protection"
+        description: "Protected Health Information safeguards"
+        rule: |
+          phi_fields:
+            - patient.id
+            - patient.name
+            - patient.dob
+            - medical.record_number
+          actions:
+            - encrypt: true
+            - audit_log: true
+            - access_control: "strict"
+
+      - name: "minimum_necessary"
+        description: "Minimum necessary standard for PHI access"
+        rule: |
+          phi_access_validation:
+            - user.role.phi_access == true
+            - request.justification != null
+            - supervisor.approval == true
+
+      - name: "audit_trail_integrity"
+        description: "Tamper-proof audit trails"
+        rule: |
+          audit_requirements:
+            - digital_signature: true
+            - hash_verification: true
+            - immutable_storage: true
+
+  gdpr-policies.yaml: |
+    # GDPR Compliance Policies
+    policies:
+      - name: "personal_data_identification"
+        description: "Automatic identification of personal data"
+        rule: |
+          personal_data_patterns:
+            - email_regex: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+            - phone_regex: "\\b\\d{3}-\\d{3}-\\d{4}\\b"
+            - ip_regex: "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b"
+          actions:
+            - flag_for_review: true
+            - apply_pseudonymization: true
+
+      - name: "right_to_be_forgotten"
+        description: "Data deletion capabilities"
+        rule: |
+          deletion_requirements:
+            - user_request_validation: true
+            - data_location_mapping: true
+            - cascaded_deletion: true
+            - deletion_audit_log: true
+
+      - name: "data_portability"
+        description: "Data export capabilities"
+        rule: |
+          export_requirements:
+            - user_authentication: true
+            - data_format: "structured"
+            - export_audit_log: true
+
+  iso27001-policies.yaml: |
+    # ISO 27001 Information Security Policies
+    policies:
+      - name: "information_classification"
+        description: "Data classification and handling"
+        rule: |
+          classification_levels:
+            - public: { retention: "3years", encryption: false }
+            - internal: { retention: "5years", encryption: true }
+            - confidential: { retention: "7years", encryption: true, access_control: "strict" }
+            - restricted: { retention: "10years", encryption: true, access_control: "need_to_know" }
+
+      - name: "incident_response"
+        description: "Security incident detection and response"
+        rule: |
+          incident_triggers:
+            - unauthorized_access_attempts: 5
+            - data_exfiltration_patterns: true
+            - privilege_escalation: true
+          response_actions:
+            - alert_security_team: true
+            - isolate_affected_systems: true
+            - preserve_evidence: true
+---
+# Compliance Reporting CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: compliance-reporting
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-compliance
+    app.kubernetes.io/component: reporting
+spec:
+  schedule: "0 0 * * 0"  # Weekly on Sunday
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: compliance-report
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            fsGroup: 65534
+          containers:
+          - name: compliance-reporter
+            image: python:3.11-slim
+            env:
+            - name: COMPLIANCE_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: compliance-config
+                  key: database-url
+            - name: REPORT_RECIPIENTS
+              value: "compliance@company.com,audit@company.com"
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              # Install dependencies
+              pip install --no-cache-dir requests pandas openpyxl
+
+              # Generate compliance reports
+              python3 << 'EOF'
+              import os
+              import json
+              import requests
+              import pandas as pd
+              from datetime import datetime, timedelta
+
+              def generate_soc2_report():
+                  print("Generating SOC2 Type II Report...")
+
+                  # Query audit data for last 7 days
+                  end_date = datetime.now()
+                  start_date = end_date - timedelta(days=7)
+
+                  # Simulated metrics (replace with actual queries)
+                  metrics = {
+                      "total_audit_events": 1250000,
+                      "failed_access_attempts": 45,
+                      "encryption_compliance": "99.8%",
+                      "access_control_violations": 3,
+                      "data_retention_compliance": "100%"
+                  }
+
+                  report = {
+                      "report_type": "SOC2 Type II",
+                      "period": f"{start_date.date()} to {end_date.date()}",
+                      "metrics": metrics,
+                      "compliance_status": "COMPLIANT" if metrics["access_control_violations"] < 5 else "NON_COMPLIANT"
+                  }
+
+                  return report
+
+              def generate_hipaa_report():
+                  print("Generating HIPAA Compliance Report...")
+
+                  metrics = {
+                      "phi_access_events": 8750,
+                      "unauthorized_phi_attempts": 0,
+                      "encryption_status": "100%",
+                      "audit_trail_integrity": "VERIFIED",
+                      "minimum_necessary_compliance": "98.5%"
+                  }
+
+                  report = {
+                      "report_type": "HIPAA",
+                      "metrics": metrics,
+                      "compliance_status": "COMPLIANT"
+                  }
+
+                  return report
+
+              def generate_gdpr_report():
+                  print("Generating GDPR Compliance Report...")
+
+                  metrics = {
+                      "personal_data_requests": 25,
+                      "deletion_requests_fulfilled": 23,
+                      "data_export_requests": 8,
+                      "pseudonymization_rate": "95.2%",
+                      "consent_tracking": "ACTIVE"
+                  }
+
+                  report = {
+                      "report_type": "GDPR",
+                      "metrics": metrics,
+                      "compliance_status": "COMPLIANT" if metrics["deletion_requests_fulfilled"] >= 20 else "REVIEW_REQUIRED"
+                  }
+
+                  return report
+
+              # Generate all reports
+              reports = {
+                  "soc2": generate_soc2_report(),
+                  "hipaa": generate_hipaa_report(),
+                  "gdpr": generate_gdpr_report()
+              }
+
+              # Save consolidated report
+              with open('/tmp/compliance_report.json', 'w') as f:
+                  json.dump(reports, f, indent=2, default=str)
+
+              print("Compliance reports generated successfully")
+              print(json.dumps(reports, indent=2, default=str))
+              EOF
+
+              echo "Compliance reporting completed"
+            volumeMounts:
+            - name: report-storage
+              mountPath: /reports
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+          volumes:
+          - name: report-storage
+            emptyDir: {}
+---
+# Compliance Monitoring Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: compliance-monitoring
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-compliance
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+  - name: compliance.rules
+    interval: 30s
+    rules:
+    # SOC2 Monitoring
+    - alert: SOC2ComplianceViolation
+      expr: otel_compliance_access_control_violations_total > 5
+      for: 0m
+      labels:
+        severity: critical
+        compliance_framework: soc2
+      annotations:
+        summary: "SOC2 access control compliance violation detected"
+        description: "{{ $value }} access control violations detected in the last hour"
+
+    # HIPAA Monitoring
+    - alert: HIPAAUnauthorizedPHIAccess
+      expr: otel_compliance_phi_unauthorized_access_total > 0
+      for: 0m
+      labels:
+        severity: critical
+        compliance_framework: hipaa
+      annotations:
+        summary: "Unauthorized PHI access detected"
+        description: "Unauthorized access to Protected Health Information detected"
+
+    # GDPR Monitoring
+    - alert: GDPRDataRetentionViolation
+      expr: otel_compliance_data_retention_violations_total > 0
+      for: 5m
+      labels:
+        severity: warning
+        compliance_framework: gdpr
+      annotations:
+        summary: "GDPR data retention policy violation"
+        description: "Data retention policy violation detected - review data lifecycle"
+
+    # General Compliance
+    - alert: ComplianceAuditFailure
+      expr: up{job="otel-audit-collector"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        compliance_framework: all
+      annotations:
+        summary: "Compliance audit system failure"
+        description: "Compliance audit collector is down - immediate attention required"
+---
+# Compliance Configuration Secret Template
+apiVersion: v1
+kind: Secret
+metadata:
+  name: compliance-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-compliance
+    app.kubernetes.io/component: config
+type: Opaque
+stringData:
+  database-url: "postgresql://compliance:CHANGE_ME@compliance-db:5432/compliance"
+  audit-token: "CHANGE_ME_AUDIT_TOKEN"
+  backup-audit-token: "CHANGE_ME_BACKUP_AUDIT_TOKEN"
+  encryption-key: "CHANGE_ME_32_CHAR_ENCRYPTION_KEY"

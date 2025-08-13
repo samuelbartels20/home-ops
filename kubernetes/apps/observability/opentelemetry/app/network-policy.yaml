@@ -1,0 +1,306 @@
+# Big Tech Standards: Zero-Trust Network Security for OpenTelemetry
+---
+# OpenTelemetry Collector Ingress Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opentelemetry-network-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+
+  policyTypes:
+  - Ingress
+
+  ingress:
+  # Allow OTLP traffic from application pods
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: observability
+    ports:
+    - protocol: TCP
+      port: 4317  # OTLP gRPC
+    - protocol: TCP
+      port: 4318  # OTLP HTTP
+
+  # Allow Jaeger tracing traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: observability
+    ports:
+    - protocol: TCP
+      port: 14250  # Jaeger gRPC
+    - protocol: TCP
+      port: 14268  # Jaeger HTTP
+
+  # Allow Zipkin tracing traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: observability
+    ports:
+    - protocol: TCP
+      port: 9411   # Zipkin
+
+  # Allow Prometheus scraping from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: alloy
+    ports:
+    - protocol: TCP
+      port: 8888   # Metrics endpoint
+
+  # Allow health checks from Kubernetes and monitoring systems
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    ports:
+    - protocol: TCP
+      port: 13113  # Health check endpoint
+
+  # Allow inter-collector communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: opentelemetry-collector
+    ports:
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+    - protocol: TCP
+      port: 8888
+    - protocol: TCP
+      port: 13113
+---
+# OpenTelemetry Collector Egress Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opentelemetry-network-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+
+  policyTypes:
+  - Egress
+
+  egress:
+  # Allow communication to Alloy (primary telemetry pipeline)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: observability
+    ports:
+    - protocol: TCP
+      port: 4317  # OTLP gRPC
+    - protocol: TCP
+      port: 4318  # OTLP HTTP
+
+  # Allow communication to Loki (logs backup)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: loki
+    ports:
+    - protocol: TCP
+      port: 3100  # Loki API
+    - protocol: TCP
+      port: 80    # Loki gateway
+
+  # Allow communication to Mimir (metrics backup)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: mimir
+    ports:
+    - protocol: TCP
+      port: 8080  # Mimir API
+    - protocol: TCP
+      port: 80    # Mimir nginx
+
+  # Allow communication to Tempo (traces backup)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: tempo
+    ports:
+    - protocol: TCP
+      port: 4317  # OTLP gRPC
+    - protocol: TCP
+      port: 4318  # OTLP HTTP
+
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Allow Kubernetes API server communication
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443   # Kubernetes API
+    - protocol: TCP
+      port: 6443  # Kubernetes API (alternative)
+
+  # Allow external telemetry backends (if configured)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 4317  # External OTLP gRPC
+    - protocol: TCP
+      port: 4318  # External OTLP HTTP
+---
+# OpenTelemetry Operator Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opentelemetry-operator-policy
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-operator
+    app.kubernetes.io/component: security
+    app.kubernetes.io/version: "v0.127.0"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-operator
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  ingress:
+  # Allow webhook traffic from Kubernetes API server
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9443  # Webhook port
+
+  # Allow metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: observability
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080  # Metrics port
+
+  egress:
+  # Allow Kubernetes API communication
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+  # Allow communication to managed collectors
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: opentelemetry-collector
+    ports:
+    - protocol: TCP
+      port: 8888   # Metrics
+    - protocol: TCP
+      port: 13113  # Health
+---
+# Default Deny All Network Policy for Enhanced Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opentelemetry-default-deny
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: security
+    app.kubernetes.io/version: "0.128.0"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+
+  policyTypes:
+  - Ingress
+  - Egress
+
+  # Empty ingress and egress rules = deny all by default
+  # Specific allow rules are defined in separate policies above

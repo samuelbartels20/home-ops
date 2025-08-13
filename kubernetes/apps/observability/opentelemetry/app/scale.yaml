@@ -1,0 +1,340 @@
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: opentelemetry-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry
+    app.kubernetes.io/component: telemetry
+    app.kubernetes.io/part-of: observability
+spec:
+  mode: deployment
+  replicas: 3
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  podDisruptionBudget:
+    minAvailable: 2
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry
+          topologyKey: kubernetes.io/hostname
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch:
+        send_batch_size: 10000
+        timeout: 10s
+      memory_limiter:
+        check_interval: 5s
+        limit_mib: 3072
+      resourcedetection:
+        detectors: [env, system]
+        timeout: 5s
+    exporters:
+      otlp:
+        endpoint: alloy.observability.svc.cluster.local:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp]
+  volumeMounts:
+    - name: tmp
+      mountPath: /tmp
+  volumes:
+    - name: tmp
+      emptyDir: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    fsGroup: 10001
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    seccompProfile:
+      type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-gateway-collector
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-gateway
+    app.kubernetes.io/component: gateway
+spec:
+  type: LoadBalancer
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  - name: health
+    port: 13133
+    targetPort: 13133
+    protocol: TCP
+  - name: metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: opentelemetry-gateway
+    app.kubernetes.io/component: gateway
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-cost-controls
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-cost
+    app.kubernetes.io/component: management
+data:
+  cardinality-limits.yaml: |
+    global:
+      max_series: 10000000
+      max_samples_per_query: 50000000
+
+    per_service:
+      default:
+        max_series: 100000
+        max_attributes: 50
+        max_attribute_length: 100
+
+      high_volume_services:
+      - name: "payment-service"
+        max_series: 1000000
+        max_attributes: 100
+      - name: "recommendation-engine"
+        max_series: 2000000
+        max_attributes: 200
+
+  budget-alerts.yaml: |
+    budgets:
+    - name: "observability-monthly"
+      limit: 50000
+      currency: "USD"
+      period: "monthly"
+      alerts:
+      - threshold: 80
+        action: "alert"
+        webhook: "https://alerts.samcloud.online/budget"
+      - threshold: 95
+        action: "throttle"
+        webhook: "https://alerts.samcloud.online/emergency"
+
+  sampling-config.yaml: |
+    sampling:
+      strategies:
+        default_strategy:
+          type: "probabilistic"
+          param: 0.1
+        per_service_strategies:
+        - service: "payment-service"
+          type: "probabilistic"
+          param: 1.0
+        - service: "debug-service"
+          type: "probabilistic"
+          param: 0.01
+        operation_strategies:
+          "slow-operation":
+            type: "probabilistic"
+            param: 1.0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: otel-performance-benchmark
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-benchmark
+    app.kubernetes.io/component: testing
+spec:
+  parallelism: 10
+  completions: 10
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: opentelemetry-benchmark
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: benchmark
+        image: otel/opentelemetry-collector-contrib:0.128.0
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Starting OpenTelemetry performance benchmark..."
+
+          apk add --no-cache curl jq
+
+          ENDPOINT="http://otel-gateway-collector:4318/v1/traces"
+          DURATION=300
+          RATE=1000
+          WORKERS=10
+
+          for i in $(seq 1 $WORKERS); do
+            (
+              echo "Worker $i starting..."
+              for j in $(seq 1 $((RATE * DURATION))); do
+                TRACE_ID=$(openssl rand -hex 16)
+                SPAN_ID=$(openssl rand -hex 8)
+
+                curl -s -X POST "$ENDPOINT" \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                    \"resourceSpans\": [{
+                      \"resource\": {
+                        \"attributes\": [{
+                          \"key\": \"service.name\",
+                          \"value\": {\"stringValue\": \"benchmark-service-$i\"}
+                        }]
+                      },
+                      \"scopeSpans\": [{
+                        \"spans\": [{
+                          \"traceId\": \"$TRACE_ID\",
+                          \"spanId\": \"$SPAN_ID\",
+                          \"name\": \"benchmark-span-$j\",
+                          \"startTimeUnixNano\": \"$(date +%s)000000000\",
+                          \"endTimeUnixNano\": \"$(date +%s)000000000\",
+                          \"attributes\": [{
+                            \"key\": \"benchmark.worker\",
+                            \"value\": {\"intValue\": $i}
+                          }, {
+                            \"key\": \"benchmark.iteration\",
+                            \"value\": {\"intValue\": $j}
+                          }]
+                        }]
+                      }]
+                    }]
+                  }" &
+
+                if [ $((j % 100)) -eq 0 ]; then
+                  wait
+                  sleep 0.1
+                fi
+              done
+              echo "Worker $i completed"
+            ) &
+          done
+
+          wait
+          echo "Performance benchmark completed successfully"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: opentelemetry-dashboard
+data:
+  opentelemetry.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "OpenTelemetry Performance",
+        "tags": ["opentelemetry", "performance"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Throughput (spans/sec)",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(otelcol_receiver_spans_received_total[5m])",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 50000},
+                    {"color": "green", "value": 100000}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Cardinality Control",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "otelcol_processor_series_count",
+                "legendFormat": "Active Series"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Cost Metrics",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "otelcol_cost_bytes_total",
+                "legendFormat": "Storage Cost"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

@@ -1,0 +1,68 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/gateway.networking.k8s.io/httproute_v1.json
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: robusta-krr
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: robusta-krr
+    app.kubernetes.io/component: cost-optimization
+  annotations:
+    # External DNS annotations
+    external-dns.alpha.kubernetes.io/hostname: "krr.samcloud.online"
+    # Hajimari dashboard integration
+    hajimari.io/enable: "true"
+    hajimari.io/appName: "KRR Resource Recommendations"
+    hajimari.io/icon: "currency-usd"
+    hajimari.io/group: "Infrastructure"
+    hajimari.io/instance: "admin"
+    # Security headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+spec:
+  parentRefs:
+    - name: internal
+      namespace: observability
+      sectionName: https
+  hostnames:
+    - "krr.samcloud.online"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Forwarded-Proto
+                value: https
+              - name: X-Forwarded-Host
+                value: "krr.samcloud.online"
+      backendRefs:
+        - name: robusta-krr
+          namespace: observability
+          port: 8080
+          weight: 100
+    # Health check endpoint
+    - matches:
+        - path:
+            type: Exact
+            value: /health
+      backendRefs:
+        - name: robusta-krr
+          namespace: observability
+          port: 8080
+    # Metrics endpoint for Prometheus scraping
+    - matches:
+        - path:
+            type: Exact
+            value: /metrics
+      backendRefs:
+        - name: robusta-krr
+          namespace: observability
+          port: 8080

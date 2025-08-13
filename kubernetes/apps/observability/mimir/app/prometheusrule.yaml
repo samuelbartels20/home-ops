@@ -1,0 +1,231 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mimir-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: mimir
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: mimir.alerts
+    interval: 30s
+    rules:
+    # High-level SLI/SLO alerts
+    - alert: MimirRequestLatencyHigh
+      expr: |
+        (
+          histogram_quantile(0.99, sum(rate(cortex_request_duration_seconds_bucket[5m])) by (le, cluster, job, route)) > 2.5
+        and
+          sum(rate(cortex_request_duration_seconds_bucket[5m])) by (cluster, job, route) > 0
+        )
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir request latency is above SLO"
+        description: "{{ $labels.cluster }}/{{ $labels.job }} has a 99th percentile latency of {{ $value }}s for {{ $labels.route }}."
+
+    - alert: MimirRequestErrors
+      expr: |
+        100 * sum(rate(cortex_request_duration_seconds_count{status_code=~"5.."}[5m])) by (cluster, job, route)
+          /
+        sum(rate(cortex_request_duration_seconds_count[5m])) by (cluster, job, route)
+          > 1
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir request error rate is above SLO"
+        description: "{{ $labels.cluster }}/{{ $labels.job }} is experiencing {{ $value | humanize }}% errors for {{ $labels.route }}."
+
+    # Ingestion path alerts
+    - alert: MimirIngesterUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-ingester.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir ingester is unhealthy"
+        description: "Mimir ingester {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    - alert: MimirDistributorUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-distributor.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir distributor is unhealthy"
+        description: "Mimir distributor {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    # Storage alerts
+    - alert: MimirIngesterDiskSpaceUtilization
+      expr: |
+        (
+          max(cortex_ingester_tsdb_head_series_created_total{cluster="observability"}) by (cluster, job, instance)
+            /
+          (cortex_ingester_tsdb_head_max_timestamp_seconds{cluster="observability"} - cortex_ingester_tsdb_head_min_timestamp_seconds{cluster="observability"})
+        ) > 80000
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir ingester disk space utilization is high"
+        description: "Mimir ingester {{ $labels.cluster }}/{{ $labels.job }}/{{ $labels.instance }} has high series creation rate."
+
+    - alert: MimirIngesterTSDBWALDiskSpaceUtilization
+      expr: |
+        (
+          cortex_ingester_tsdb_wal_corruptions_total{cluster="observability"}
+        ) > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir ingester TSDB WAL corruption detected"
+        description: "Mimir ingester {{ $labels.cluster }}/{{ $labels.job }}/{{ $labels.instance }} has WAL corruption."
+
+    # Query path alerts
+    - alert: MimirQuerierUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-querier.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir querier is unhealthy"
+        description: "Mimir querier {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    - alert: MimirQueryFrontendUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-query-frontend.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir query-frontend is unhealthy"
+        description: "Mimir query-frontend {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    # Compactor alerts
+    - alert: MimirCompactorUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-compactor.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir compactor is unhealthy"
+        description: "Mimir compactor {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    - alert: MimirCompactorHasNotRun
+      expr: |
+        (time() - cortex_compactor_last_successful_run_timestamp_seconds{cluster="observability"}) > 60 * 60 * 24
+      for: 15m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Mimir compactor has not run"
+        description: "Mimir compactor {{ $labels.cluster }}/{{ $labels.job }}/{{ $labels.instance }} has not run in over 24 hours."
+
+    # Alertmanager alerts
+    - alert: MimirAlertmanagerUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-alertmanager.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir alertmanager is unhealthy"
+        description: "Mimir alertmanager {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    # Store-gateway alerts
+    - alert: MimirStoreGatewayUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-store-gateway.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir store-gateway is unhealthy"
+        description: "Mimir store-gateway {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    # Ruler alerts
+    - alert: MimirRulerUnhealthy
+      expr: min(up{cluster="observability",job=~".*mimir-ruler.*"}) by (cluster, job) < 1
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir ruler is unhealthy"
+        description: "Mimir ruler {{ $labels.cluster }}/{{ $labels.job }} is unhealthy."
+
+    # Rate limiting alerts
+    - alert: MimirIngestionRateLimitedSamples
+      expr: |
+        sum(rate(cortex_discarded_samples_total{reason="rate_limited", cluster="observability"}[5m])) by (cluster, job)
+          /
+        sum(rate(cortex_distributor_samples_in_total{cluster="observability"}[5m])) by (cluster, job)
+          > 0.01
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir is rate limiting samples"
+        description: "{{ $labels.cluster }}/{{ $labels.job }} is rate limiting {{ $value | humanizePercentage }} of samples."
+
+    # Overrides alerts
+    - alert: MimirTenantHasPartialBlocks
+      expr: |
+        min(cortex_bucket_blocks_partials_count{cluster="observability"}) by (cluster, job, instance) > 0
+      for: 15m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir tenant has partial blocks"
+        description: "Mimir {{ $labels.cluster }}/{{ $labels.job }}/{{ $labels.instance }} has {{ $value }} partial blocks."
+
+    # Performance monitoring
+    - alert: MimirRequestsQueueLength
+      expr: |
+        cortex_query_frontend_queue_length{cluster="observability"} > 100
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Mimir query queue is long"
+        description: "Mimir {{ $labels.cluster }}/{{ $labels.job }}/{{ $labels.instance }} has {{ $value }} queries queued."
+
+  - name: mimir.rules
+    interval: 30s
+    rules:
+    # SLI recording rules
+    - record: cluster_job_route:cortex_request_duration_seconds:99quantile
+      expr: |
+        histogram_quantile(0.99,
+          sum(rate(cortex_request_duration_seconds_bucket[5m]))
+          by (cluster, job, route, le)
+        )
+
+    - record: cluster_job_route:cortex_request_duration_seconds:50quantile
+      expr: |
+        histogram_quantile(0.50,
+          sum(rate(cortex_request_duration_seconds_bucket[5m]))
+          by (cluster, job, route, le)
+        )
+
+    - record: cluster_job_route:cortex_request_duration_seconds:avg
+      expr: |
+        sum(rate(cortex_request_duration_seconds_sum[5m]))
+        by (cluster, job, route)
+          /
+        sum(rate(cortex_request_duration_seconds_count[5m]))
+        by (cluster, job, route)
+
+    - record: cluster_job_route:cortex_request_duration_seconds_rate5m
+      expr: |
+        sum(rate(cortex_request_duration_seconds_count[5m]))
+        by (cluster, job, route)
+
+    - record: cluster_job_route:cortex_request_duration_seconds:error_rate5m
+      expr: |
+        sum(rate(cortex_request_duration_seconds_count{status_code=~"5.."}[5m]))
+        by (cluster, job, route)
+          /
+        sum(rate(cortex_request_duration_seconds_count[5m]))

@@ -1,0 +1,98 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: incident-response
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: incident-response
+    app.kubernetes.io/component: incident-management
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: incident-response
+      version: 0.5.0
+      sourceRef:
+        kind: HelmRepository
+        name: incident-response
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+
+    config:
+      alertSources:
+        - name: alertmanager
+          type: alertmanager
+          url: http://alertmanager-operated:9093
+      responseTemplates:
+        - name: default
+          steps:
+            - name: Acknowledge
+              description: Acknowledge the incident
+            - name: Investigate
+              description: Investigate the root cause
+            - name: Mitigate
+              description: Apply temporary fixes
+            - name: Resolve
+              description: Implement permanent solution
+            - name: Review
+              description: Post-incident review
+      severityLevels:
+        - name: critical
+          color: red
+          priority: 1
+        - name: warning
+          color: yellow
+          priority: 2
+        - name: info
+          color: blue
+          priority: 3
+
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        hajimari.io/icon: mdi:alert-circle-check
+      hosts:
+        - host: &host "incidents.${SECRET_DOMAIN}"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - hosts:
+            - *host
+
+    notifications:
+      enabled: true
+      slack:
+        enabled: false
+      email:
+        enabled: false
+      webhook:
+        enabled: true
+        endpoint: http://alertmanager-operated:9093/api/v2/alerts

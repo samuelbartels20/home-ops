@@ -1,0 +1,328 @@
+---
+# Advanced Cost Controls & Cardinality Management
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-cost-controls
+  namespace: observability
+data:
+  cost-controls.yaml: |
+    cardinality:
+      limits:
+        metrics_per_day: 1000000
+        labels_per_metric: 10
+        label_values_per_label: 1000
+
+    retention:
+      hot_storage: 7d
+      warm_storage: 30d
+      cold_storage: 90d
+
+    quotas:
+      max_queries_per_day: 10000
+      max_concurrent_queries: 10
+      max_series_per_query: 100000
+
+    optimization:
+      compression: enabled
+      downsampling: enabled
+      caching: enabled
+
+  cost-monitoring.yaml: |
+    # Cost Monitoring and Alerting
+    cost_monitoring:
+      # Data volume tracking
+      volume_tracking:
+        enabled: true
+        track_ingestion_bytes: true
+        track_storage_bytes: true
+        track_query_bytes: true
+
+      # Cost calculations (based on AWS CloudWatch pricing)
+      pricing:
+        ingestion_cost_per_gb: 0.50    # $0.50 per GB ingested
+        storage_cost_per_gb_month: 0.03 # $0.03 per GB/month
+        query_cost_per_gb: 0.01        # $0.01 per GB queried
+
+      # Budget alerts
+      budgets:
+        daily_budget_usd: 100
+        monthly_budget_usd: 2000
+        alert_thresholds: [50, 75, 90, 100]  # Alert at 50%, 75%, 90%, 100%
+
+      # Data retention policies for cost optimization
+      retention_policies:
+        high_frequency_metrics:
+          resolution: "15s"
+          retention: "7d"
+          downsampling:
+            - resolution: "5m"
+              retention: "30d"
+            - resolution: "1h"
+              retention: "90d"
+            - resolution: "6h"
+              retention: "1y"
+
+        standard_metrics:
+          resolution: "30s"
+          retention: "30d"
+          downsampling:
+            - resolution: "5m"
+              retention: "90d"
+            - resolution: "1h"
+              retention: "1y"
+
+        low_priority_metrics:
+          resolution: "5m"
+          retention: "7d"
+          downsampling:
+            - resolution: "1h"
+              retention: "30d"
+
+---
+# CronJob for Cardinality Monitoring and Enforcement
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: alloy-cardinality-monitor
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: cardinality-monitor
+    observability.samcloud.online/tier: production
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: alloy-cardinality-monitor
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: alloy-cost-controls
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: cardinality-monitor
+            image: grafana/alloy:v1.4.0
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            env:
+            - name: PROMETHEUS_URL
+              value: "http://mimir-query-frontend.observability.svc.cluster.local:8080"
+            - name: ALERT_THRESHOLD
+              value: "10000"  # Alert when metric has >10K series
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: alloy-alerts
+                  key: slack-webhook-url
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting cardinality monitoring..."
+
+              # Query high cardinality metrics
+              QUERY='topk(20, count by (__name__)({__name__=~".+"}))'
+
+              curl -s -G "${PROMETHEUS_URL}/api/v1/query" \
+                --data-urlencode "query=${QUERY}" \
+                | jq -r '.data.result[] | select(.value[1] | tonumber > 10000) |
+                  "ALERT: Metric " + .metric.__name__ + " has " + .value[1] + " series"' \
+                > /tmp/high_cardinality_alerts.txt
+
+              if [ -s /tmp/high_cardinality_alerts.txt ]; then
+                echo "High cardinality metrics detected:"
+                cat /tmp/high_cardinality_alerts.txt
+
+                # Send alert to Slack
+                if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+                  ALERT_MESSAGE=$(cat /tmp/high_cardinality_alerts.txt | head -10)
+                  curl -X POST -H 'Content-type: application/json' \
+                    --data "{\"text\":\"[ALERT] High Cardinality Alert\\n\`\`\`${ALERT_MESSAGE}\`\`\`\"}" \
+                    "${SLACK_WEBHOOK_URL}"
+                fi
+              else
+                echo "All metrics within cardinality limits"
+              fi
+
+              # Calculate daily cost estimate
+              INGESTION_QUERY='sum(rate(prometheus_tsdb_symbol_table_size_bytes[1h]) * 24)'
+              COST_DATA=$(curl -s -G "${PROMETHEUS_URL}/api/v1/query" \
+                --data-urlencode "query=${INGESTION_QUERY}")
+
+              DAILY_GB=$(echo "${COST_DATA}" | jq -r '.data.result[0].value[1] // "0"' | \
+                awk '{printf "%.2f", $1/1024/1024/1024}')
+              DAILY_COST=$(echo "${DAILY_GB}" | awk '{printf "%.2f", $1 * 0.50}')
+
+              echo "Daily ingestion: ${DAILY_GB} GB, Cost: \$${DAILY_COST}"
+
+              # Alert if cost exceeds budget
+              if [ $(echo "${DAILY_COST} > 100" | bc -l) -eq 1 ]; then
+                echo "BUDGET ALERT: Daily cost \$${DAILY_COST} exceeds budget"
+                if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+                  curl -X POST -H 'Content-type: application/json' \
+                    --data "{\"text\":\"[COST] Budget Alert: Daily observability cost \$${DAILY_COST} exceeds \$100 budget\"}" \
+                    "${SLACK_WEBHOOK_URL}"
+                fi
+              fi
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: tmp
+            emptyDir: {}
+
+---
+# ServiceAccount for Cost Controls
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy-cost-controls
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: cost-controls
+automountServiceAccountToken: true
+
+---
+# ClusterRole for Cost Controls
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-cost-controls
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: cost-controls
+rules:
+- apiGroups: [""]
+  resources:
+    - configmaps
+    - secrets
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources:
+    - prometheusrules
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+# ClusterRoleBinding for Cost Controls
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-cost-controls
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-cost-controls
+subjects:
+- kind: ServiceAccount
+  name: alloy-cost-controls
+  namespace: observability
+
+---
+# PrometheusRule for Cost and Cardinality Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alloy-cost-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alloy
+    app.kubernetes.io/component: cost-alerts
+
+spec:
+  groups:
+  - name: alloy.cost
+    interval: 60s
+    rules:
+
+    # High Cardinality Alert
+    - alert: AlloyHighCardinality
+      expr: count by (__name__)({__name__=~".+"}) > 50000
+      for: 5m
+      labels:
+        severity: warning
+        component: alloy-cost
+        tier: production
+      annotations:
+        summary: "High cardinality metric detected"
+        description: "Metric {{ $labels.__name__ }} has {{ $value }} series (threshold: 50,000)"
+
+    # Extreme Cardinality Alert
+    - alert: AlloyExtremeCardinality
+      expr: count by (__name__)({__name__=~".+"}) > 100000
+      for: 1m
+      labels:
+        severity: critical
+        component: alloy-cost
+        tier: production
+      annotations:
+        summary: "CRITICAL: Extreme cardinality metric"
+        description: "Metric {{ $labels.__name__ }} has {{ $value }} series (critical threshold: 100,000)"
+
+    # High Ingestion Rate
+    - alert: AlloyHighIngestionRate
+      expr: rate(prometheus_tsdb_samples_appended_total[5m]) > 100000
+      for: 5m
+      labels:
+        severity: warning
+        component: alloy-cost
+        tier: production
+      annotations:
+        summary: "High metric ingestion rate"
+        description: "Ingestion rate is {{ $value }} samples/sec (threshold: 100K/sec)"
+
+    # WAL Growth Rate
+    - alert: AlloyWALGrowthHigh
+      expr: rate(prometheus_tsdb_wal_size_bytes[1h]) > 1073741824  # 1GB/hour
+      for: 30m
+      labels:
+        severity: warning
+        component: alloy-cost
+        tier: production
+      annotations:
+        summary: "High WAL growth rate"
+        description: "WAL growing at {{ $value | humanizeBytes }}/hour"
+
+    # Storage Usage High
+    - alert: AlloyStorageUsageHigh
+      expr: |
+        (
+          prometheus_tsdb_size_bytes /
+          (
+            kubernetes_node_filesystem_size_bytes{mountpoint="/var/lib/alloy"} -
+            kubernetes_node_filesystem_free_bytes{mountpoint="/var/lib/alloy"}
+          )
+        ) * 100 > 80
+      for: 15m
+      labels:
+        severity: warning
+        component: alloy-cost
+        tier: production
+      annotations:
+        summary: "High storage usage"
+        description: "Storage usage is {{ $value }}% of available space"

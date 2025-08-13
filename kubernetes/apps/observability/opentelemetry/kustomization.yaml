@@ -1,0 +1,76 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observability
+
+resources:
+  # Original components
+  - operator
+  - collector
+
+  # Enterprise Production Components
+  - app/enterprise-persistence.yaml
+  - app/enterprise-scale.yaml
+  - app/compliance-audit.yaml
+  - app/gitops-cicd.yaml
+  - app/performance-benchmarking.yaml
+  - app/network-policy.yaml
+  - app/prometheus-rules.yaml
+  - app/pod-security-policy.yaml
+
+commonLabels:
+  app.kubernetes.io/name: opentelemetry
+  app.kubernetes.io/instance: enterprise
+  app.kubernetes.io/component: observability
+  tier: enterprise-production
+
+patches:
+  # Enterprise resource requirements
+  - target:
+      kind: OpenTelemetryCollector
+      name: ".*"
+    patch: |-
+      - op: add
+        path: /metadata/labels/compliance.framework
+        value: "soc2-hipaa-gdpr"
+      - op: add
+        path: /metadata/labels/security.hardened
+        value: "true"
+      - op: add
+        path: /metadata/labels/performance.tier
+        value: "enterprise"
+
+  # Add enterprise annotations
+  - target:
+      kind: Deployment
+      name: ".*otel.*"
+    patch: |-
+      - op: add
+        path: /metadata/annotations/deployment.strategy
+        value: "rolling-update"
+      - op: add
+        path: /metadata/annotations/backup.enabled
+        value: "true"
+      - op: add
+        path: /metadata/annotations/monitoring.tier
+        value: "enterprise"
+
+# Configuration transformers
+transformers:
+  - enterprise-transformers.yaml
+
+# Secret generators for enterprise config
+secretGenerator:
+  - name: enterprise-secrets
+    files:
+      - enterprise-config.env
+    type: Opaque
+
+# ConfigMap generators
+configMapGenerator:
+  - name: enterprise-config
+    files:
+      - enterprise-settings.yaml
+    options:
+      disableNameSuffixHash: true

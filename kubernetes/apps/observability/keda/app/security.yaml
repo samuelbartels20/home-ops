@@ -1,0 +1,183 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: keda-restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+    kubernetes.io/description: 'Production hardened PSP for KEDA'
+    security.kubernetes.io/pod-security-standards: 'restricted'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+  forbiddenSysctls:
+    - '*'
+  seccompProfile:
+    type: RuntimeDefault
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keda-metrics-apiserver-strict
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keda-metrics-apiserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-apiserver
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keda-operator
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          ports:
+            - port: 6443
+              protocol: TCP
+            - port: 443
+              protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          ports:
+            - port: 9090
+              protocol: TCP
+---
+# Enhanced mTLS Configuration
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keda-webhook-cert
+  namespace: observability
+spec:
+  secretName: keda-webhook-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  subject:
+    organizations:
+      - keda
+  commonName: keda-admission-webhooks.observability.svc
+  dnsNames:
+    - keda-admission-webhooks
+    - keda-admission-webhooks.observability
+    - keda-admission-webhooks.observability.svc
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    name: cluster-issuer
+    kind: ClusterIssuer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keda-operator-pdb
+  namespace: observability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-operator
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keda-metrics-apiserver-pdb
+  namespace: observability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-metrics-apiserver
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keda-webhooks-pdb
+  namespace: observability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keda-admission-webhooks
+---
+# Security Scanning Configuration
+apiVersion: aquasecurity.github.io/v1alpha1
+kind: TriviaScan
+metadata:
+  name: keda-security-scan
+  namespace: observability
+spec:
+  schedule: "0 */6 * * *"
+  target:
+    resource:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: keda-operator
+  severity: CRITICAL,HIGH
+  timeout: 5m
+---
+# Audit Policy Configuration
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: keda-audit-policy
+rules:
+  - level: RequestResponse
+    resources:
+      - group: keda.sh
+        resources: ["*"]
+    verbs: ["create", "update", "delete", "patch"]

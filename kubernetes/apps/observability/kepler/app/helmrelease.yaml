@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kepler
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: kepler
+    app.kubernetes.io/component: energy-monitoring
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kepler
+      version: 0.7.2
+      sourceRef:
+        kind: HelmRepository
+        name: kepler
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    exporter:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+
+    prometheus:
+      enabled: true
+      port: 9102
+      portName: metrics
+
+    config:
+      enableGPU: false
+      enabledContainerMetrics:
+        - ContainerCPUUsage
+        - ContainerMemoryUsage
+        - ContainerDiskIO
+        - ContainerNetworkIO
+      exposeCPUMetrics: true
+      exposeMemoryMetrics: true
+      exposeDiskMetrics: true
+      exposeNetworkMetrics: true
+
+    nodeSelector:
+      kubernetes.io/os: linux
+
+    tolerations:
+      - operator: Exists
+        effect: NoSchedule
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi

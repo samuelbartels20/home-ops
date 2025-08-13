@@ -1,0 +1,683 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: on-call-rotation
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: incident-response
+    app.kubernetes.io/component: on-call
+data:
+  rotation-config.yaml: |
+    # On-Call Rotation Configuration
+    # Production-grade on-call management
+
+    version: "1.0"
+    last_updated: "2025-01-26"
+
+    # === GLOBAL ON-CALL CONFIGURATION ===
+    global:
+      timezone: "UTC"
+      rotation_start_time: "09:00"  # When rotations start
+      handoff_time: "09:00"         # When handoffs occur
+      escalation_timeout: "15m"     # Default escalation timeout
+
+      notification_methods:
+        primary: ["pagerduty", "slack"]
+        secondary: ["email", "sms"]
+        emergency: ["phone", "push"]
+
+      response_times:
+        critical: "5 minutes"
+        high: "15 minutes"
+        medium: "1 hour"
+        low: "next business day"
+
+    # === TEAM DEFINITIONS ===
+    teams:
+      sre:
+        name: "Site Reliability Engineering"
+        description: "24/7 platform reliability and incident response"
+        escalation_policy: "sre-escalation"
+
+        primary_rotation:
+          name: "SRE Primary On-Call"
+          schedule_type: "weekly"
+          rotation_length: "1 week"
+          coverage: "24/7"
+
+          members:
+            - name: "Alex Chen"
+              email: "alex.chen@company.com"
+              phone: "+1-555-0101"
+              slack: "@alex.chen"
+              pagerduty_id: "PUSER001"
+              timezone: "America/Los_Angeles"
+              expertise: ["kubernetes", "observability", "networking"]
+
+            - name: "Sarah Johnson"
+              email: "sarah.johnson@company.com"
+              phone: "+1-555-0102"
+              slack: "@sarah.johnson"
+              pagerduty_id: "PUSER002"
+              timezone: "America/New_York"
+              expertise: ["storage", "databases", "security"]
+
+            - name: "Raj Patel"
+              email: "raj.patel@company.com"
+              phone: "+1-555-0103"
+              slack: "@raj.patel"
+              pagerduty_id: "PUSER003"
+              timezone: "Europe/London"
+              expertise: ["automation", "ci-cd", "monitoring"]
+
+            - name: "Maria Garcia"
+              email: "maria.garcia@company.com"
+              phone: "+1-555-0104"
+              slack: "@maria.garcia"
+              pagerduty_id: "PUSER004"
+              timezone: "America/Chicago"
+              expertise: ["performance", "capacity", "troubleshooting"]
+
+        secondary_rotation:
+          name: "SRE Secondary On-Call"
+          schedule_type: "weekly"
+          rotation_length: "1 week"
+          coverage: "24/7"
+
+          members:
+            - name: "David Kim"
+              email: "david.kim@company.com"
+              phone: "+1-555-0105"
+              slack: "@david.kim"
+              pagerduty_id: "PUSER005"
+              timezone: "Asia/Seoul"
+              expertise: ["incident-management", "postmortems"]
+
+            - name: "Emily Brown"
+              email: "emily.brown@company.com"
+              phone: "+1-555-0106"
+              slack: "@emily.brown"
+              pagerduty_id: "PUSER006"
+              timezone: "Australia/Sydney"
+              expertise: ["observability", "alerting"]
+
+        escalation_contacts:
+          sre_lead:
+            name: "Michael Rodriguez"
+            email: "michael.rodriguez@company.com"
+            phone: "+1-555-0201"
+            slack: "@michael.rodriguez"
+            pagerduty_id: "PUSER201"
+
+          engineering_manager:
+            name: "Jennifer Lee"
+            email: "jennifer.lee@company.com"
+            phone: "+1-555-0301"
+            slack: "@jennifer.lee"
+            pagerduty_id: "PUSER301"
+
+      data:
+        name: "Data Engineering"
+        description: "Data platform and analytics systems"
+        escalation_policy: "data-escalation"
+
+        primary_rotation:
+          name: "Data Platform On-Call"
+          schedule_type: "business_hours_plus"
+          rotation_length: "2 weeks"
+          coverage: "weekdays 6am-10pm, weekends 9am-6pm"
+
+          members:
+            - name: "Chris Wilson"
+              email: "chris.wilson@company.com"
+              phone: "+1-555-0107"
+              slack: "@chris.wilson"
+              pagerduty_id: "PUSER007"
+              timezone: "America/Los_Angeles"
+              expertise: ["clickhouse", "analytics", "sql"]
+
+            - name: "Lisa Zhang"
+              email: "lisa.zhang@company.com"
+              phone: "+1-555-0108"
+              slack: "@lisa.zhang"
+              pagerduty_id: "PUSER008"
+              timezone: "America/New_York"
+              expertise: ["druid", "streaming", "kafka"]
+
+            - name: "Ahmed Hassan"
+              email: "ahmed.hassan@company.com"
+              phone: "+1-555-0109"
+              slack: "@ahmed.hassan"
+              pagerduty_id: "PUSER009"
+              timezone: "Europe/Berlin"
+              expertise: ["superset", "visualization", "python"]
+
+        escalation_contacts:
+          data_lead:
+            name: "Priya Sharma"
+            email: "priya.sharma@company.com"
+            phone: "+1-555-0202"
+            slack: "@priya.sharma"
+            pagerduty_id: "PUSER202"
+
+      platform:
+        name: "Platform Engineering"
+        description: "Kubernetes platform and infrastructure"
+        escalation_policy: "platform-escalation"
+
+        primary_rotation:
+          name: "Platform On-Call"
+          schedule_type: "weekly"
+          rotation_length: "1 week"
+          coverage: "24/7"
+
+          members:
+            - name: "Roberto Silva"
+              email: "roberto.silva@company.com"
+              phone: "+1-555-0110"
+              slack: "@roberto.silva"
+              pagerduty_id: "PUSER010"
+              timezone: "America/Sao_Paulo"
+              expertise: ["kubernetes", "helm", "infrastructure"]
+
+            - name: "Anna Kowalski"
+              email: "anna.kowalski@company.com"
+              phone: "+1-555-0111"
+              slack: "@anna.kowalski"
+              pagerduty_id: "PUSER011"
+              timezone: "Europe/Warsaw"
+              expertise: ["storage", "ceph", "networking"]
+
+        escalation_contacts:
+          platform_lead:
+            name: "James Thompson"
+            email: "james.thompson@company.com"
+            phone: "+1-555-0203"
+            slack: "@james.thompson"
+            pagerduty_id: "PUSER203"
+
+    # === ESCALATION POLICIES ===
+    escalation_policies:
+      sre-escalation:
+        name: "SRE Escalation Policy"
+        description: "Standard SRE escalation for critical incidents"
+
+        levels:
+          level_1:
+            timeout: "5 minutes"
+            targets:
+              - type: "user"
+                id: "primary_oncall"
+                method: ["pagerduty", "slack"]
+
+          level_2:
+            timeout: "15 minutes"
+            targets:
+              - type: "user"
+                id: "secondary_oncall"
+                method: ["pagerduty", "phone"]
+              - type: "user"
+                id: "sre_lead"
+                method: ["slack", "email"]
+
+          level_3:
+            timeout: "30 minutes"
+            targets:
+              - type: "user"
+                id: "engineering_manager"
+                method: ["phone", "email"]
+              - type: "schedule"
+                id: "sre_management"
+                method: ["pagerduty"]
+
+          level_4:
+            timeout: "60 minutes"
+            targets:
+              - type: "user"
+                id: "vp_engineering"
+                method: ["phone", "email"]
+
+      data-escalation:
+        name: "Data Platform Escalation Policy"
+        description: "Data platform specific escalation"
+
+        levels:
+          level_1:
+            timeout: "10 minutes"
+            targets:
+              - type: "user"
+                id: "data_primary_oncall"
+                method: ["slack", "email"]
+
+          level_2:
+            timeout: "30 minutes"
+            targets:
+              - type: "user"
+                id: "data_lead"
+                method: ["pagerduty", "phone"]
+              - type: "user"
+                id: "sre_primary_oncall"  # Cross-team escalation
+                method: ["slack"]
+
+          level_3:
+            timeout: "60 minutes"
+            targets:
+              - type: "user"
+                id: "engineering_manager"
+                method: ["phone", "email"]
+
+      platform-escalation:
+        name: "Platform Infrastructure Escalation"
+        description: "Platform and infrastructure escalation"
+
+        levels:
+          level_1:
+            timeout: "3 minutes"  # Faster for infrastructure issues
+            targets:
+              - type: "user"
+                id: "platform_primary_oncall"
+                method: ["pagerduty", "slack"]
+              - type: "user"
+                id: "sre_primary_oncall"  # Parallel notification
+                method: ["slack"]
+
+          level_2:
+            timeout: "10 minutes"
+            targets:
+              - type: "user"
+                id: "platform_lead"
+                method: ["pagerduty", "phone"]
+              - type: "user"
+                id: "sre_lead"
+                method: ["pagerduty"]
+
+          level_3:
+            timeout: "20 minutes"
+            targets:
+              - type: "user"
+                id: "engineering_manager"
+                method: ["phone"]
+              - type: "user"
+                id: "cto"
+                method: ["phone"]  # Critical infrastructure
+
+    # === COVERAGE REQUIREMENTS ===
+    coverage_requirements:
+      critical_services:
+        - "kubernetes-api"
+        - "mimir"
+        - "loki"
+        - "clickhouse"
+        - "storage-cluster"
+
+      coverage_sla:
+        acknowledgment_time: "5 minutes"
+        response_time: "15 minutes"
+        resolution_target: "1 hour"
+
+      timezone_coverage:
+        primary_regions: ["americas", "europe", "asia-pacific"]
+        handoff_times:
+          americas_to_europe: "09:00 UTC"
+          europe_to_asia: "17:00 UTC"
+          asia_to_americas: "01:00 UTC"
+
+    # === SPECIAL PROCEDURES ===
+    special_procedures:
+      severity_based_routing:
+        critical:
+          immediate_escalation: true
+          parallel_notification: true
+          executive_notification: true
+
+        high:
+          standard_escalation: true
+          team_notification: true
+
+        medium:
+          business_hours_only: true
+          email_notification: true
+
+        low:
+          ticket_only: true
+          next_business_day: true
+
+      multi_team_incidents:
+        coordination_required: ["sre", "data", "platform"]
+        incident_commander: "sre"
+        communication_lead: "sre"
+
+      security_incidents:
+        immediate_escalation: ["security-team", "legal", "compliance"]
+        isolation_procedures: true
+        documentation_required: true
+
+      data_loss_incidents:
+        executive_notification: "immediate"
+        all_hands: true
+        external_communication: "legal-approval-required"
+
+    # === HANDOFF PROCEDURES ===
+    handoff_procedures:
+      daily_handoff:
+        time: "09:00 UTC"
+        method: "slack + voice call"
+        duration: "15 minutes"
+
+        checklist:
+          - "Review active incidents"
+          - "Check system health dashboards"
+          - "Review overnight alerts"
+          - "Update incident status"
+          - "Share context on ongoing issues"
+          - "Verify contact information"
+
+      weekly_handoff:
+        time: "Monday 09:00 UTC"
+        method: "team meeting"
+        duration: "30 minutes"
+
+        checklist:
+          - "Week-over-week incident review"
+          - "System health trends"
+          - "Upcoming maintenance windows"
+          - "Team availability updates"
+          - "Process improvements"
+
+      emergency_handoff:
+        triggers: ["extended outage", "team member unavailable"]
+        notification: "immediate"
+        method: "phone + slack"
+
+        checklist:
+          - "Immediate status update"
+          - "Critical system status"
+          - "Active incident briefing"
+          - "Emergency contacts verification"
+
+    # === TRAINING AND CERTIFICATION ===
+    training_requirements:
+      mandatory_training:
+        - "Incident Response Procedures"
+        - "Escalation Policies"
+        - "Communication Protocols"
+        - "System Architecture Overview"
+        - "Monitoring and Alerting"
+
+      specialized_training:
+        sre:
+          - "Kubernetes Administration"
+          - "Observability Stack Deep Dive"
+          - "Performance Troubleshooting"
+
+        data:
+          - "ClickHouse Administration"
+          - "Druid Operations"
+          - "Data Pipeline Troubleshooting"
+
+        platform:
+          - "Ceph Storage Administration"
+          - "Network Troubleshooting"
+          - "Security Procedures"
+
+      certification_renewal:
+        frequency: "quarterly"
+        method: "hands-on exercises"
+        passing_score: "80%"
+
+    # === METRICS AND REPORTING ===
+    metrics:
+      response_time_targets:
+        acknowledgment: "< 5 minutes"
+        initial_response: "< 15 minutes"
+        status_update: "< 30 minutes"
+
+      quality_metrics:
+        - "Mean Time to Acknowledgment (MTTA)"
+        - "Mean Time to Resolution (MTTR)"
+        - "Escalation Rate"
+        - "False Positive Rate"
+        - "Communication Quality Score"
+
+      reporting:
+        frequency: "weekly"
+        recipients: ["team-leads", "engineering-manager"]
+        dashboards: ["on-call-performance", "incident-trends"]
+
+  notification-templates.yaml: |
+    # Notification Templates for On-Call System
+
+    slack_templates:
+      on_call_alert:
+        channel: "#incidents"
+        message: |
+          **{severity}** Alert - {service}
+
+          **Issue**: {alert_name}
+          **Description**: {description}
+          **Started**: {start_time}
+          **On-Call**: @{oncall_engineer}
+
+          **Dashboard**: {dashboard_link}
+          **Runbook**: {runbook_link}
+          **War Room**: {incident_channel}
+
+          Please acknowledge within 5 minutes.
+
+      escalation_alert:
+        channel: "#incidents-critical"
+        message: |
+          [ESCALATED] **ESCALATED** - {service} Incident
+
+          **Alert**: {alert_name}
+          **Duration**: {duration}
+          **Previous On-Call**: @{previous_oncall}
+          **Current On-Call**: @{current_oncall}
+          **Escalation Level**: {escalation_level}
+
+          **Why Escalated**: No acknowledgment after {timeout}
+          **War Room**: {incident_channel}
+
+      handoff_notification:
+        channel: "#sre-team"
+        message: |
+          [HANDOFF] **On-Call Handoff** - {team}
+
+          **Outgoing**: @{outgoing_oncall}
+          **Incoming**: @{incoming_oncall}
+          **Effective**: {handoff_time}
+
+          **Active Incidents**: {active_incidents_count}
+          **System Status**: {overall_status}
+          **Notes**: {handoff_notes}
+
+      incident_resolved:
+        channel: "#incidents"
+        message: |
+          [RESOLVED] **RESOLVED** - {service}
+
+          **Issue**: {alert_name}
+          **Duration**: {total_duration}
+          **Resolved By**: @{resolver}
+          **Resolution**: {resolution_summary}
+
+          **Post-Mortem**: {postmortem_required}
+          **Follow-up**: {followup_actions}
+
+    email_templates:
+      escalation_notification:
+        subject: "[ALERT] ESCALATED: {service} - {alert_name}"
+        body: |
+          An incident has been escalated to you.
+
+          Service: {service}
+          Alert: {alert_name}
+          Severity: {severity}
+          Started: {start_time}
+          Duration: {duration}
+
+          Previous on-call engineer: {previous_oncall}
+          Escalation reason: {escalation_reason}
+
+          Incident details: {incident_link}
+          War room: {war_room_link}
+
+          Please acknowledge immediately and join the war room.
+
+      weekly_summary:
+        subject: "Weekly On-Call Summary - {team} Team"
+        body: |
+          Weekly on-call summary for {week_start} to {week_end}
+
+          INCIDENT SUMMARY:
+          - Total incidents: {total_incidents}
+          - Critical incidents: {critical_incidents}
+          - Mean time to acknowledgment: {mtta}
+          - Mean time to resolution: {mttr}
+
+          TOP ISSUES:
+          {top_issues_list}
+
+          TEAM PERFORMANCE:
+          - Response time SLA met: {response_sla_met}%
+          - Escalation rate: {escalation_rate}%
+          - False positive rate: {false_positive_rate}%
+
+          UPCOMING:
+          - Next on-call: {next_oncall}
+          - Maintenance windows: {maintenance_windows}
+          - Training due: {training_due}
+
+    pagerduty_templates:
+      incident_trigger:
+        title: "{severity}: {service} - {alert_name}"
+        description: |
+          {description}
+
+          Started: {start_time}
+          Service: {service}
+          Environment: {environment}
+
+          Dashboard: {dashboard_link}
+          Runbook: {runbook_link}
+
+        custom_details:
+          service: "{service}"
+          environment: "{environment}"
+          alert_name: "{alert_name}"
+          severity: "{severity}"
+          team: "{team}"
+          dashboard_url: "{dashboard_link}"
+          runbook_url: "{runbook_link}"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: on-call-scheduler
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: on-call-scheduler
+    app.kubernetes.io/component: automation
+spec:
+  schedule: "0 9 * * 1"  # Every Monday at 9 AM UTC
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: on-call-scheduler
+            app.kubernetes.io/component: automation
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+          - name: scheduler
+            image: python:3.11-slim
+            command:
+            - python
+            - /app/on-call-scheduler.py
+            env:
+            - name: PAGERDUTY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: on-call-secrets
+                  key: pagerduty-api-key
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: on-call-secrets
+                  key: slack-bot-token
+            volumeMounts:
+            - name: config
+              mountPath: /app
+            - name: rotation-config
+              mountPath: /config
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: config
+            configMap:
+              name: on-call-scripts
+              items:
+              - key: on-call-scheduler.py
+                path: on-call-scheduler.py
+                mode: 0755
+          - name: rotation-config
+            configMap:
+              name: on-call-rotation
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: on-call-secrets
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: on-call-rotation
+    app.kubernetes.io/component: secrets
+spec:
+  refreshInterval: 1m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: on-call-secrets
+    creationPolicy: Owner
+    template:
+      type: Opaque
+      data:
+        pagerduty-api-key: "{{ .pagerduty_api_key }}"
+        slack-bot-token: "{{ .slack_bot_token }}"
+        oncall-webhook-secret: "{{ .oncall_webhook_secret }}"
+  data:
+  - secretKey: pagerduty_api_key
+    remoteRef:
+      key: on-call-integration
+      property: pagerduty_api_key
+  - secretKey: slack_bot_token
+    remoteRef:
+      key: on-call-integration
+      property: slack_bot_token
+  - secretKey: oncall_webhook_secret
+    remoteRef:
+      key: on-call-integration
+      property: webhook_secret

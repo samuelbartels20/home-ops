@@ -1,0 +1,176 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: keda-slo-rules
+  namespace: observability
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+    - name: keda.slo.rules
+      rules:
+        # Availability SLO - 99.9%
+        - record: keda:slo:availability:ratio
+          expr: |
+            avg_over_time(up{job=~"keda.*"}[30d]) * 100
+
+        # Latency SLO - 95% of requests under 500ms
+        - record: keda:slo:latency:ratio
+          expr: |
+            (1 - (
+              sum(rate(keda_metrics_adapter_scale_duration_seconds_bucket{le="0.5"}[5m]))
+              /
+              sum(rate(keda_metrics_adapter_scale_duration_seconds_count[5m]))
+            )) * 100
+
+        # Error Rate SLO - Less than 0.1% error rate
+        - record: keda:slo:error:ratio
+          expr: |
+            sum(rate(keda_metrics_adapter_scaler_errors_total[5m]))
+            /
+            sum(rate(keda_metrics_adapter_scaled_object_metrics_total[5m])) * 100
+
+        # Scaling Success Rate SLO - 99.9% successful scaling operations
+        - record: keda:slo:scaling_success:ratio
+          expr: |
+            sum(rate(keda_metrics_adapter_scale_result_total{result="true"}[5m]))
+            /
+            sum(rate(keda_metrics_adapter_scale_result_total[5m])) * 100
+
+        # Resource Saturation
+        - record: keda:resource:cpu:saturation
+          expr: |
+            max(
+              rate(container_cpu_usage_seconds_total{container=~"keda.*"}[5m])
+              /
+              kube_pod_container_resource_limits{container=~"keda.*",resource="cpu"}
+            ) * 100
+
+        - record: keda:resource:memory:saturation
+          expr: |
+            max(
+              container_memory_working_set_bytes{container=~"keda.*"}
+              /
+              kube_pod_container_resource_limits{container=~"keda.*",resource="memory"}
+            ) * 100
+
+        # Webhook Performance
+        - record: keda:webhook:latency:p95
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(keda_webhook_duration_seconds_bucket[5m])) by (le)
+            )
+
+        # Circuit Breaker Metrics
+        - record: keda:circuit_breaker:open_circuits
+          expr: |
+            sum(keda_circuit_breaker_status{status="open"})
+
+        # Scaling Operation Metrics
+        - record: keda:scaling:operations:total
+          expr: |
+            sum(rate(keda_metrics_adapter_scaled_object_metrics_total[5m]))
+
+        - record: keda:scaling:operations:failed
+          expr: |
+            sum(rate(keda_metrics_adapter_scaler_errors_total[5m]))
+
+    - name: keda.slo.alerts
+      rules:
+        - alert: KedaSLOAvailabilityBreach
+          expr: |
+            keda:slo:availability:ratio < 99.9
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: KEDA availability SLO breach
+            description: "KEDA availability has dropped below 99.9% in the last 5 minutes"
+            runbook_url: "https://runbooks.example.com/keda/availability"
+
+        - alert: KedaSLOLatencyBreach
+          expr: |
+            keda:slo:latency:ratio < 95
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA latency SLO breach
+            description: "More than 5% of KEDA scaling operations are taking longer than 500ms"
+            runbook_url: "https://runbooks.example.com/keda/latency"
+
+        - alert: KedaSLOErrorRateBreach
+          expr: |
+            keda:slo:error:ratio > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA error rate SLO breach
+            description: "KEDA error rate has exceeded 0.1% in the last 5 minutes"
+            runbook_url: "https://runbooks.example.com/keda/errors"
+
+        - alert: KedaSLOScalingSuccessBreach
+          expr: |
+            keda:slo:scaling_success:ratio < 99.9
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA scaling success rate SLO breach
+            description: "KEDA scaling success rate has dropped below 99.9% in the last 5 minutes"
+            runbook_url: "https://runbooks.example.com/keda/scaling"
+
+        - alert: KedaResourceSaturation
+          expr: |
+            keda:resource:cpu:saturation > 80 or keda:resource:memory:saturation > 80
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA resource saturation
+            description: "KEDA components are experiencing high resource utilization"
+            runbook_url: "https://runbooks.example.com/keda/resources"
+
+        - alert: KedaWebhookLatencyHigh
+          expr: |
+            keda:webhook:latency:p95 > 1
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA webhook latency high
+            description: "KEDA webhook 95th percentile latency is above 1 second"
+            runbook_url: "https://runbooks.example.com/keda/webhook"
+
+        - alert: KedaCircuitBreakerOpen
+          expr: |
+            keda:circuit_breaker:open_circuits > 0
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA circuit breaker open
+            description: "One or more KEDA circuit breakers are in open state"
+            runbook_url: "https://runbooks.example.com/keda/circuit-breaker"
+
+        - alert: KedaScalingOperationsFailing
+          expr: |
+            keda:scaling:operations:failed / keda:scaling:operations:total > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: KEDA scaling operations failing
+            description: "More than 5% of KEDA scaling operations are failing"
+            runbook_url: "https://runbooks.example.com/keda/scaling-failures"

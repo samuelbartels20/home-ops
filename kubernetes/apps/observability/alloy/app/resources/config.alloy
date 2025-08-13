@@ -1,0 +1,832 @@
+////////////////////////////////////////////////////////////////////////////////
+// Production Alloy Configuration for Enterprise Observability
+// Supports full LGTM stack with metrics, logs, traces, and profiling
+////////////////////////////////////////////////////////////////////////////////
+
+// Global logging configuration
+logging {
+  level    = "info"
+  format   = "json"
+  write_to = [loki.write.default.receiver]
+}
+
+// Telemetry for self-monitoring
+telemetry {
+  metrics {
+    // Internal metrics configuration
+    wal_cleanup_age         = "12h"
+    wal_cleanup_period      = "30m"
+    global_wal_truncation   = true
+  }
+
+  traces {
+    // Send Alloy's own traces to Tempo
+    receivers = [otelcol.receiver.jaeger.alloy_traces.receiver]
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// METRICS COLLECTION (Prometheus/Mimir Integration)
+////////////////////////////////////////////////////////////////////////////////
+
+// Prometheus remote write configuration
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir-nginx.observability.svc.cluster.local:80/api/v1/push"
+
+    // Queue configuration for high throughput
+    queue_config {
+      capacity             = 10000
+      max_shards          = 200
+      min_shards          = 1
+      max_samples_per_send = 2000
+      batch_send_deadline  = "5s"
+      min_backoff         = "30ms"
+      max_backoff         = "5s"
+      retry_on_http_429   = true
+    }
+
+    // Metadata configuration
+    metadata_config {
+      send              = true
+      send_interval     = "1m"
+      max_samples_per_send = 2000
+    }
+
+    // Headers for authentication if needed
+    headers = {
+      "X-Scope-OrgID" = "home-ops"
+    }
+  }
+}
+
+// Kubernetes service discovery
+discovery.kubernetes "nodes" {
+  role = "node"
+}
+
+discovery.kubernetes "endpoints" {
+  role = "endpoints"
+}
+
+discovery.kubernetes "pods" {
+  role = "pod"
+}
+
+discovery.kubernetes "services" {
+  role = "service"
+}
+
+// Node exporter metrics collection
+discovery.relabel "node_exporter" {
+  targets = discovery.kubernetes.endpoints.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_service_name"]
+    regex         = "node-exporter"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_endpoint_port_name"]
+    regex         = "metrics"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    target_label  = "node"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+}
+
+prometheus.scrape "node_exporter" {
+  targets    = discovery.relabel.node_exporter.output
+  forward_to = [prometheus.remote_write.mimir.receiver]
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  metrics_path = "/metrics"
+
+  // Add cluster label
+  extra_metrics_labels = {
+    cluster = "home-ops-production"
+  }
+}
+
+// Kubernetes metrics from kube-state-metrics
+discovery.relabel "kube_state_metrics" {
+  targets = discovery.kubernetes.endpoints.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_service_name"]
+    regex         = "kube-state-metrics"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_endpoint_port_name"]
+    regex         = "http"
+    action        = "keep"
+  }
+}
+
+prometheus.scrape "kube_state_metrics" {
+  targets    = discovery.relabel.kube_state_metrics.output
+  forward_to = [prometheus.remote_write.mimir.receiver]
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  extra_metrics_labels = {
+    cluster = "home-ops-production"
+  }
+}
+
+// Kubelet metrics collection
+discovery.relabel "kubelet" {
+  targets = discovery.kubernetes.nodes.targets
+
+  rule {
+    target_label = "__address__"
+    replacement  = "kubernetes.default.svc.cluster.local:443"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    regex         = "(.+)"
+    target_label  = "__metrics_path__"
+    replacement   = "/api/v1/nodes/$1/proxy/metrics"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    target_label  = "node"
+  }
+}
+
+prometheus.scrape "kubelet" {
+  targets         = discovery.relabel.kubelet.output
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+  bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+  tls_config {
+    ca_file     = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    server_name = "kubernetes"
+  }
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  extra_metrics_labels = {
+    cluster = "home-ops-production"
+  }
+}
+
+// cAdvisor metrics for container metrics
+discovery.relabel "cadvisor" {
+  targets = discovery.kubernetes.nodes.targets
+
+  rule {
+    target_label = "__address__"
+    replacement  = "kubernetes.default.svc.cluster.local:443"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    regex         = "(.+)"
+    target_label  = "__metrics_path__"
+    replacement   = "/api/v1/nodes/$1/proxy/metrics/cadvisor"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    target_label  = "node"
+  }
+}
+
+prometheus.scrape "cadvisor" {
+  targets         = discovery.relabel.cadvisor.output
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+  bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+  tls_config {
+    ca_file     = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    server_name = "kubernetes"
+  }
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  extra_metrics_labels = {
+    cluster = "home-ops-production"
+  }
+}
+
+// Service monitors for application metrics
+discovery.relabel "service_monitors" {
+  targets = discovery.kubernetes.pods.targets
+
+  // Keep only pods with ServiceMonitor annotations
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_path"]
+    target_label  = "__metrics_path__"
+    regex         = "(.+)"
+  }
+
+  rule {
+    source_labels = ["__address__", "__meta_kubernetes_pod_annotation_prometheus_io_port"]
+    regex         = "([^:]+)(?::[0-9]+)?;([0-9]+)"
+    replacement   = "$1:$2"
+    target_label  = "__address__"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    target_label  = "app"
+  }
+}
+
+prometheus.scrape "service_monitors" {
+  targets    = discovery.relabel.service_monitors.output
+  forward_to = [prometheus.remote_write.mimir.receiver]
+
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+
+  extra_metrics_labels = {
+    cluster = "home-ops-production"
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TRACES COLLECTION (Tempo Integration)
+////////////////////////////////////////////////////////////////////////////////
+
+// OTLP receiver for traces
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+
+    // TLS configuration for secure communication
+    tls {
+      insecure = true  // Set to false in production with proper certs
+    }
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Jaeger receiver for legacy applications
+otelcol.receiver.jaeger "default" {
+  protocols {
+    grpc {
+      endpoint = "0.0.0.0:14250"
+    }
+
+    thrift_http {
+      endpoint = "0.0.0.0:14268"
+    }
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Jaeger receiver for Alloy's own traces
+otelcol.receiver.jaeger "alloy_traces" {
+  protocols {
+    grpc {
+      endpoint = "0.0.0.0:14251"
+    }
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Zipkin receiver for additional compatibility
+otelcol.receiver.zipkin "default" {
+  endpoint = "0.0.0.0:9411"
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Batch processor for efficient trace processing
+otelcol.processor.batch "default" {
+  timeout               = "5s"
+  send_batch_size      = 1024
+  send_batch_max_size  = 2048
+
+  output {
+    metrics = [otelcol.processor.attributes.default.input]
+    logs    = [otelcol.processor.attributes.default.input]
+    traces  = [otelcol.processor.attributes.default.input]
+  }
+}
+
+// Add cluster and environment attributes
+otelcol.processor.attributes "default" {
+  action {
+    key    = "cluster"
+    value  = "home-ops-production"
+    action = "insert"
+  }
+
+  action {
+    key    = "environment"
+    value  = "production"
+    action = "insert"
+  }
+
+  action {
+    key    = "region"
+    value  = "homelab"
+    action = "insert"
+  }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.mimir.input]
+    logs    = [otelcol.exporter.loki.default.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// Memory limiter to prevent OOM
+otelcol.processor.memory_limiter "default" {
+  limit_mib         = 512
+  spike_limit_mib   = 128
+  check_interval    = "5s"
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Export traces to Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo-distributor.observability.svc.cluster.local:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// Export metrics to Mimir via Prometheus remote write
+otelcol.exporter.prometheus "mimir" {
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// Export logs to Loki
+otelcol.exporter.loki "default" {
+  forward_to = [loki.write.default.receiver]
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// LOGS COLLECTION (Loki Integration)
+////////////////////////////////////////////////////////////////////////////////
+
+// Enhanced pod logs collection with structured parsing
+discovery.relabel "pod_logs" {
+  targets = discovery.kubernetes.pods.targets
+
+  // Exclude system namespaces logs to reduce noise
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    regex         = "kube-system|kube-public|kube-node-lease"
+    action        = "drop"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    action        = "replace"
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    action        = "replace"
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    action        = "replace"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    action        = "replace"
+    target_label  = "app"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_version"]
+    action        = "replace"
+    target_label  = "version"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_node_name"]
+    action        = "replace"
+    target_label  = "node"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+    action        = "replace"
+    target_label  = "job"
+    separator     = "/"
+    replacement   = "$1/$2"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+    action        = "replace"
+    target_label  = "__path__"
+    separator     = "/"
+    replacement   = "/var/log/pods/*$1/*.log"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_id"]
+    action        = "replace"
+    target_label  = "container_runtime"
+    regex         = "^(\\S+):\\/\\/.+$"
+    replacement   = "$1"
+  }
+}
+
+loki.source.kubernetes "pod_logs" {
+  targets    = discovery.relabel.pod_logs.output
+  forward_to = [loki.process.pod_logs.receiver]
+}
+
+// Enhanced log processing with JSON parsing and trace correlation
+loki.process "pod_logs" {
+  // Add static labels
+  stage.static_labels {
+    values = {
+      cluster = "home-ops-production"
+      environment = "production"
+    }
+  }
+
+  // Parse JSON logs
+  stage.json {
+    expressions = {
+      level     = "level"
+      timestamp = "timestamp"
+      message   = "message"
+      trace_id  = "trace_id"
+      span_id   = "span_id"
+      service   = "service"
+      logger    = "logger"
+    }
+  }
+
+  // Extract log level and set as label
+  stage.labels {
+    values = {
+      level = "level"
+    }
+  }
+
+  // Parse trace ID for correlation with Tempo
+  stage.regex {
+    expression = "trace[Ii]d[=:]\\s*([a-fA-F0-9]+)"
+    source     = "message"
+  }
+
+  stage.labels {
+    values = {
+      trace_id = "trace_id"
+    }
+  }
+
+  // Drop noisy logs
+  stage.drop {
+    expression  = ".*healthcheck.*"
+    drop_counter_reason = "healthcheck_logs"
+  }
+
+  stage.drop {
+    expression  = ".*GET /metrics.*"
+    drop_counter_reason = "metrics_logs"
+  }
+
+  // Rate limiting for verbose applications
+  stage.limit {
+    rate  = 1000
+    burst = 2000
+    drop  = true
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// Kubernetes events collection
+loki.source.kubernetes_events "cluster_events" {
+  job_name   = "integrations/kubernetes/eventhandler"
+  log_format = "logfmt"
+  forward_to = [loki.process.cluster_events.receiver]
+}
+
+loki.process "cluster_events" {
+  stage.static_labels {
+    values = {
+      cluster = "home-ops-production"
+      component = "kubernetes-events"
+    }
+  }
+
+  // Parse event severity
+  stage.json {
+    expressions = {
+      type     = "type"
+      reason   = "reason"
+      object   = "involvedObject.name"
+      kind     = "involvedObject.kind"
+      namespace = "involvedObject.namespace"
+    }
+  }
+
+  stage.labels {
+    values = {
+      event_type = "type"
+      event_reason = "reason"
+      object_kind = "kind"
+    }
+  }
+
+  // Drop normal events to reduce noise
+  stage.drop {
+    expression = ".*type=\"Normal\".*"
+    drop_counter_reason = "normal_events"
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// Journal logs from systemd
+loki.source.journal "system_logs" {
+  forward_to    = [loki.process.system_logs.receiver]
+  relabel_rules = loki.relabel.journal.rules
+
+  labels = {
+    job      = "systemd-journal"
+    cluster  = "home-ops-production"
+  }
+}
+
+loki.relabel "journal" {
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+
+  rule {
+    source_labels = ["__journal__hostname"]
+    target_label  = "hostname"
+  }
+
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.process "system_logs" {
+  stage.static_labels {
+    values = {
+      cluster = "home-ops-production"
+      component = "systemd"
+    }
+  }
+
+  // Only keep important system logs
+  stage.drop {
+    expression = ".*PRIORITY=[4-7].*"  // Drop info/debug messages
+    drop_counter_reason = "low_priority_system_logs"
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// Loki write configuration with enhanced settings
+loki.write "default" {
+  endpoint {
+    url = "http://loki-gateway.observability.svc.cluster.local:80/loki/api/v1/push"
+
+    // Headers for multi-tenancy
+    headers = {
+      "X-Scope-OrgID" = "home-ops"
+    }
+
+    // Retry configuration
+    backoff_config {
+      min_period  = "100ms"
+      max_period  = "10s"
+      max_retries = 10
+    }
+  }
+
+  // WAL configuration for durability
+  wal {
+    truncate_frequency = "2h"
+    min_age           = "5m"
+    max_age           = "4h"
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PROFILING COLLECTION (Pyroscope Integration)
+////////////////////////////////////////////////////////////////////////////////
+
+// Pyroscope scraping for continuous profiling
+discovery.relabel "profiling" {
+  targets = discovery.kubernetes.pods.targets
+
+  // Keep only pods with profiling annotation
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotation_profiles_grafana_com_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_annotation_profiles_grafana_com_port"]
+    target_label  = "__address__"
+    regex         = "(.+):(.+);(.+)"
+    replacement   = "$1:$3"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    target_label  = "app"
+  }
+}
+
+pyroscope.scrape "default" {
+  targets    = discovery.relabel.profiling.output
+  forward_to = [pyroscope.write.default.receiver]
+
+  scrape_interval = "60s"
+  scrape_timeout  = "30s"
+
+  profiling_config {
+    profile.memory {
+      enabled = true
+    }
+    profile.cpu {
+      enabled = true
+    }
+    profile.goroutine {
+      enabled = true
+    }
+    profile.block {
+      enabled = true
+    }
+    profile.mutex {
+      enabled = true
+    }
+  }
+}
+
+pyroscope.write "default" {
+  endpoint {
+    url = "http://pyroscope.observability.svc.cluster.local:4040"
+
+    headers = {
+      "X-Scope-OrgID" = "home-ops"
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// CUSTOM INTEGRATIONS
+////////////////////////////////////////////////////////////////////////////////
+
+// Special handling for sensitive workloads
+discovery.relabel "sensitive_logs" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    regex         = "security|vault|secrets"
+    action        = "keep"
+  }
+
+  // Same relabeling rules as pod_logs
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    action        = "replace"
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    action        = "replace"
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    action        = "replace"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+    action        = "replace"
+    target_label  = "__path__"
+    separator     = "/"
+    replacement   = "/var/log/pods/*$1/*.log"
+  }
+}
+
+loki.source.kubernetes "sensitive_logs" {
+  targets    = discovery.relabel.sensitive_logs.output
+  forward_to = [loki.process.sensitive_logs.receiver]
+}
+
+loki.process "sensitive_logs" {
+  stage.static_labels {
+    values = {
+      cluster = "home-ops-production"
+      security_tier = "sensitive"
+    }
+  }
+
+  // Redact sensitive information
+  stage.replace {
+    expression   = "password[=:]\\s*[\\w]+"
+    replace      = "password=***REDACTED***"
+  }
+
+  stage.replace {
+    expression   = "token[=:]\\s*[\\w]+"
+    replace      = "token=***REDACTED***"
+  }
+
+  stage.replace {
+    expression   = "key[=:]\\s*[\\w]+"
+    replace      = "key=***REDACTED***"
+  }
+
+  // Higher retention for security logs
+  stage.labels {
+    values = {
+      retention = "long"
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}

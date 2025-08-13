@@ -1,0 +1,20 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - ./helmrelease.yaml
+  - ./networkpolicy.yaml
+  - ./hpa.yaml
+  - ./velero-backup.yaml
+  - ./security.yaml
+  - ./slo.yaml
+commonLabels:
+  app.kubernetes.io/name: keda
+  app.kubernetes.io/instance: keda
+  app.kubernetes.io/part-of: keda
+  app.kubernetes.io/managed-by: flux
+  app.kubernetes.io/created-by: flux
+  app.kubernetes.io/version: "2.17.2"
+  app.kubernetes.io/component: autoscaler
