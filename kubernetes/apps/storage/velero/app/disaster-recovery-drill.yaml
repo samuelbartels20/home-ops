@@ -1,0 +1,35 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: velero-disaster-recovery-drill
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: disaster-recovery
+spec:
+  schedule: "0 3 * * 0" # Every Sunday at 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: velero-sa
+          containers:
+            - name: restore-test
+              image: velero/velero:v1.12.3
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting Velero disaster recovery drill..."
+                  # Simulate restore (replace with real restore logic)
+                  velero restore create --from-backup $(velero backup get -o name | head -n1 | cut -d'/' -f2) --namespace velero
+                  echo "Disaster recovery drill completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+          restartPolicy: OnFailure

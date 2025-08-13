@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero-sa
+  namespace: storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: velero-role
+  namespace: storage
+rules:
+  - apiGroups: ["velero.io"]
+    resources: ["*" ]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "persistentvolumeclaims", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: velero-rolebinding
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: velero-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: velero-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: velero-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes", "nodes", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: velero-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: velero-sa
+    namespace: storage
+roleRef:
+  kind: ClusterRole
+  name: velero-clusterrole
+  apiGroup: rbac.authorization.k8s.io

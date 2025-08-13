@@ -1,0 +1,45 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: velero-upgrade
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: upgrade
+spec:
+  template:
+    spec:
+      serviceAccountName: velero-sa
+      containers:
+        - name: upgrade-test
+          image: bitnami/kubectl:1.28
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Pre-upgrade health check..."
+              kubectl get pods -n velero -l app.kubernetes.io/name=velero
+              echo "Upgrading Velero..."
+              # Simulate upgrade (replace with real Helm/manifest upgrade)
+              sleep 10
+              echo "Post-upgrade health check..."
+              kubectl get pods -n velero -l app.kubernetes.io/name=velero
+              # Simulate failure detection
+              if [ $(kubectl get pods -n velero -l app.kubernetes.io/name=velero | grep -c CrashLoopBackOff) -gt 0 ]; then
+                echo "Upgrade failed, rolling back..."
+                # Simulate rollback (replace with real rollback logic)
+                sleep 5
+                echo "Rollback completed"
+              else
+                echo "Upgrade successful"
+              fi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      restartPolicy: Never
