@@ -18,4 +18,8 @@ data:
           - name: "Cache"
             description: "Data caching service"
           - name: "Monitoring"
-            description: "System monitoring service" 
+            description: "System monitoring service"
+  status-updater.py: |
+    #!/usr/bin/env python3
+    # placeholder script; replace with real status-updater implementation
+    print("status-updater placeholder") 
