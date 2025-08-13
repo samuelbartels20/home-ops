@@ -1,0 +1,56 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pgadmin
+  namespace: storage
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: pgadmin4
+      version: 1.47.0
+      sourceRef:
+        kind: HelmRepository
+        name: runix
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    nameOverride: pgadmin
+    strategy:
+      type: Recreate
+    env:
+      email: ${PGADMIN_EMAIL}
+    existingSecret: pgadmin
+    secretKeys:
+      pgadminPasswordKey: password
+    ingress:
+      enabled: true
+      ingressClassName: external
+      annotations:
+        hajimari.io/appName: "Postgres Admin"
+        hajimari.io/icon: simple-icons:postgresql
+      hosts:
+        - host: pgadmin.samcloud.online
+          paths:
+            - path: /
+              pathType: Prefix
+    networkPolicy:
+      enabled: false
+    persistentVolume:
+      enabled: true
+      existingClaim: ${VOLSYNC_CLAIM}
+    resources:
+      requests:
+        cpu: 15m
+        memory: 183M
+      limits:
+        memory: 283M
