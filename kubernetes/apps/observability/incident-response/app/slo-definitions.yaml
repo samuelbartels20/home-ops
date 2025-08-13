@@ -9,13 +9,9 @@ metadata:
     app.kubernetes.io/component: sli-slo
 data:
   slo-definitions.yaml: |
-    # SLI/SLO Definitions for Production Infrastructure
-    # Based on Google SRE practices and big tech standards
-
     version: "1.0"
     last_updated: "2025-01-26"
 
-    # Global SLO Configuration
     global:
       error_budget_policy:
         calculation_window: "30d"  # 30-day rolling window
@@ -23,9 +19,7 @@ data:
           critical: [2, 6]      # 2% in 1h, 6% in 6h
           warning: [5, 10]      # 5% in 6h, 10% in 3d
 
-    # Service Level Objectives
     services:
-      # === OBSERVABILITY STACK ===
       mimir:
         service_name: "Mimir Metrics Platform"
         owner: "SRE Team"
@@ -34,18 +28,18 @@ data:
           availability:
             description: "Percentage of successful requests"
             sli_specification: "rate(cortex_request_duration_seconds_count{status_code!~'5..'}[5m]) / rate(cortex_request_duration_seconds_count[5m])"
-            target: 99.95  # 99.95% availability
-            error_budget: 0.05  # 21.6 minutes/month
+            target: 99.95  
+            error_budget: 0.05  
 
           latency:
             description: "95th percentile request latency"
             sli_specification: "histogram_quantile(0.95, rate(cortex_request_duration_seconds_bucket[5m]))"
-            target: 500  # 500ms
+            target: 500  
 
           throughput:
             description: "Ingestion rate capability"
             sli_specification: "rate(cortex_distributor_samples_in_total[5m])"
-            target: 100000  # 100K samples/sec minimum
+            target: 100000  
 
       loki:
         service_name: "Loki Log Platform"
@@ -55,18 +49,18 @@ data:
           availability:
             description: "Log ingestion success rate"
             sli_specification: "rate(loki_ingester_samples_received_total[5m]) / (rate(loki_ingester_samples_received_total[5m]) + rate(loki_ingester_samples_failed_total[5m]))"
-            target: 99.9   # 99.9% availability
-            error_budget: 0.1   # 43.2 minutes/month
+            target: 99.9  
+            error_budget: 0.1  
 
           latency:
             description: "Log query response time"
             sli_specification: "histogram_quantile(0.95, rate(loki_request_duration_seconds_bucket[5m]))"
-            target: 1000   # 1 second
+            target: 1000  
 
           durability:
             description: "Log retention compliance"
             sli_specification: "loki_ingester_wal_corruptions_total"
-            target: 0      # Zero data loss
+            target: 0      
 
       tempo:
         service_name: "Tempo Tracing Platform"
@@ -82,12 +76,12 @@ data:
           latency:
             description: "Trace query latency"
             sli_specification: "histogram_quantile(0.95, rate(tempo_request_duration_seconds_bucket[5m]))"
-            target: 2000   # 2 seconds
+            target: 2000  
 
           completeness:
             description: "Trace span completeness"
             sli_specification: "tempo_ingester_live_traces"
-            target: 99.5   # 99.5% traces complete
+            target: 99.5  
 
       grafana:
         service_name: "Grafana Visualization Platform"
@@ -103,9 +97,8 @@ data:
           latency:
             description: "Dashboard load time"
             sli_specification: "histogram_quantile(0.95, rate(grafana_http_request_duration_seconds_bucket[5m]))"
-            target: 3000   # 3 seconds
+            target: 3000  
 
-      # === DATA PLATFORM ===
       clickhouse:
         service_name: "ClickHouse Analytics Platform"
         owner: "Data Team"
@@ -120,12 +113,12 @@ data:
           latency:
             description: "Query execution latency"
             sli_specification: "histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))"
-            target: 5000   # 5 seconds
+            target: 5000  
 
           durability:
             description: "Data integrity and backup success"
             sli_specification: "clickhouse_backup_success_timestamp"
-            target: 99.99  # 99.99% data durability
+            target: 99.99  
 
       druid:
         service_name: "Druid Real-time Analytics"
@@ -141,12 +134,12 @@ data:
           latency:
             description: "Real-time query latency"
             sli_specification: "histogram_quantile(0.95, rate(druid_broker_query_time_bucket[5m]))"
-            target: 1000   # 1 second
+            target: 1000  
 
           freshness:
             description: "Data ingestion lag"
             sli_specification: "druid_ingestion_lag_seconds"
-            target: 60     # 1 minute max lag
+            target: 60     
 
       superset:
         service_name: "Superset BI Platform"
@@ -162,9 +155,8 @@ data:
           latency:
             description: "Dashboard render time"
             sli_specification: "histogram_quantile(0.95, rate(superset_http_request_duration_seconds_bucket[5m]))"
-            target: 10000  # 10 seconds
+            target: 10000  
 
-      # === INFRASTRUCTURE ===
       kubernetes_api:
         service_name: "Kubernetes API Server"
         owner: "Platform Team"
@@ -179,7 +171,7 @@ data:
           latency:
             description: "API request latency"
             sli_specification: "histogram_quantile(0.99, rate(apiserver_request_duration_seconds_bucket[5m]))"
-            target: 1000   # 1 second
+            target: 1000  
 
       storage_cluster:
         service_name: "Ceph Storage Cluster"
@@ -195,49 +187,42 @@ data:
           latency:
             description: "Storage I/O latency"
             sli_specification: "ceph_osd_op_r_latency + ceph_osd_op_w_latency"
-            target: 100    # 100ms average
+            target: 100    
 
           durability:
             description: "Data durability and replication"
             sli_specification: "ceph_pg_degraded_ratio"
-            target: 0      # Zero degraded placement groups
+            target: 0      
 
-    # Error Budget Policies
     error_budget_policies:
       burn_rate_alerts:
-        # Fast burn (2% budget in 1 hour)
         fast_burn:
           severity: "critical"
           for: "2m"
-          burn_rate: 14.4  # (100% / 30 days) * 24 hours * 2% = 14.4x
+          burn_rate: 14.4  
 
-        # Slow burn (5% budget in 6 hours)
         slow_burn:
           severity: "warning"
           for: "15m"
-          burn_rate: 6.0   # (100% / 30 days) * 6 hours * 5% = 6.0x
+          burn_rate: 6.0  
 
-    # SLO Reporting
     reporting:
       frequency: "daily"
       recipients:
-        - "sre-team@company.com"
-        - "engineering-leads@company.com"
+        - "sre-team@samcloud.online"
+        - "engineering-leads@samcloud.online"
       dashboard_url: "https://grafana.samcloud.online/d/slo-overview"
 
-    # Compliance Requirements
     compliance:
       frameworks: ["SOC2", "ISO27001", "GDPR"]
       audit_frequency: "quarterly"
       documentation_review: "monthly"
 
   slo-burn-rate-rules.yaml: |
-    # Prometheus rules for SLO burn rate alerting
     groups:
     - name: slo.burn.rate
       interval: 30s
       rules:
-      # === MIMIR SLO BURN RATES ===
       - record: slo:mimir_availability_5m
         expr: |
           (
@@ -286,7 +271,6 @@ data:
         expr: |
           (1 - slo:mimir_availability_6h) / (1 - 0.9995)
 
-      # === LOKI SLO BURN RATES ===
       - record: slo:loki_availability_5m
         expr: |
           (
@@ -299,7 +283,6 @@ data:
         expr: |
           (1 - slo:loki_availability_5m) / (1 - 0.999)
 
-      # === CLICKHOUSE SLO BURN RATES ===
       - record: slo:clickhouse_availability_5m
         expr: |
           up{job=~".*clickhouse.*"}

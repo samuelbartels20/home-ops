@@ -9,13 +9,9 @@ metadata:
     app.kubernetes.io/component: escalation
 data:
   escalation-policies.yaml: |
-    # Escalation Policies for Production Infrastructure
-    # Based on big tech incident response practices
-
     version: "1.0"
     last_updated: "2025-01-26"
 
-    # === GLOBAL ESCALATION CONFIGURATION ===
     global:
       business_hours:
         timezone: "UTC"
@@ -38,17 +34,15 @@ data:
           executive_service: "Executive-Escalation"
 
         email:
-          sre_list: "sre-team@company.com"
-          engineering_leads: "engineering-leads@company.com"
-          executives: "cto@company.com,vp-engineering@company.com"
+          sre_list: "sre-team@samcloud.online"
+          engineering_leads: "engineering-leads@samcloud.online"
+          executives: "cto@samcloud.online,vp-engineering@samcloud.online"
 
         phone:
           emergency_hotline: "+1-555-INCIDENT"
           cto_direct: "+1-555-CTO-HELP"
 
-    # === SERVICE-SPECIFIC ESCALATION POLICIES ===
     services:
-      # === OBSERVABILITY STACK ===
       mimir:
         service_name: "Mimir Metrics Platform"
         tier: "critical"
@@ -80,7 +74,7 @@ data:
             timeout: "30 minutes"
             contacts:
               - type: "email"
-                target: "engineering-manager@company.com"
+                target: "engineering-manager@samcloud.online"
               - type: "phone"
                 target: "+1-555-ENG-MGR"
 
@@ -89,13 +83,12 @@ data:
             timeout: "60 minutes"
             contacts:
               - type: "email"
-                target: "vp-engineering@company.com"
+                target: "vp-engineering@samcloud.online"
               - type: "phone"
                 target: "+1-555-VP-ENG"
 
         severity_overrides:
           critical:
-            # Skip level 1 for critical Mimir issues
             start_level: 2
             accelerated_timeout: "10 minutes"
             additional_notifications:
@@ -172,7 +165,6 @@ data:
               - type: "pagerduty"
                 target: "SRE-Lead"
 
-      # === DATA PLATFORM ===
       clickhouse:
         service_name: "ClickHouse Analytics Platform"
         tier: "critical"
@@ -204,7 +196,7 @@ data:
             timeout: "30 minutes"
             contacts:
               - type: "email"
-                target: "data-eng-manager@company.com"
+                target: "data-eng-manager@samcloud.online"
               - type: "phone"
                 target: "+1-555-DATA-MGR"
 
@@ -217,7 +209,7 @@ data:
                 target: "#incidents-critical"
                 message: "[CRITICAL] ClickHouse cluster down - Analytics platform unavailable"
               - type: "email"
-                target: "analytics-users@company.com"
+                target: "analytics-users@samcloud.online"
                 subject: "Analytics Platform Outage"
 
       druid:
@@ -260,7 +252,6 @@ data:
               - type: "pagerduty"
                 target: "Data-Lead"
 
-      # === INFRASTRUCTURE ===
       kubernetes:
         service_name: "Kubernetes Platform"
         tier: "critical"
@@ -307,7 +298,7 @@ data:
                 target: "#general"
                 message: "[CRITICAL] Kubernetes cluster issues - All services may be affected"
               - type: "email"
-                target: "all-engineering@company.com"
+                target: "all-engineering@samcloud.online"
                 subject: "Platform Critical Incident"
 
       storage:
@@ -341,7 +332,6 @@ data:
                 target: "#incidents-critical"
                 message: "[CRITICAL] Ceph cluster degraded - Data loss risk"
 
-    # === SPECIAL ESCALATION SCENARIOS ===
     special_scenarios:
       data_loss_risk:
         description: "Any incident with potential for data loss"
@@ -362,13 +352,13 @@ data:
           - type: "phone"
             target: "+1-555-SECURITY"
           - type: "email"
-            target: "security@company.com,legal@company.com"
+            target: "security@samcloud.online,legal@samcloud.online"
 
       compliance_breach:
         description: "Potential regulatory compliance violation"
         immediate_escalation:
           - type: "email"
-            target: "compliance@company.com,legal@company.com"
+            target: "compliance@samcloud.online,legal@samcloud.online"
           - type: "phone"
             target: "+1-555-COMPLIANCE"
 
@@ -380,49 +370,45 @@ data:
           - type: "slack"
             target: "#customer-success"
           - type: "email"
-            target: "customer-success@company.com"
+            target: "customer-success@samcloud.online"
 
-    # === ON-CALL ROTATION ===
     on_call_rotation:
       sre_primary:
         schedule: "24/7"
         rotation_length: "1 week"
         members:
-          - "sre-engineer-1@company.com"
-          - "sre-engineer-2@company.com"
-          - "sre-engineer-3@company.com"
-          - "sre-engineer-4@company.com"
+          - "sre-engineer-1@samcloud.online"
+          - "sre-engineer-2@samcloud.online"
+          - "sre-engineer-3@samcloud.online"
+          - "sre-engineer-4@samcloud.online"
         backup:
-          - "sre-lead@company.com"
+          - "sre-lead@samcloud.online"
 
       data_platform:
         schedule: "business hours + weekend backup"
         rotation_length: "2 weeks"
         members:
-          - "data-engineer-1@company.com"
-          - "data-engineer-2@company.com"
-          - "data-engineer-3@company.com"
+          - "data-engineer-1@samcloud.online"
+          - "data-engineer-2@samcloud.online"
+          - "data-engineer-3@samcloud.online"
         backup:
-          - "data-lead@company.com"
+          - "data-lead@samcloud.online"
 
       platform_infrastructure:
         schedule: "24/7"
         rotation_length: "1 week"
         members:
-          - "platform-engineer-1@company.com"
-          - "platform-engineer-2@company.com"
+          - "platform-engineer-1@samcloud.online"
+          - "platform-engineer-2@samcloud.online"
         backup:
-          - "platform-lead@company.com"
+          - "platform-lead@samcloud.online"
 
-    # === AUTO-ESCALATION RULES ===
     auto_escalation:
       time_based:
-        # Auto-escalate if not acknowledged within timeout
         enabled: true
         default_timeout: "15 minutes"
 
       metric_based:
-        # Auto-escalate based on severity metrics
         error_budget_exhaustion:
           threshold: "90% consumed"
           action: "immediate_escalation"
@@ -431,14 +417,13 @@ data:
         multi_service_outage:
           threshold: "3+ critical services down"
           action: "executive_notification"
-          target: "vp-engineering@company.com"
+          target: "vp-engineering@samcloud.online"
 
         prolonged_outage:
           threshold: "2+ hours critical outage"
           action: "c_level_notification"
-          target: "cto@company.com"
+          target: "cto@samcloud.online"
 
-    # === COMMUNICATION TEMPLATES ===
     communication_templates:
       initial_notification:
                   subject: "[CRITICAL] {severity} - {service} Incident #{incident_id}"

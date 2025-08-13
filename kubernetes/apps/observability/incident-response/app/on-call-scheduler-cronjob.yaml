@@ -1,0 +1,73 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: on-call-scheduler
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: on-call-scheduler
+    app.kubernetes.io/component: automation
+spec:
+  schedule: "0 9 * * 1"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: on-call-scheduler
+            app.kubernetes.io/component: automation
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            fsGroup: 65534
+          containers:
+          - name: scheduler
+            image: python:3.11-slim
+            command:
+            - python
+            - /app/on-call-scheduler.py
+            env:
+            - name: PAGERDUTY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: on-call-secrets
+                  key: pagerduty-api-key
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: on-call-secrets
+                  key: slack-bot-token
+            volumeMounts:
+            - name: config
+              mountPath: /app
+            - name: rotation-config
+              mountPath: /config
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+          volumes:
+          - name: config
+            configMap:
+              name: on-call-scripts
+              items:
+              - key: on-call-scheduler.py
+                path: on-call-scheduler.py
+                mode: 0755
+          - name: rotation-config
+            configMap:
+              name: on-call-rotation
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1 

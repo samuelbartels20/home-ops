@@ -8,5 +8,7 @@ resources:
   - ./alerting-rules.yaml
   - ./escalation-policies.yaml
   - ./status-page.yaml
-  - ./on-call-rotation.yaml
+  - ./on-call-rotation-configmap.yaml
+  - ./on-call-scheduler-cronjob.yaml
+  - ./on-call-secrets.yaml
   - ./post-mortem-templates.yaml

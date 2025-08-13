@@ -9,18 +9,14 @@ metadata:
     app.kubernetes.io/component: on-call
 data:
   rotation-config.yaml: |
-    # On-Call Rotation Configuration
-    # Production-grade on-call management
-
     version: "1.0"
     last_updated: "2025-01-26"
 
-    # === GLOBAL ON-CALL CONFIGURATION ===
     global:
       timezone: "UTC"
-      rotation_start_time: "09:00"  # When rotations start
-      handoff_time: "09:00"         # When handoffs occur
-      escalation_timeout: "15m"     # Default escalation timeout
+      rotation_start_time: "09:00"  
+      handoff_time: "09:00"         
+      escalation_timeout: "15m"     
 
       notification_methods:
         primary: ["pagerduty", "slack"]
@@ -33,7 +29,6 @@ data:
         medium: "1 hour"
         low: "next business day"
 
-    # === TEAM DEFINITIONS ===
     teams:
       sre:
         name: "Site Reliability Engineering"
@@ -48,7 +43,7 @@ data:
 
           members:
             - name: "Alex Chen"
-              email: "alex.chen@company.com"
+              email: "alex.chen@samcloud.online"
               phone: "+1-555-0101"
               slack: "@alex.chen"
               pagerduty_id: "PUSER001"
@@ -56,7 +51,7 @@ data:
               expertise: ["kubernetes", "observability", "networking"]
 
             - name: "Sarah Johnson"
-              email: "sarah.johnson@company.com"
+              email: "sarah.johnson@samcloud.online"
               phone: "+1-555-0102"
               slack: "@sarah.johnson"
               pagerduty_id: "PUSER002"
@@ -64,7 +59,7 @@ data:
               expertise: ["storage", "databases", "security"]
 
             - name: "Raj Patel"
-              email: "raj.patel@company.com"
+                email: "raj.patel@samcloud.online"
               phone: "+1-555-0103"
               slack: "@raj.patel"
               pagerduty_id: "PUSER003"
@@ -72,7 +67,7 @@ data:
               expertise: ["automation", "ci-cd", "monitoring"]
 
             - name: "Maria Garcia"
-              email: "maria.garcia@company.com"
+              email: "maria.garcia@samcloud.online"
               phone: "+1-555-0104"
               slack: "@maria.garcia"
               pagerduty_id: "PUSER004"
@@ -87,7 +82,7 @@ data:
 
           members:
             - name: "David Kim"
-              email: "david.kim@company.com"
+              email: "david.kim@samcloud.online"
               phone: "+1-555-0105"
               slack: "@david.kim"
               pagerduty_id: "PUSER005"
@@ -95,7 +90,7 @@ data:
               expertise: ["incident-management", "postmortems"]
 
             - name: "Emily Brown"
-              email: "emily.brown@company.com"
+              email: "emily.brown@samcloud.online"
               phone: "+1-555-0106"
               slack: "@emily.brown"
               pagerduty_id: "PUSER006"
@@ -105,14 +100,14 @@ data:
         escalation_contacts:
           sre_lead:
             name: "Michael Rodriguez"
-            email: "michael.rodriguez@company.com"
+            email: "michael.rodriguez@samcloud.online"
             phone: "+1-555-0201"
             slack: "@michael.rodriguez"
             pagerduty_id: "PUSER201"
 
           engineering_manager:
             name: "Jennifer Lee"
-            email: "jennifer.lee@company.com"
+            email: "jennifer.lee@samcloud.online"
             phone: "+1-555-0301"
             slack: "@jennifer.lee"
             pagerduty_id: "PUSER301"
@@ -130,7 +125,7 @@ data:
 
           members:
             - name: "Chris Wilson"
-              email: "chris.wilson@company.com"
+              email: "chris.wilson@samcloud.online"
               phone: "+1-555-0107"
               slack: "@chris.wilson"
               pagerduty_id: "PUSER007"
@@ -138,7 +133,7 @@ data:
               expertise: ["clickhouse", "analytics", "sql"]
 
             - name: "Lisa Zhang"
-              email: "lisa.zhang@company.com"
+              email: "lisa.zhang@samcloud.online"
               phone: "+1-555-0108"
               slack: "@lisa.zhang"
               pagerduty_id: "PUSER008"
@@ -156,7 +151,7 @@ data:
         escalation_contacts:
           data_lead:
             name: "Priya Sharma"
-            email: "priya.sharma@company.com"
+            email: "priya.sharma@samcloud.online"
             phone: "+1-555-0202"
             slack: "@priya.sharma"
             pagerduty_id: "PUSER202"
@@ -174,7 +169,7 @@ data:
 
           members:
             - name: "Roberto Silva"
-              email: "roberto.silva@company.com"
+              email: "roberto.silva@samcloud.online"
               phone: "+1-555-0110"
               slack: "@roberto.silva"
               pagerduty_id: "PUSER010"
@@ -182,7 +177,7 @@ data:
               expertise: ["kubernetes", "helm", "infrastructure"]
 
             - name: "Anna Kowalski"
-              email: "anna.kowalski@company.com"
+              email: "anna.kowalski@samcloud.online"
               phone: "+1-555-0111"
               slack: "@anna.kowalski"
               pagerduty_id: "PUSER011"
@@ -192,12 +187,11 @@ data:
         escalation_contacts:
           platform_lead:
             name: "James Thompson"
-            email: "james.thompson@company.com"
+            email: "james.thompson@samcloud.online"
             phone: "+1-555-0203"
             slack: "@james.thompson"
             pagerduty_id: "PUSER203"
 
-    # === ESCALATION POLICIES ===
     escalation_policies:
       sre-escalation:
         name: "SRE Escalation Policy"
@@ -257,7 +251,7 @@ data:
                 id: "data_lead"
                 method: ["pagerduty", "phone"]
               - type: "user"
-                id: "sre_primary_oncall"  # Cross-team escalation
+                id: "sre_primary_oncall"  
                 method: ["slack"]
 
           level_3:
@@ -273,13 +267,13 @@ data:
 
         levels:
           level_1:
-            timeout: "3 minutes"  # Faster for infrastructure issues
+            timeout: "3 minutes"  
             targets:
               - type: "user"
                 id: "platform_primary_oncall"
                 method: ["pagerduty", "slack"]
               - type: "user"
-                id: "sre_primary_oncall"  # Parallel notification
+                id: "sre_primary_oncall"  
                 method: ["slack"]
 
           level_2:
@@ -300,9 +294,8 @@ data:
                 method: ["phone"]
               - type: "user"
                 id: "cto"
-                method: ["phone"]  # Critical infrastructure
+                method: ["phone"]  
 
-    # === COVERAGE REQUIREMENTS ===
     coverage_requirements:
       critical_services:
         - "kubernetes-api"
@@ -323,7 +316,6 @@ data:
           europe_to_asia: "17:00 UTC"
           asia_to_americas: "01:00 UTC"
 
-    # === SPECIAL PROCEDURES ===
     special_procedures:
       severity_based_routing:
         critical:
@@ -358,7 +350,6 @@ data:
         all_hands: true
         external_communication: "legal-approval-required"
 
-    # === HANDOFF PROCEDURES ===
     handoff_procedures:
       daily_handoff:
         time: "09:00 UTC"
@@ -396,7 +387,6 @@ data:
           - "Active incident briefing"
           - "Emergency contacts verification"
 
-    # === TRAINING AND CERTIFICATION ===
     training_requirements:
       mandatory_training:
         - "Incident Response Procedures"
@@ -426,7 +416,6 @@ data:
         method: "hands-on exercises"
         passing_score: "80%"
 
-    # === METRICS AND REPORTING ===
     metrics:
       response_time_targets:
         acknowledgment: "< 5 minutes"
@@ -446,8 +435,6 @@ data:
         dashboards: ["on-call-performance", "incident-trends"]
 
   notification-templates.yaml: |
-    # Notification Templates for On-Call System
-
     slack_templates:
       on_call_alert:
         channel: "#incidents"
@@ -569,115 +556,4 @@ data:
           severity: "{severity}"
           team: "{team}"
           dashboard_url: "{dashboard_link}"
-          runbook_url: "{runbook_link}"
-
----
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: on-call-scheduler
-  namespace: observability
-  labels:
-    app.kubernetes.io/name: on-call-scheduler
-    app.kubernetes.io/component: automation
-spec:
-  schedule: "0 9 * * 1"  # Every Monday at 9 AM UTC
-  jobTemplate:
-    spec:
-      template:
-        metadata:
-          labels:
-            app.kubernetes.io/name: on-call-scheduler
-            app.kubernetes.io/component: automation
-        spec:
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            fsGroup: 65534
-          containers:
-          - name: scheduler
-            image: python:3.11-slim
-            command:
-            - python
-            - /app/on-call-scheduler.py
-            env:
-            - name: PAGERDUTY_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: on-call-secrets
-                  key: pagerduty-api-key
-            - name: SLACK_BOT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: on-call-secrets
-                  key: slack-bot-token
-            volumeMounts:
-            - name: config
-              mountPath: /app
-            - name: rotation-config
-              mountPath: /config
-            resources:
-              requests:
-                memory: "128Mi"
-                cpu: "100m"
-              limits:
-                memory: "256Mi"
-                cpu: "200m"
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                - ALL
-          volumes:
-          - name: config
-            configMap:
-              name: on-call-scripts
-              items:
-              - key: on-call-scheduler.py
-                path: on-call-scheduler.py
-                mode: 0755
-          - name: rotation-config
-            configMap:
-              name: on-call-rotation
-          restartPolicy: OnFailure
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: on-call-secrets
-  namespace: observability
-  labels:
-    app.kubernetes.io/name: on-call-rotation
-    app.kubernetes.io/component: secrets
-spec:
-  refreshInterval: 1m
-  secretStoreRef:
-    kind: ClusterSecretStore
-    name: onepassword-connect
-  target:
-    name: on-call-secrets
-    creationPolicy: Owner
-    template:
-      type: Opaque
-      data:
-        pagerduty-api-key: "{{ .pagerduty_api_key }}"
-        slack-bot-token: "{{ .slack_bot_token }}"
-        oncall-webhook-secret: "{{ .oncall_webhook_secret }}"
-  data:
-  - secretKey: pagerduty_api_key
-    remoteRef:
-      key: on-call-integration
-      property: pagerduty_api_key
-  - secretKey: slack_bot_token
-    remoteRef:
-      key: on-call-integration
-      property: slack_bot_token
-  - secretKey: oncall_webhook_secret
-    remoteRef:
-      key: on-call-integration
-      property: webhook_secret
+          runbook_url: "{runbook_link}" 
