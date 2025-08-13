@@ -1,0 +1,92 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: otel-backup
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: opentelemetry-backup
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: opentelemetry-backup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            fsGroup: 65534
+          containers:
+          - name: backup
+            image: restic/restic:0.16.4
+            env:
+            - name: RESTIC_REPOSITORY
+              value: "s3:s3.amazonaws.com/opentelemetry-backups"
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: restic-config
+                  key: password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: restic-config
+                  key: access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: restic-config
+                  key: secret-key
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting OpenTelemetry data backup..."
+
+              restic snapshots || restic init
+
+              restic backup /data /wal \
+                --tag otel-data \
+                --tag $(date +%Y-%m-%d) \
+                --exclude "*.tmp" \
+                --exclude "*.lock"
+
+              restic forget \
+                --keep-daily 30 \
+                --keep-monthly 12 \
+                --prune
+
+              restic check
+
+              echo "Backup completed successfully"
+            volumeMounts:
+            - name: data-storage
+              mountPath: /data
+              readOnly: true
+            - name: wal-storage
+              mountPath: /wal
+              readOnly: true
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+          volumes:
+          - name: data-storage
+            persistentVolumeClaim:
+              claimName: otel-collector-data
+          - name: wal-storage
+            persistentVolumeClaim:
+              claimName: otel-collector-wal 

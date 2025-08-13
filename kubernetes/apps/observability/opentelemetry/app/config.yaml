@@ -12,7 +12,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: fast-ssd
+  storageClassName: openebs-hostpath
   resources:
     requests:
       storage: 500Gi
@@ -30,12 +30,13 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: nvme-ssd
+  storageClassName: openebs-hostpath
   resources:
     requests:
       storage: 100Gi
   volumeMode: Filesystem
 ---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/opentelemetry.io/opentelemetrycollector_v1beta1.json
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
@@ -138,6 +139,7 @@ spec:
           processors: [memory_limiter, batch, file_storage_queue]
           exporters: [otlp/backend]
 ---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/batch_v1_cronjob.json
 apiVersion: batch/v1
 kind: CronJob
 metadata:
