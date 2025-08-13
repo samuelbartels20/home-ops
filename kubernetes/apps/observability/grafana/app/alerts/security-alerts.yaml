@@ -27,9 +27,9 @@ spec:
               {{range query "security:vulnerabilities:critical_high:total"}}
               - Namespace: {{.Labels.namespace}}, Container: {{.Labels.container}}, Image: {{.Labels.image}}
               {{end}}
-            runbook_url: https://runbooks.your-domain.com/security/vulnerabilities
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/security/vulnerability-response
+            runbook_url: https://runbooks.samcloud.online/security/vulnerabilities
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/security/vulnerability-response
 
         # Scan Failure Alerts
         - alert: SecurityScanFailures
@@ -48,9 +48,9 @@ spec:
               {{range query "security:scan:failures:24h"}}
               - Job: {{.Labels.job_name}}
               {{end}}
-            runbook_url: https://runbooks.your-domain.com/security/scan-failures
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/security/scan-failure-response
+            runbook_url: https://runbooks.samcloud.online/security/scan-failures
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/security/scan-failure-response
 
         # Compliance Alerts
         - alert: ComplianceScoreDegraded
@@ -72,9 +72,9 @@ spec:
               {{range query "security:checkov:compliance_score"}}
               - Checkov: {{.Value}}%
               {{end}}
-            runbook_url: https://runbooks.your-domain.com/security/compliance
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/security/compliance-response
+            runbook_url: https://runbooks.samcloud.online/security/compliance
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/security/compliance-response
 
         # SLO Alerts
         - alert: SecurityScanSLOBreach
@@ -88,9 +88,9 @@ spec:
           annotations:
             summary: Security scan success rate SLO breach
             description: Security scan success rate is {{ $value }}%, below target SLO of 99.9%
-            runbook_url: https://runbooks.your-domain.com/slo/security-scans
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/slo/breach-response
+            runbook_url: https://runbooks.samcloud.online/slo/security-scans
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/slo/breach-response
 
         # Secrets Detection Alert
         - alert: SecretsDetected
@@ -103,9 +103,9 @@ spec:
           annotations:
             summary: Secrets detected in codebase
             description: "{{ $value }} potential secrets detected in the codebase"
-            runbook_url: https://runbooks.your-domain.com/security/secrets
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/security/secret-exposure-response
+            runbook_url: https://runbooks.samcloud.online/security/secrets
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/security/secret-exposure-response
 
         # SBOM Alert
         - alert: CriticalDependencyVulnerability
@@ -123,6 +123,6 @@ spec:
               {{range query "security:sbom:vulnerabilities:total{severity='CRITICAL'}"}}
               - Namespace: {{.Labels.namespace}}
               {{end}}
-            runbook_url: https://runbooks.your-domain.com/security/dependencies
-            dashboard_url: https://grafana.your-domain.com/d/security-scan-results
-            playbook_url: https://playbooks.your-domain.com/security/dependency-vulnerability-response
+            runbook_url: https://runbooks.samcloud.online/security/dependencies
+            dashboard_url: https://grafana.samcloud.online/d/security-scan-results
+            playbook_url: https://playbooks.samcloud.online/security/dependency-vulnerability-response
