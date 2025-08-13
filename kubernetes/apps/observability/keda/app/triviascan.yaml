@@ -1,0 +1,16 @@
+---
+# Security Scanning Configuration
+apiVersion: aquasecurity.github.io/v1alpha1
+kind: TriviaScan
+metadata:
+  name: keda-security-scan
+  namespace: observability
+spec:
+  schedule: "0 */6 * * *"
+  target:
+    resource:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: keda-operator
+  severity: CRITICAL,HIGH
+  timeout: 5m 

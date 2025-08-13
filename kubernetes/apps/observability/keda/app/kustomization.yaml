@@ -8,8 +8,15 @@ resources:
   - ./networkpolicy.yaml
   - ./hpa.yaml
   - ./velero-backup.yaml
-  - ./security.yaml
+  - ./pod-security-policy.yaml
+  - ./networkpolicy-metrics-apiserver.yaml
+  - ./certificate.yaml
+  - ./pdb-operator.yaml
+  - ./pdb-metrics-apiserver.yaml
+  - ./pdb-webhooks.yaml
+  - ./triviascan.yaml
   - ./slo.yaml
+  - ./audit-policy.yaml
 commonLabels:
   app.kubernetes.io/name: keda
   app.kubernetes.io/instance: keda

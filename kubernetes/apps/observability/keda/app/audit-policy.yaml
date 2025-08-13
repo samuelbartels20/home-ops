@@ -1,0 +1,12 @@
+---
+# Audit Policy Configuration
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: keda-audit-policy
+rules:
+  - level: RequestResponse
+    resources:
+      - group: keda.sh
+        resources: ["*"]
+    verbs: ["create", "update", "delete", "patch"] 

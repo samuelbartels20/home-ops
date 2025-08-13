@@ -1,0 +1,25 @@
+---
+# Enhanced mTLS Configuration
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keda-webhook-cert
+  namespace: observability
+spec:
+  secretName: keda-webhook-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  subject:
+    organizations:
+      - keda
+  commonName: keda-admission-webhooks.observability.svc
+  dnsNames:
+    - keda-admission-webhooks
+    - keda-admission-webhooks.observability
+    - keda-admission-webhooks.observability.svc
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    name: cluster-issuer
+    kind: ClusterIssuer 
