@@ -12,41 +12,32 @@ metadata:
   annotations:
     monitoring.samcloud.online/description: "External probe for kromgo public endpoints"
 spec:
-  # Blackbox exporter job name
   jobName: kromgo-external-probe
 
-  # Probe specification
   prober:
     url: blackbox-exporter.observability.svc.cluster.local:9115
     scheme: http
     path: /probe
 
-  # Module for HTTP probes
   module: http_2xx
 
-  # Targets to probe
   targets:
     staticConfig:
       static:
-      # Primary kromgo endpoints
       - "https://kromgo.samcloud.online/cluster_node_count"
       - "https://kromgo.samcloud.online/cluster_cpu_usage"
       - "https://kromgo.samcloud.online/cluster_memory_usage"
       - "https://kromgo.samcloud.online/cluster_alert_count"
 
-      # Health endpoints
       - "https://kromgo.samcloud.online/readyz"
 
-      # Alternative hostnames
       - "https://metrics.samcloud.online/cluster_node_count"
       - "https://badges.samcloud.online/cluster_node_count"
 
-  # Probe interval
   interval: 60s
   scrapeTimeout: 30s
 
 ---
-# ServiceMonitor for external probes
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -77,7 +68,6 @@ spec:
       replacement: blackbox-exporter.observability.svc.cluster.local:9115
 
 ---
-# Additional Probe for JSON endpoints
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
@@ -97,9 +87,8 @@ spec:
   targets:
     staticConfig:
       static:
-      # JSON format endpoints for shields.io integration
       - "https://kromgo.samcloud.online/cluster_node_count?format=json"
       - "https://kromgo.samcloud.online/cluster_cpu_usage?format=json"
       - "https://kromgo.samcloud.online/cluster_memory_usage?format=json"
-  interval: 300s  # Less frequent for JSON endpoints
+  interval: 300s
   scrapeTimeout: 30s

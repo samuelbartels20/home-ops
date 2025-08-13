@@ -1,6 +1,4 @@
 ---
-# Production NetworkPolicy for Kromgo Metrics Badge Service
-# Zero-trust network security for kromgo with granular access controls
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -14,20 +12,15 @@ metadata:
   annotations:
     policy.kubernetes.io/description: "Zero-trust network policy for kromgo"
 spec:
-  # Apply to kromgo pods
   podSelector:
     matchLabels:
       app.kubernetes.io/name: kromgo
 
-  # Policy types
   policyTypes:
   - Ingress
   - Egress
 
-  # Ingress rules - what can connect TO kromgo
   ingress:
-
-  # Allow ingress controller (Gateway API) access
   - from:
     - namespaceSelector:
         matchLabels:
@@ -43,7 +36,6 @@ spec:
     - protocol: TCP
       port: 8082
 
-  # Allow Prometheus scraping
   - from:
     - namespaceSelector:
         matchLabels:
@@ -53,11 +45,10 @@ spec:
           app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
-      port: 8082  # metrics port
+      port: 8082
     - protocol: TCP
-      port: 8081  # health port
+      port: 8081
 
-  # Allow blackbox exporter for external monitoring
   - from:
     - namespaceSelector:
         matchLabels:
@@ -69,7 +60,6 @@ spec:
     - protocol: TCP
       port: 8080
 
-  # Allow same-namespace monitoring tools
   - from:
     - namespaceSelector:
         matchLabels:
@@ -83,10 +73,7 @@ spec:
     - protocol: TCP
       port: 8082
 
-  # Egress rules - what kromgo can connect TO
   egress:
-
-  # Allow DNS resolution
   - to: []
     ports:
     - protocol: UDP
@@ -94,7 +81,6 @@ spec:
     - protocol: TCP
       port: 53
 
-  # Allow connection to Prometheus in same namespace
   - to:
     - namespaceSelector:
         matchLabels:
@@ -106,7 +92,6 @@ spec:
     - protocol: TCP
       port: 9090
 
-  # Allow connection to alternative Prometheus instances
   - to:
     - namespaceSelector:
         matchLabels:
@@ -119,7 +104,7 @@ spec:
       port: 9090
 
 ---
-# Additional NetworkPolicy for enhanced security between kromgo replicas
+
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -130,7 +115,6 @@ metadata:
     app.kubernetes.io/component: network-security-inter-pod
     production-grade: "true"
 spec:
-  # Apply to kromgo pods
   podSelector:
     matchLabels:
       app.kubernetes.io/name: kromgo
@@ -138,7 +122,6 @@ spec:
   policyTypes:
   - Ingress
 
-  # Allow kromgo pods to communicate with each other (if needed for clustering)
   ingress:
   - from:
     - podSelector:
