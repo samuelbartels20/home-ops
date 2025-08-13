@@ -1,6 +1,5 @@
 
 ---
-# Persistent Volume Claims for Data Durability
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -19,7 +18,6 @@ spec:
       storage: 500Gi
   volumeMode: Filesystem
 ---
-# WAL (Write-Ahead Log) Storage for High Throughput
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -38,7 +36,6 @@ spec:
       storage: 100Gi
   volumeMode: Filesystem
 ---
-# Gateway Mode Deployment for Enterprise Scale
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
@@ -61,7 +58,6 @@ spec:
       cpu: 8
       memory: 32Gi
 
-  # Persistent Storage Mounts
   volumeMounts:
     - name: data-storage
       mountPath: /var/lib/otelcol-contrib/data
@@ -102,20 +98,17 @@ spec:
         send_batch_max_size: 32768
         timeout: 10s
 
-      # Memory Management
       memory_limiter:
         check_interval: 5s
         limit_percentage: 75
         spike_limit_percentage: 15
 
-      # Data Persistence Queue
       file_storage_queue:
         storage: file_storage/data
-        queue_size: 5000000  # 5M items
+        queue_size: 5000000
         num_consumers: 16
 
     exporters:
-      # Primary export to backend
       otlp/backend:
         endpoint: "alloy-distributor:4317"
         tls:
@@ -145,7 +138,6 @@ spec:
           processors: [memory_limiter, batch, file_storage_queue]
           exporters: [otlp/backend]
 ---
-# Backup CronJob for Data Protection
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -155,7 +147,7 @@ metadata:
     app.kubernetes.io/name: opentelemetry-backup
     app.kubernetes.io/component: backup
 spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  schedule: "0 2 * * *"
   timeZone: "UTC"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 7
@@ -200,23 +192,19 @@ spec:
               set -e
               echo "Starting OpenTelemetry data backup..."
 
-              # Initialize repository if it doesn't exist
               restic snapshots || restic init
 
-              # Create backup
               restic backup /data /wal \
                 --tag otel-data \
                 --tag $(date +%Y-%m-%d) \
                 --exclude "*.tmp" \
                 --exclude "*.lock"
 
-              # Prune old backups (keep 30 daily, 12 monthly)
               restic forget \
                 --keep-daily 30 \
                 --keep-monthly 12 \
                 --prune
 
-              # Verify backup integrity
               restic check
 
               echo "Backup completed successfully"
@@ -242,7 +230,6 @@ spec:
             persistentVolumeClaim:
               claimName: otel-collector-wal
 ---
-# Disaster Recovery Script ConfigMap
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -258,31 +245,24 @@ data:
 
     echo "Starting OpenTelemetry disaster recovery..."
 
-    # Check if backup exists
     if ! restic snapshots --tag otel-data; then
       echo "ERROR: No backups found!"
       exit 1
     fi
 
-    # Get latest snapshot
     SNAPSHOT_ID=$(restic snapshots --tag otel-data --json | jq -r '.[0].id')
     echo "Restoring from snapshot: $SNAPSHOT_ID"
 
-    # Stop collectors (scale to 0)
     kubectl scale deployment otel-gateway-collector --replicas=0 -n observability
     kubectl scale daemonset otel-enterprise-collector --replicas=0 -n observability
 
-    # Wait for pods to terminate
     sleep 30
 
-    # Restore data
     restic restore $SNAPSHOT_ID --target /restore
 
-    # Copy restored data to PVCs
     cp -r /restore/data/* /data/
     cp -r /restore/wal/* /wal/
 
-    # Restart collectors
     kubectl scale deployment otel-gateway-collector --replicas=6 -n observability
     kubectl scale daemonset otel-enterprise-collector --replicas=1 -n observability
 
@@ -294,10 +274,8 @@ data:
 
     echo "Validating OpenTelemetry deployment after recovery..."
 
-    # Check pod status
     kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=opentelemetry-collector -n observability --timeout=300s
 
-    # Check data integrity
     if [ -f /data/integrity.check ]; then
       echo "Data integrity check passed"
     else
@@ -305,57 +283,9 @@ data:
       exit 1
     fi
 
-    # Test telemetry pipeline
     curl -f http://otel-gateway-collector:13113/ || {
       echo "ERROR: Health check failed"
       exit 1
     }
 
     echo "Validation completed successfully"
----
-# Backup Configuration Secret Template
-apiVersion: v1
-kind: Secret
-metadata:
-  name: restic-config
-  namespace: observability
-  labels:
-    app.kubernetes.io/name: opentelemetry-backup
-    app.kubernetes.io/component: config
-type: Opaque
-stringData:
-  password: "CHANGE_ME_RESTIC_PASSWORD"
-  access-key: "CHANGE_ME_AWS_ACCESS_KEY"
-  secret-key: "CHANGE_ME_AWS_SECRET_KEY"
----
-# Storage Classes for High Performance
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: fast-ssd
-  labels:
-    app.kubernetes.io/name: opentelemetry-storage
-provisioner: kubernetes.io/aws-ebs
-parameters:
-  type: gp3
-  iops: "16000"
-  throughput: "1000"
-  fsType: ext4
-allowVolumeExpansion: true
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nvme-ssd
-  labels:
-    app.kubernetes.io/name: opentelemetry-storage
-provisioner: kubernetes.io/aws-ebs
-parameters:
-  type: io2
-  iops: "32000"
-  fsType: ext4
-allowVolumeExpansion: true
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer

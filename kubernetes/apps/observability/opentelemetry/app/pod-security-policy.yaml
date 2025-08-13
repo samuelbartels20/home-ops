@@ -37,7 +37,7 @@ spec:
 
   hostPorts:
     - min: 0
-      max: 0  # No host ports allowed
+      max: 0
 
   runAsUser:
     rule: MustRunAsNonRoot

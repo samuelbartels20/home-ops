@@ -22,7 +22,7 @@ spec:
         image: grafana/k6:latest
         env:
         - name: OTEL_ENDPOINT
-          value: "http://otel-enterprise-gateway.observability:4318"
+          value: "http://otel-gateway-collector.observability:4318"
         - name: TARGET_RPS
           value: "10000"
         - name: TEST_DURATION
@@ -86,7 +86,7 @@ spec:
                     endTimeUnixNano: String((Date.now() + Math.floor(Math.random() * 1000)) * 1000000),
                     attributes: [
                       { key: "http.method", value: { stringValue: "GET" } },
-                      { key: "http.url", value: { stringValue: "https://api.example.com/endpoint" } },
+                      { key: "http.url", value: { stringValue: "https://api.samcloud.online/endpoint" } },
                       { key: "http.status_code", value: { intValue: 200 } },
                       { key: "http.user_agent", value: { stringValue: "k6-load-test/1.0" } },
                       { key: "custom.business_metric", value: { doubleValue: Math.random() * 100 } },
@@ -496,18 +496,13 @@ data:
             }
 
             return report
-
-    # Example usage
     if __name__ == "__main__":
         planner = CapacityPlanner()
 
-        # Load metrics from performance test
         planner.load_current_metrics("/tmp/performance_report.json")
 
-        # Project capacity with 30% monthly growth
         planner.project_capacity_needs({"monthly_growth": 0.3})
 
-        # Generate report
         report = planner.generate_capacity_report()
         print(json.dumps(report, indent=2))
 
@@ -581,11 +576,11 @@ spec:
               mountPath: /tmp
             resources:
               requests:
-                cpu: 500m
-                memory: 1Gi
+                cpu: 1000m
+                memory: 2Gi
               limits:
-                cpu: 2
-                memory: 4Gi
+                cpu: 1000m
+                memory: 2Gi
           volumes:
           - name: scripts
             configMap:
