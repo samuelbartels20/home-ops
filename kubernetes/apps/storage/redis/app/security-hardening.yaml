@@ -1,7 +1,9 @@
+---
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
   name: redis-restricted
+  namespace: storage
 spec:
   allowHostDirVolumePlugin: false
   allowHostIPC: false
@@ -37,96 +39,3 @@ spec:
     - persistentVolumeClaim
     - projected
     - secret
----
-apiVersion: policy.cilium.io/v1alpha1
-kind: CiliumNetworkPolicy
-metadata:
-  name: redis-zero-trust
-  namespace: data
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: redis
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            io.cilium.k8s.policy.serviceaccount: redis-client
-            io.kubernetes.pod.namespace: data
-      toPorts:
-        - ports:
-            - port: "6379"
-          rules:
-            l7proto: "redis"
-            l7:
-              - method: "GET"
-              - method: "SET"
-              - method: "DEL"
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: kube-system
-            k8s-app: kube-dns
-      toPorts:
-        - ports:
-            - port: "53"
-              protocol: UDP
----
-apiVersion: secrets-store.csi.x-k8s.io/v1
-kind: SecretProviderClass
-metadata:
-  name: redis-secrets
-  namespace: data
-spec:
-  provider: vault
-  parameters:
-    vaultAddress: "https://vault.security:8200"
-    roleName: "redis-role"
-    objects: |
-      - objectName: "redis-password"
-        secretPath: "secret/data/redis"
-        secretKey: "password"
-      - objectName: "redis-tls"
-        secretPath: "secret/data/redis"
-        secretKey: "tls"
-  secretObjects:
-    - data:
-        - key: password
-          objectName: redis-password
-      secretName: redis-credentials
-      type: Opaque
-    - data:
-        - key: tls.crt
-          objectName: redis-tls
-        - key: tls.key
-          objectName: redis-tls
-      secretName: redis-tls-cert
-      type: kubernetes.io/tls
----
-apiVersion: policy.cilium.io/v1alpha1
-kind: CiliumClusterwideNetworkPolicy
-metadata:
-  name: redis-encryption-required
-spec:
-  description: "Enforce encryption for all Redis traffic"
-  nodeSelector:
-    matchLabels: {}
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app.kubernetes.io/name: redis
-      toPorts:
-        - ports:
-            - port: "6379"
-          rules:
-            l7proto: "redis"
-  encryption:
-    type: ipsec
-    ipsec:
-      mode: "always-on"
-      keyRotation: 12h
-      keyFile: "/etc/ipsec/redis-keys"
-      replay-window-size: 4096
-      authentication:
-        algorithm: "sha512"
-      encryption:
-        algorithm: "aes-gcm-256"

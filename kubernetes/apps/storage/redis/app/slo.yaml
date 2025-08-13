@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: redis-slo-rules
-  namespace: data
+  namespace: storage
   labels:
     prometheus: k8s
     role: alert-rules
@@ -47,7 +47,7 @@ spec:
           annotations:
             summary: "Redis availability below 99.99%"
             description: "Redis cluster availability has dropped below SLO threshold"
-            runbook_url: "https://runbooks.example.com/redis/availability"
+            runbook_url: "https://runbooks.samcloud.online/redis/availability"
 
         - alert: RedisSLOLatencyBreach
           expr: redis:slo:latency:ratio < 0.99
@@ -58,7 +58,7 @@ spec:
           annotations:
             summary: "Redis latency above SLO threshold"
             description: "More than 1% of requests are taking longer than 10ms"
-            runbook_url: "https://runbooks.example.com/redis/latency"
+            runbook_url: "https://runbooks.samcloud.online/redis/latency"
 
         - alert: RedisSLOErrorBreach
           expr: redis:slo:error:ratio > 0.0001
@@ -69,7 +69,7 @@ spec:
           annotations:
             summary: "Redis error rate above SLO threshold"
             description: "Error rate has exceeded 0.01% threshold"
-            runbook_url: "https://runbooks.example.com/redis/errors"
+            runbook_url: "https://runbooks.samcloud.online/redis/errors"
 
         - alert: RedisSLODurabilityBreach
           expr: redis:slo:durability:ratio != 1
@@ -80,7 +80,7 @@ spec:
           annotations:
             summary: "Redis durability SLO breach"
             description: "Data persistence checks indicate potential data loss risk"
-            runbook_url: "https://runbooks.example.com/redis/durability"
+            runbook_url: "https://runbooks.samcloud.online/redis/durability"
 
         - alert: RedisSLOReplicationBreach
           expr: redis:slo:replication:lag > 1
@@ -91,4 +91,4 @@ spec:
           annotations:
             summary: "Redis replication lag exceeds SLO"
             description: "Replication lag has exceeded 1 second threshold"
-            runbook_url: "https://runbooks.example.com/redis/replication"
+            runbook_url: "https://runbooks.samcloud.online/redis/replication"
