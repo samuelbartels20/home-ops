@@ -136,11 +136,11 @@ spec:
           mountPath: /tmp/results
         resources:
           requests:
-            cpu: 1
+            cpu: 1000m
             memory: 2Gi
           limits:
-            cpu: 4
-            memory: 8Gi
+            cpu: 1000m
+            memory: 2Gi
       volumes:
       - name: results
         emptyDir: {}
