@@ -1,0 +1,89 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-data-integrity-check
+  namespace: storage
+spec:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: redis-admin
+          containers:
+            - name: integrity-check
+              image: redis:7.2-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  redis-cli -h redis-master --tls --cert /certs/tls.crt --key /certs/tls.key --cacert /certs/ca.crt PING || exit 1
+                  redis-cli -h redis-master --tls --cert /certs/tls.crt --key /certs/tls.key --cacert /certs/ca.crt DEBUG DIGEST || exit 1
+                  redis-cli -h redis-master --tls --cert /certs/tls.crt --key /certs/tls.key --cacert /certs/ca.crt MEMORY DOCTOR || exit 1
+                  redis-cli -h redis-master --tls --cert /certs/tls.crt --key /certs/tls.key --cacert /certs/ca.crt CONFIG GET maxmemory-policy | grep "allkeys-lru" || exit 1
+              volumeMounts:
+                - name: redis-certs
+                  mountPath: /certs
+                  readOnly: true
+          volumes:
+            - name: redis-certs
+              secret:
+                secretName: redis-tls-cert
+          restartPolicy: OnFailure
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb-strict
+  namespace: storage
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: redis-premium-storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: zfs.csi.openebs.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  fstype: "zfs"
+  poolname: "redis-premium-pool"
+  compression: "zstd-3"
+  dedup: "on"
+  recordsize: "8k"
+  primarycache: "all"
+  secondarycache: "all"
+  logbias: "latency"
+  redundancy: "mirror"
+  sync: "always"
+  atime: "off"
+  xattr: "sa"
+  acltype: "posixacl"
+  checksum: "sha512"
+  copies: "3"
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: redis-premium-snapshot
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "true"
+driver: zfs.csi.openebs.io
+deletionPolicy: Retain
+parameters:
+  # Snapshot settings
+  type: zfs
+  incremental: "true"
+  compression: "zstd-3"
+  checksum: "sha512"
+  encryption: "aes-256-gcm"

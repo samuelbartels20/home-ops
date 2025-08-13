@@ -1,0 +1,94 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: redis-slo-rules
+  namespace: data
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+    - name: redis.slo.rules
+      rules:
+        # Availability SLO (99.99%)
+        - record: redis:slo:availability:ratio
+          expr: |
+            sum(rate(redis_up[1h])) / count(redis_up) >= 0.9999
+
+        # Latency SLO (99% of requests < 10ms)
+        - record: redis:slo:latency:ratio
+          expr: |
+            sum(rate(redis_commands_duration_seconds_bucket{le="0.01"}[1h]))
+            / sum(rate(redis_commands_duration_seconds_count[1h])) >= 0.99
+
+        # Error Rate SLO (99.99% success)
+        - record: redis:slo:error:ratio
+          expr: |
+            sum(rate(redis_rejected_connections_total[1h]))
+            / sum(rate(redis_connections_received_total[1h])) <= 0.0001
+
+        # Durability SLO (zero data loss)
+        - record: redis:slo:durability:ratio
+          expr: |
+            min(redis_rdb_last_save_timestamp_seconds - redis_rdb_last_bgsave_status) < 300
+
+        # Replication Lag SLO
+        - record: redis:slo:replication:lag
+          expr: |
+            max(redis_connected_slave_lag_seconds) <= 1
+
+        # Alerts based on SLO violations
+        - alert: RedisSLOAvailabilityBreach
+          expr: redis:slo:availability:ratio < 0.9999
+          for: 5m
+          labels:
+            severity: critical
+            slo: availability
+          annotations:
+            summary: "Redis availability below 99.99%"
+            description: "Redis cluster availability has dropped below SLO threshold"
+            runbook_url: "https://runbooks.example.com/redis/availability"
+
+        - alert: RedisSLOLatencyBreach
+          expr: redis:slo:latency:ratio < 0.99
+          for: 5m
+          labels:
+            severity: critical
+            slo: latency
+          annotations:
+            summary: "Redis latency above SLO threshold"
+            description: "More than 1% of requests are taking longer than 10ms"
+            runbook_url: "https://runbooks.example.com/redis/latency"
+
+        - alert: RedisSLOErrorBreach
+          expr: redis:slo:error:ratio > 0.0001
+          for: 5m
+          labels:
+            severity: critical
+            slo: error_rate
+          annotations:
+            summary: "Redis error rate above SLO threshold"
+            description: "Error rate has exceeded 0.01% threshold"
+            runbook_url: "https://runbooks.example.com/redis/errors"
+
+        - alert: RedisSLODurabilityBreach
+          expr: redis:slo:durability:ratio != 1
+          for: 5m
+          labels:
+            severity: critical
+            slo: durability
+          annotations:
+            summary: "Redis durability SLO breach"
+            description: "Data persistence checks indicate potential data loss risk"
+            runbook_url: "https://runbooks.example.com/redis/durability"
+
+        - alert: RedisSLOReplicationBreach
+          expr: redis:slo:replication:lag > 1
+          for: 5m
+          labels:
+            severity: critical
+            slo: replication
+          annotations:
+            summary: "Redis replication lag exceeds SLO"
+            description: "Replication lag has exceeded 1 second threshold"
+            runbook_url: "https://runbooks.example.com/redis/replication"

@@ -1,0 +1,22 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-monitor
+  namespace: storage
+spec:
+  endpoints:
+    - port: metrics
+      interval: 10s
+      scrapeTimeout: 5s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'redis_(.*)'
+          targetLabel: metric_type
+          replacement: 'redis'
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  namespaceSelector:
+    matchNames:
+      - storage 

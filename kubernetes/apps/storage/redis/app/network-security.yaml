@@ -1,0 +1,128 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: storage
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: storage
+            app.kubernetes.io/part-of: application-tier
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/metrics"
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9121"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: redis
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+            - port: "26379"
+              protocol: TCP
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: redis-tls
+  namespace: storage
+spec:
+  secretName: redis-tls-cert
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  subject:
+    organizations:
+      - Redis Enterprise
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    - redis-master
+    - redis-master.storage
+    - redis-master.storage.svc
+    - redis-master.storage.svc.cluster.local
+    - "*.redis-replicas"
+    - "*.redis-replicas.storage"
+    - "*.redis-replicas.storage.svc"
+    - "*.redis-replicas.storage.svc.cluster.local"
+  issuerRef:
+    name: redis-issuer
+    kind: ClusterIssuer
+---
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: redis-encryption-policy
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  ingress:
+    - toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+            - port: "26379"
+              protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-network-policy
+  namespace: storage
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+        - podSelector:
+            matchLabels:
+              app: redis-client
+      ports:
+        - port: 6379
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: storage
+      ports:
+        - port: 6379
+          protocol: TCP

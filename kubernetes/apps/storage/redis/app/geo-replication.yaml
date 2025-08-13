@@ -1,0 +1,78 @@
+apiVersion: redis.redis.opstreelabs.in/v1beta1
+kind: RedisGeoReplication
+metadata:
+  name: redis-geo-replication
+  namespace: storage
+spec:
+  # Primary region configuration
+  primaryRegion:
+    clusterRef:
+      name: redis
+      namespace: storage
+
+  # Secondary regions
+  secondaryRegions:
+    - name: europe-west1
+      storageClass: openebs-zfspv-europe
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+    - name: asia-east1
+      storageClass: openebs-zfspv-asia
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+
+  # Compliance and data sovereignty
+  compliance:
+    dataResidency:
+      - region: eu
+        enabled: true
+        dataTypes: ["PII", "GDPR"]
+      - region: asia
+        enabled: true
+        dataTypes: ["PII"]
+
+  # Replication settings
+  replicationConfig:
+    syncStrategy: semi-sync
+    writePolicy: primary-only
+    consistencyCheck:
+      enabled: true
+      interval: 3600
+
+  # Disaster recovery
+  failover:
+    automatic: true
+    maxLagSeconds: 30
+    promotionStrategy: most-up-to-date
+
+  # Performance monitoring
+  monitoring:
+    latencyThreshold: 100
+    bandwidthLimit: "100Mi"
+    syncDelay:
+      warning: 10
+      critical: 30
+
+  # Security
+  security:
+    encryption:
+      inTransit: true
+      atRest: true
+      keyRotation:
+        enabled: true
+        interval: 168h # 7 days
+    accessControl:
+      enabled: true
+      allowedNamespaces:
+        - storage
+        - services

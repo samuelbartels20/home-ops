@@ -1,0 +1,38 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: redis-audit-policy
+  namespace: storage
+rules:
+  # Log all changes to Redis pods at RequestResponse level
+  - level: RequestResponse
+    resources:
+    - group: ""
+      resources: ["pods"]
+      namespaces: ["storage"]
+      verbs: ["create", "update", "patch", "delete"]
+
+  # Log ConfigMap and Secret changes
+  - level: Metadata
+    resources:
+    - group: ""
+      resources: ["configmaps", "secrets"]
+      namespaces: ["storage"]
+      verbs: ["create", "update", "patch", "delete"]
+
+  # Log PersistentVolumeClaim changes
+  - level: RequestResponse
+    resources:
+    - group: ""
+      resources: ["persistentvolumeclaims"]
+      namespaces: ["storage"]
+
+  # Log all authorization failures
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
+    resources:
+    - group: ""
+      resources: ["*"]
+    verbs: ["*"]
+    nonResourceURLs: ["*"]

@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+resources:
+  - helm-release.yaml
+  - secret.sops.yaml
+  - dashboard.yaml
+  - networkpolicy.yaml
+  - backup.yaml
+  - audit-policy.yaml
+  - geo-replication.yaml
+  - slo.yaml
+  - storage-config.yaml
+  - observability.yaml
+  - network-security.yaml
+  - data-integrity.yaml
+  - security-hardening.yaml
+  - critical-protection.yaml
+  - externalsecret.yaml
+  - tls-externalsecret.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/instance: redis
+      app.kubernetes.io/part-of: redis

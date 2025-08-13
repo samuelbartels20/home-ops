@@ -1,0 +1,68 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: redis-storage
+  namespace: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+spec:
+  provisioner: kubernetes.io/no-provisioner
+  allowVolumeExpansion: true
+  reclaimPolicy: Retain
+  volumeBindingMode: WaitForFirstConsumer
+  parameters:
+    type: ssd
+    fsType: ext4
+    encrypted: "true"
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: redis-snapshot-class
+driver: zfs.csi.openebs.io
+deletionPolicy: Retain
+parameters:
+  # Snapshot settings
+  type: zfs
+  incremental: "true"
+  compression: "zstd-fast"
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: redis-replication
+  namespace: data
+spec:
+  sourcePVC: redis-data
+  trigger:
+    schedule: "*/10 * * * *"
+  restic:
+    repository: redis-backup-repo
+    retention:
+      hourly: 24
+      daily: 30
+      weekly: 52
+      monthly: 12
+    copyMethod: Snapshot
+    pruneIntervalDays: 7
+    volumeSnapshotClassName: redis-snapshot-class
+    storageClassName: redis-enterprise-storage
+    cacheCapacity: "10Gi"
+    cacheStorageClassName: openebs-zfspv
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: redis.csi.openebs.io
+spec:
+  attachRequired: true
+  podInfoOnMount: true
+  volumeLifecycleModes:
+    - Persistent
+    - Ephemeral
+  fsGroupPolicy: File
+  storageCapacity: true
+  tokenRequests:
+    - audience: storage-provider
+      expirationSeconds: 3600
+  requiresRepublish: true

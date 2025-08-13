@@ -1,0 +1,37 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: redis-hourly-backup
+  namespace: storage
+spec:
+  schedule: "0 * * * *"
+  template:
+    hooks: {}
+    includedNamespaces:
+      - storage
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: redis
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+    ttl: 24h0m0s
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: redis-daily-backup
+  namespace: storage
+spec:
+  schedule: "0 0 * * *"
+  template:
+    hooks: {}
+    includedNamespaces:
+      - storage
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: redis
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+    ttl: 168h0m0s  # 7 days

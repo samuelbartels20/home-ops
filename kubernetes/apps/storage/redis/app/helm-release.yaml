@@ -1,0 +1,372 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app redis
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/instance: redis
+    app.kubernetes.io/part-of: storage-system
+spec:
+  interval: 15m
+  chart:
+    spec:
+      # renovate: registryUrl=https://charts.bitnami.com/bitnami
+      chart: redis
+      version: 20.13.3
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami-charts
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 5
+  upgrade:
+    remediation:
+      retries: 5
+    cleanupOnFail: true
+  values:
+    # Security Configuration
+    auth:
+      enabled: true
+      existingSecret: "redis-credentials"
+      existingSecretPasswordKey: "redis-password"
+      sentinel: true
+
+    # Architecture Configuration
+    architecture: replication
+
+    # Master node configuration
+    master:
+      persistence:
+        enabled: true
+        storageClass: "openebs-zfspv"
+        size: 10Gi
+        annotations:
+          backup.velero.io/backup-volumes: data
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: redis
+              topologyKey: kubernetes.io/hostname
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+        failureThreshold: 3
+        exec:
+          command:
+            - sh
+            - -c
+            - redis-cli ping
+      readinessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+        failureThreshold: 3
+        exec:
+          command:
+            - sh
+            - -c
+            - redis-cli ping
+
+    # Replica configuration
+    replica:
+      replicaCount: 2
+      persistence:
+        enabled: true
+        storageClass: "openebs-zfspv"
+        size: 10Gi
+        annotations:
+          backup.velero.io/backup-volumes: data
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: redis
+              topologyKey: kubernetes.io/hostname
+      livenessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+        failureThreshold: 3
+        exec:
+          command:
+            - sh
+            - -c
+            - redis-cli ping
+      readinessProbe:
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+        failureThreshold: 3
+        exec:
+          command:
+            - sh
+            - -c
+            - redis-cli ping
+
+    # Sentinel Configuration
+    sentinel:
+      enabled: true
+      masterSet: redis-master
+      getMasterTimeout: 10
+      quorum: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    # Metrics and Monitoring
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        namespace: storage
+        interval: 15s
+        scrapeTimeout: 10s
+        labels:
+          release: prometheus
+        relabelings:
+          - sourceLabels: [__meta_kubernetes_pod_node_name]
+            targetLabel: node
+          - sourceLabels: [__meta_kubernetes_pod_ip]
+            targetLabel: pod_ip
+      prometheusRule:
+        enabled: true
+        namespace: storage
+        rules:
+          - alert: RedisDown
+            expr: redis_up == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: Redis instance is down
+              description: Redis instance has been down for more than 5 minutes
+          - alert: RedisHighMemoryUsage
+            expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Redis high memory usage
+              description: Redis memory usage is above 90%
+          - alert: RedisHighCPUUsage
+            expr: rate(redis_cpu_sys_seconds_total[1m]) > 0.8
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Redis high CPU usage
+              description: Redis is using high CPU (> 80%)
+          - alert: RedisKeyEvictionRate
+            expr: rate(redis_evicted_keys_total[1m]) > 100
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: High key eviction rate
+              description: Redis is evicting more than 100 keys per minute
+          - alert: RedisReplicationBroken
+            expr: redis_connected_slaves < 2
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: Redis replication broken
+              description: Redis has less than 2 connected slaves
+          - alert: RedisReplicationLag
+            expr: redis_master_repl_offset - on(instance) redis_connected_slave_offset_bytes > 10000000
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Redis replication lag
+              description: Redis replication is lagging by more than 10MB
+          - alert: RedisTooManyConnections
+            expr: redis_connected_clients > 1000
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Too many connections
+              description: Redis has more than 1000 client connections
+          - alert: RedisRejectedConnections
+            expr: rate(redis_rejected_connections_total[1m]) > 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Redis is rejecting connections
+              description: Some connections to Redis are being rejected
+          - alert: RedisSlowOperations
+            expr: rate(redis_commands_duration_seconds_total{cmd!~"info|ping"}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: Redis slow operations detected
+              description: Redis commands are taking longer than 100ms to execute
+          - alert: RedisAOFRewriteInProgress
+            expr: redis_aof_rewrite_in_progress > 0
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: Long running AOF rewrite
+              description: Redis AOF rewrite has been running for more than 15 minutes
+          - alert: RedisOutOfSystemMemory
+            expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: System memory critically low
+              description: Redis host has less than 10% available memory
+
+    # TLS Configuration
+    tls:
+      enabled: true
+      authClients: true
+      autoGenerated: true
+      existingSecret: ""
+
+    # Backup Configuration (if using Velero)
+    backup:
+      enabled: true
+      annotations:
+        backup.velero.io/backup-volumes: data
+
+    # Pod Security Context
+    securityContext:
+      enabled: true
+      fsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+
+    # Pod Disruption Budget
+    pdb:
+      enabled: true
+      minAvailable: 1
+
+    # Network Policy
+    networkPolicy:
+      enabled: true
+      ingressNSMatchLabels:
+        kubernetes.io/metadata.name: storage
+
+    # Additional configuration
+    commonConfiguration: |-
+      # Memory management
+      maxmemory 2gb
+      maxmemory-policy allkeys-lru
+
+      # Persistence
+      save 900 1
+      save 300 10
+      save 60 10000
+
+      # Performance tuning
+      tcp-keepalive 300
+      rdbcompression yes
+      rdbchecksum yes
+
+      # Replication and HA
+      repl-diskless-sync yes
+      repl-diskless-sync-delay 5
+      repl-timeout 60
+      repl-ping-replica-period 10
+      repl-backlog-size 512mb
+
+      # Latency monitoring
+      latency-monitor-threshold 100
+
+      # Client handling
+      timeout 300
+      tcp-keepalive 60
+      maxclients 10000
+
+      # Security hardening
+      rename-command FLUSHDB ""
+      rename-command FLUSHALL ""
+      rename-command DEBUG ""
+      rename-command CONFIG ""
+      rename-command SHUTDOWN ""
+      rename-command SLAVEOF ""
+      rename-command REPLICAOF ""
+
+      # Performance optimizations
+      activedefrag yes
+      active-defrag-threshold-lower 10
+      active-defrag-threshold-upper 30
+      active-defrag-cycle-min 25
+      active-defrag-cycle-max 75
+
+      # AOF settings
+      appendonly yes
+      appendfsync everysec
+      no-appendfsync-on-rewrite yes
+      auto-aof-rewrite-percentage 100
+      auto-aof-rewrite-min-size 64mb
+
+      # Slow log
+      slowlog-log-slower-than 10000
+      slowlog-max-len 128
+
+    # Pod Security Policy
+    podSecurityContext:
+      enabled: true
+      fsGroup: 1001
+      runAsUser: 1001
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Topology Spread Constraints
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: redis
+
+    # Lifecycle hooks
+    lifecycle:
+      preStop:
+        exec:
+          command:
+            - sh
+            - -c
+            - redis-cli SAVE

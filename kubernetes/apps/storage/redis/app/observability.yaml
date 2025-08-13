@@ -1,0 +1,100 @@
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: redis-otel-collector
+  namespace: storage
+spec:
+  mode: deployment
+  config: |
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'redis-metrics'
+              scrape_interval: 10s
+              static_configs:
+                - targets: ['redis-metrics:9121']
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "0.0.0.0:4317"
+          http:
+            endpoint: "0.0.0.0:4318"
+      redis:
+        endpoint: "redis-master:6379"
+        collection_interval: 10s
+        metrics:
+          enabled: true
+          statements:
+            - name: "redis_commands_total"
+              help: "Total number of Redis commands executed"
+              unit: "1"
+              type: "counter"
+            - name: "redis_memory_usage"
+              help: "Redis memory usage"
+              unit: "bytes"
+              type: "gauge"
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 1024
+      resourcedetection:
+        detectors: ['env', 'system', 'kubernetes']
+      k8sattributes:
+        auth_type: "serviceAccount"
+        passthrough: false
+        filter:
+          node_from_env_var: KUBE_NODE_NAME
+      tail_sampling:
+        policies:
+          - name: error-in-policy
+            type: status_code
+            status_code: ERROR
+            sampling_percentage: 100
+          - name: latency-policy
+            type: latency
+            latency_threshold: 100ms
+            sampling_percentage: 90
+
+    exporters:
+      otlp:
+        endpoint: "tempo.monitoring:4317"
+        tls:
+          insecure: false
+      loki:
+        endpoint: "http://loki.monitoring:3100/loki/api/v1/push"
+        tenant_id: "redis"
+        labels:
+          app: "redis"
+          component: "storage"
+      prometheus:
+        endpoint: "prometheus-operated.monitoring:9090"
+        namespace: "redis"
+        send_timestamps: true
+        metric_expiration: 180m
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resourcedetection, k8sattributes, tail_sampling]
+          exporters: [otlp]
+        metrics:
+          receivers: [prometheus, redis]
+          processors: [memory_limiter, batch, resourcedetection, k8sattributes]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resourcedetection, k8sattributes]
+          exporters: [loki]
+
+      telemetry:
+        logs:
+          level: "debug"
+        metrics:
+          address: "0.0.0.0:8888"

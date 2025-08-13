@@ -1,0 +1,175 @@
+apiVersion: falco.security.falco.org/v1beta1
+kind: FalcoRule
+metadata:
+  name: redis-threat-detection
+  namespace: storage
+spec:
+  customRules:
+    - rule: Unauthorized Redis Command
+      desc: Detect unauthorized Redis commands
+      condition: >
+        redis.cmd.name in (FLUSHALL, FLUSHDB, CONFIG, EVAL, KEYS)
+        and not redis.user.name in (admin, system)
+      output: >
+        Unauthorized Redis command executed
+        (user=%redis.user.name command=%redis.cmd.name)
+      priority: CRITICAL
+      tags: [redis, security]
+
+    - rule: Redis Data Access Pattern Anomaly
+      desc: Detect unusual data access patterns
+      condition: >
+        redis.cmd.name in (GET, MGET, SCAN) and
+        redis.cmd.rate > 1000 and
+        redis.client.ip != "internal-service"
+      output: >
+        Unusual Redis access pattern detected
+        (client=%redis.client.ip rate=%redis.cmd.rate)
+      priority: WARNING
+      tags: [redis, security, anomaly]
+
+    - rule: Redis Configuration Change
+      desc: Detect runtime configuration changes
+      condition: redis.cmd.name = "CONFIG" and redis.cmd.args contains "SET"
+      output: >
+        Redis configuration change detected
+        (user=%redis.user.name args=%redis.cmd.args)
+      priority: WARNING
+      tags: [redis, compliance]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: redis-advanced-alerts
+  namespace: storage
+spec:
+  groups:
+    - name: redis.critical.rules
+      rules:
+        - alert: RedisAnomalousMemoryPattern
+          expr: |
+            rate(redis_memory_used_bytes[5m]) >
+            avg_over_time(redis_memory_used_bytes[24h]) * 2
+          for: 5m
+          labels:
+            severity: critical
+            type: anomaly
+          annotations:
+            summary: Anomalous memory usage pattern detected
+            description: Memory usage shows unusual pattern compared to baseline
+
+        - alert: RedisDataAccessSpike
+          expr: |
+            sum(rate(redis_commands_total{cmd=~"get|set|mget|mset"}[1m])) >
+            avg_over_time(sum(rate(redis_commands_total{cmd=~"get|set|mget|mset"}[1h]))[6h:]) * 3
+          for: 5m
+          labels:
+            severity: critical
+            type: anomaly
+          annotations:
+            summary: Unusual data access pattern detected
+            description: Command rate significantly above normal baseline
+
+        - alert: RedisSecurityEvent
+          expr: redis_denied_commands_total > 0
+          for: 1m
+          labels:
+            severity: critical
+            type: security
+          annotations:
+            summary: Security violation detected
+            description: Unauthorized command attempts detected
+---
+apiVersion: policy.cilium.io/v1alpha1
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: redis-advanced-protection
+spec:
+  description: "Advanced protection for Redis clusters"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  ingressDeny:
+    - fromEntities:
+        - "world"
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: "untrusted"
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            security.cloud.google.com/verified-node: "true"
+      toPorts:
+        - ports:
+            - port: "6379"
+          rules:
+            l7proto: "redis"
+            l7:
+              - method: "GET"
+                rateLimit:
+                  rate: "1000/m"
+                  burst: 100
+              - method: "SET"
+                rateLimit:
+                  rate: "500/m"
+                  burst: 50
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+    - toFQDNs:
+        - matchPattern: "*.monitoring.svc.cluster.local"
+  egressDeny:
+    - toEntities:
+        - "world"
+---
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: redis-ultra-restricted
+spec:
+  allowHostDirVolumePlugin: false
+  allowHostIPC: false
+  allowHostNetwork: false
+  allowHostPID: false
+  allowHostPorts: false
+  allowPrivilegeEscalation: false
+  allowPrivilegedContainer: false
+  allowedCapabilities: []
+  defaultAddCapabilities: []
+  fsGroup:
+    type: MustRunAs
+    ranges:
+      - min: 1001
+        max: 1001
+  readOnlyRootFilesystem: true
+  requiredDropCapabilities:
+    - ALL
+  runAsUser:
+    type: MustRunAs
+    uid: 1001
+  seLinuxContext:
+    type: MustRunAs
+    seLinuxOptions:
+      level: "s0:c123,c456"
+  supplementalGroups:
+    type: MustRunAs
+    ranges:
+      - min: 1001
+        max: 1001
+  volumes:
+    - configMap
+    - downwardAPI
+    - emptyDir
+    - persistentVolumeClaim
+    - projected
+    - secret
+  seccompProfiles:
+    - runtime/default
+  sysctls: []
+  forbiddenSysctls:
+    - "*"
