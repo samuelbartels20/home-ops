@@ -1,15 +1,4 @@
-# Enterprise Production: Performance Testing & Benchmarking for OpenTelemetry
 ---
-# Performance Testing Namespace
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: otel-performance
-  labels:
-    app.kubernetes.io/name: opentelemetry-performance
-    app.kubernetes.io/component: testing
----
-# Load Testing Infrastructure
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,7 +8,7 @@ metadata:
     app.kubernetes.io/name: opentelemetry-load-generator
     app.kubernetes.io/component: testing
 spec:
-  replicas: 20  # Scale for high load
+  replicas: 20
   selector:
     matchLabels:
       app.kubernetes.io/name: opentelemetry-load-generator
@@ -35,11 +24,11 @@ spec:
         - name: OTEL_ENDPOINT
           value: "http://otel-enterprise-gateway.observability:4318"
         - name: TARGET_RPS
-          value: "10000"  # 10K requests per second
+          value: "10000"
         - name: TEST_DURATION
-          value: "1800s"  # 30 minutes
+          value: "1800s"
         - name: RAMP_DURATION
-          value: "300s"   # 5 minute ramp
+          value: "300s"
         command:
         - /bin/sh
         - -c
@@ -49,7 +38,6 @@ spec:
           import { check, sleep } from 'k6';
           import { Rate, Counter, Trend } from 'k6/metrics';
 
-          // Custom metrics
           const errorRate = new Rate('error_rate');
           const throughput = new Counter('throughput');
           const latency = new Trend('latency');
@@ -67,7 +55,6 @@ spec:
             },
           };
 
-          // Generate realistic trace data
           function generateTrace() {
             const traceId = Math.random().toString(16).slice(2, 34).padEnd(32, '0');
             const spanId = Math.random().toString(16).slice(2, 18).padEnd(16, '0');
@@ -94,7 +81,7 @@ spec:
                     spanId: spanId,
                     parentSpanId: parentSpanId,
                     name: "http_request",
-                    kind: 3, // CLIENT
+                    kind: 3,
                     startTimeUnixNano: String(Date.now() * 1000000),
                     endTimeUnixNano: String((Date.now() + Math.floor(Math.random() * 1000)) * 1000000),
                     attributes: [
@@ -130,23 +117,19 @@ spec:
 
             const duration = Date.now() - startTime;
 
-            // Record metrics
             throughput.add(1);
             latency.add(duration);
             errorRate.add(response.status !== 200);
 
-            // Validate response
             check(response, {
               'status is 200': (r) => r.status === 200,
               'response time < 500ms': (r) => r.timings.duration < 500,
             });
 
-            // Add some randomness to simulate real-world traffic
             sleep(Math.random() * 0.1);
           }
           EOF
 
-          # Run the load test
           k6 run /tmp/load-test.js --out json=/tmp/results.json
         volumeMounts:
         - name: results
@@ -162,7 +145,7 @@ spec:
       - name: results
         emptyDir: {}
 ---
-# Performance Monitoring & Metrics Collection
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -531,7 +514,6 @@ data:
         with open("/tmp/capacity_plan.json", "w") as f:
             json.dump(report, f, indent=2)
 ---
-# Performance Test Execution Job
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -541,7 +523,7 @@ metadata:
     app.kubernetes.io/name: opentelemetry-benchmark
     app.kubernetes.io/component: testing
 spec:
-  schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+  schedule: "0 2 * * 0"
   timeZone: "UTC"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 4
@@ -559,9 +541,9 @@ spec:
             image: python:3.11-slim
             env:
             - name: BENCHMARK_DURATION
-              value: "1800"  # 30 minutes
+              value: "1800"
             - name: TARGET_THROUGHPUT
-              value: "100000"  # 100K spans/sec
+              value: "100000"
             - name: RESULTS_BUCKET
               value: "s3://performance-results"
             command:
@@ -570,29 +552,22 @@ spec:
             - |
               set -e
 
-              # Install dependencies
               apt-get update && apt-get install -y curl jq
               pip install --no-cache-dir requests psutil boto3
 
               echo "Starting OpenTelemetry Performance Benchmark..."
 
-              # Run performance monitoring
               python3 /scripts/monitor-performance.py &
               MONITOR_PID=$!
 
-              # Trigger load test
               kubectl create job --from=deployment/otel-load-generator load-test-$(date +%s) -n otel-performance
 
-              # Wait for test completion
               sleep $BENCHMARK_DURATION
 
-              # Stop monitoring
               kill $MONITOR_PID 2>/dev/null || true
 
-              # Generate capacity planning report
               python3 /scripts/capacity-planning.py
 
-              # Upload results to S3 (if configured)
               if [ ! -z "$RESULTS_BUCKET" ]; then
                 aws s3 cp /tmp/performance_report.json "$RESULTS_BUCKET/$(date +%Y/%m/%d)/"
                 aws s3 cp /tmp/capacity_plan.json "$RESULTS_BUCKET/$(date +%Y/%m/%d)/"
@@ -619,7 +594,6 @@ spec:
           - name: results
             emptyDir: {}
 ---
-# Performance Alerts
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -633,7 +607,6 @@ spec:
   - name: opentelemetry.performance
     interval: 30s
     rules:
-    # Throughput Alerts
     - alert: OpenTelemetryLowThroughput
       expr: rate(otelcol_receiver_accepted_spans_total[5m]) < 50000
       for: 2m
@@ -654,7 +627,6 @@ spec:
         summary: "OpenTelemetry throughput critically low"
         description: "Current throughput {{ $value }} spans/sec is critically low"
 
-    # Latency Alerts
     - alert: OpenTelemetryHighLatency
       expr: histogram_quantile(0.95, rate(otelcol_processor_batch_batch_send_size_bucket[5m])) > 1000
       for: 5m
@@ -665,7 +637,6 @@ spec:
         summary: "OpenTelemetry high processing latency"
         description: "95th percentile latency is {{ $value }}ms, above 1000ms threshold"
 
-    # Resource Alerts
     - alert: OpenTelemetryHighCPUUsage
       expr: rate(container_cpu_usage_seconds_total{pod=~"otel-.*"}[5m]) * 100 > 85
       for: 3m
@@ -686,7 +657,6 @@ spec:
         summary: "OpenTelemetry high memory usage"
         description: "Memory usage is {{ $value }}%, above 85% threshold"
 
-    # Performance Regression Detection
     - alert: OpenTelemetryPerformanceRegression
       expr: (rate(otelcol_receiver_accepted_spans_total[1h]) / rate(otelcol_receiver_accepted_spans_total[1h] offset 24h)) < 0.8
       for: 10m
@@ -697,7 +667,7 @@ spec:
         summary: "OpenTelemetry performance regression detected"
         description: "Current throughput is {{ $value }}% of yesterday's performance"
 ---
-# Performance Dashboard ConfigMap
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
