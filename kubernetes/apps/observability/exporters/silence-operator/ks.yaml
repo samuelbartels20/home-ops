@@ -15,7 +15,7 @@ spec:
       name: *app
       namespace: *namespace
   interval: 1h
-  path: ./kubernetes/apps/observability/silence-operator/app
+  path: ./kubernetes/apps/observability/exporters/silence-operator/app
   prune: true
   retryInterval: 2m
   sourceRef:
@@ -39,7 +39,7 @@ spec:
     - name: silence-operator
       namespace: *namespace
   interval: 1h
-  path: ./kubernetes/apps/observability/silence-operator/silences
+  path: ./kubernetes/apps/observability/exporters/silence-operator/silences
   prune: true
   retryInterval: 2m
   sourceRef:

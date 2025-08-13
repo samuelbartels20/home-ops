@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: *appname
   interval: 1h
-  path: "./kubernetes/apps/observability/node-exporter/app"
+  path: "./kubernetes/apps/observability/exporters/node-exporter/app"
   prune: true
   sourceRef:
     kind: GitRepository
