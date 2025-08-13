@@ -7,7 +7,12 @@ resources:
   - ./incident-playbooks.yaml
   - ./alerting-rules.yaml
   - ./escalation-policies.yaml
-  - ./status-page.yaml
+  - ./status-page-deployment.yaml
+  - ./status-page-service.yaml
+  - ./status-page-ingress.yaml
+  - ./status-page-external-secret.yaml
+  - ./status-page-configmap.yaml
+  - ./status-updater-deployment.yaml
   - ./on-call-rotation-configmap.yaml
   - ./on-call-scheduler-cronjob.yaml
   - ./on-call-secrets.yaml

@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: status-page
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: status-page
+    app.kubernetes.io/component: public-status
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: status-page 

@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: status-page
+  namespace: observability
+data:
+  config.yaml: |
+    services:
+      - name: "Platform Services"
+        description: "Core platform services"
+        components:
+          - name: "API Gateway"
+            description: "API routing and management"
+          - name: "Authentication"
+            description: "User authentication service"
+          - name: "Database"
+            description: "Data storage service"
+          - name: "Cache"
+            description: "Data caching service"
+          - name: "Monitoring"
+            description: "System monitoring service" 
