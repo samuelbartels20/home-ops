@@ -94,7 +94,7 @@ spec:
         enabled: true
         org_role: Viewer
       server:
-        root_url: https://grafana.${SECRET_DOMAIN}
+        root_url: https://grafana.samcloud.online
       security:
         allow_embedding: true
         cookie_secure: true
@@ -116,7 +116,7 @@ spec:
         annotations:
           hajimari.io/icon: simple-icons:grafana
         hosts:
-          - host: &host "grafana.${SECRET_DOMAIN}"
+          - host: &host "grafana.samcloud.online"
             paths:
               - path: /
                 pathType: Prefix
