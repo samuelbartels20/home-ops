@@ -11,7 +11,8 @@ spec:
   prune: true
   sourceRef:
     kind: GitRepository
-    name: home-kubernetes
+    name: flux-system
+    namespace: flux-system
   healthChecks:
     - apiVersion: networking.k8s.io/v1
       kind: Ingress
