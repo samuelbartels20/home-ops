@@ -1,6 +1,4 @@
 ---
-# External Connectivity Probe for Kromgo Public Endpoints
-# Ensures public metrics badges are accessible from external networks
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
