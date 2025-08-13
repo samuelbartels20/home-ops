@@ -2,18 +2,16 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: redis-storage
-  namespace: storage
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
-spec:
-  provisioner: kubernetes.io/no-provisioner
-  allowVolumeExpansion: true
-  reclaimPolicy: Retain
-  volumeBindingMode: WaitForFirstConsumer
-  parameters:
-    type: ssd
-    fsType: ext4
-    encrypted: "true"
+provisioner: kubernetes.io/no-provisioner
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: ssd
+  fsType: ext4
+  encrypted: "true"
 ---
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
@@ -31,7 +29,7 @@ apiVersion: volsync.backube/v1alpha1
 kind: ReplicationSource
 metadata:
   name: redis-replication
-  namespace: data
+  namespace: storage
 spec:
   sourcePVC: redis-data
   trigger:
