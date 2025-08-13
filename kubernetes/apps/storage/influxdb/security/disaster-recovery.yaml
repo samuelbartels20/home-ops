@@ -1,0 +1,152 @@
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: influxdb-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  schedule: "0 */4 * * *"  # Every 4 hours
+  template:
+    includedNamespaces:
+      - storage
+    includedResources:
+      - persistentvolumeclaims
+      - persistentvolumes
+      - secrets
+      - configmaps
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: influxdb
+    storageLocation: default
+    volumeSnapshotLocations:
+      - default
+    ttl: 720h  # 30 days
+    hooks:
+      pre:
+        - exec:
+            container: influxdb
+            command:
+              - /bin/sh
+              - -c
+              - influx backup /backup/pre-backup --token $INFLUXDB_TOKEN
+      post:
+        - exec:
+            container: influxdb
+            command:
+              - /bin/sh
+              - -c
+              - influx backup /backup/post-backup --token $INFLUXDB_TOKEN
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-dr-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  dr-policy.yaml: |
+    # Disaster Recovery Policy
+    disaster_recovery:
+      # Backup Configuration
+      backup:
+        enabled: true
+        type: "full"
+        schedule: "0 */4 * * *"
+        retention:
+          days: 30
+          copies: 3
+        encryption:
+          enabled: true
+          key_rotation: 90d
+        validation:
+          enabled: true
+          interval: 24h
+        locations:
+          - type: "s3"
+            bucket: "${BACKUP_BUCKET}"
+            region: "${AWS_REGION}"
+            encryption: "aws:kms"
+          - type: "gcs"
+            bucket: "${GCS_BUCKET}"
+            encryption: "google-managed"
+
+      # Recovery Configuration
+      recovery:
+        rpo: "4h"  # Recovery Point Objective
+        rto: "1h"  # Recovery Time Objective
+        verification:
+          enabled: true
+          schedule: "0 0 * * *"
+        automated:
+          enabled: true
+          criteria:
+            - type: "data_corruption"
+              threshold: "5%"
+            - type: "service_unavailable"
+              duration: "5m"
+
+      # High Availability
+      high_availability:
+        enabled: true
+        replicas: 3
+        topology_spread:
+          - maxSkew: 1
+            topologyKey: "kubernetes.io/hostname"
+            whenUnsatisfiable: DoNotSchedule
+        failover:
+          automatic: true
+          threshold: "2m"
+
+      # Data Protection
+      data_protection:
+        encryption:
+          at_rest: true
+          in_transit: true
+          key_rotation: "90d"
+        integrity_check:
+          enabled: true
+          schedule: "0 0 * * *"
+        audit:
+          enabled: true
+          retention: "365d"
+
+      # Monitoring and Alerts
+      monitoring:
+        metrics:
+          - name: "backup_success_rate"
+            threshold: "99%"
+            window: "24h"
+          - name: "recovery_time"
+            threshold: "1h"
+            window: "7d"
+          - name: "data_integrity"
+            threshold: "100%"
+            window: "24h"
+        alerts:
+          - name: "BackupFailure"
+            severity: "critical"
+            description: "Backup job failed"
+          - name: "RecoveryFailure"
+            severity: "critical"
+            description: "Recovery verification failed"
+          - name: "DataCorruption"
+            severity: "critical"
+            description: "Data integrity check failed"
+
+      # Compliance
+      compliance:
+        data_retention:
+          minimum: "30d"
+          maximum: "7y"
+        audit_trail:
+          enabled: true
+          retention: "7y"
+        encryption:
+          algorithm: "AES-256-GCM"
+          key_management: "aws-kms"

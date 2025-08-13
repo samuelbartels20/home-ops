@@ -1,0 +1,77 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-audit-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  audit.yaml: |
+    # Audit Policy Configuration
+    audit-log-path: "/var/log/influxdb/audit.log"
+    audit-log-enabled: "true"
+    audit-log-format: "json"
+
+    # Audit Events
+    events:
+      - category: "auth"
+        enabled: true
+        include:
+          - "login"
+          - "logout"
+          - "create_user"
+          - "delete_user"
+          - "grant_admin"
+          - "revoke_admin"
+          - "change_password"
+          - "create_organization"
+          - "delete_organization"
+
+      - category: "buckets"
+        enabled: true
+        include:
+          - "create_bucket"
+          - "delete_bucket"
+          - "update_retention_policy"
+
+      - category: "data"
+        enabled: true
+        include:
+          - "write_data"
+          - "delete_data"
+          - "query_data"
+
+      - category: "tokens"
+        enabled: true
+        include:
+          - "create_token"
+          - "delete_token"
+          - "update_token"
+
+    # Compliance Settings
+    compliance:
+      data-retention:
+        enabled: true
+        min-duration: "30d"
+        max-duration: "7y"
+
+      password-policy:
+        min-length: 12
+        require-uppercase: true
+        require-lowercase: true
+        require-numbers: true
+        require-special: true
+        max-age-days: 90
+        prevent-reuse: 24
+
+      session:
+        timeout: "12h"
+        max-concurrent: 5
+
+      api:
+        rate-limit:
+          enabled: true
+          requests-per-second: 100
+          burst: 200

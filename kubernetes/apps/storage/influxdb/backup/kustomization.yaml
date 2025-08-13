@@ -1,0 +1,59 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - ./backup.yaml
+  - ./disaster-recovery.yaml
+
+commonLabels:
+  app.kubernetes.io/name: influxdb
+  app.kubernetes.io/component: backup
+  app.kubernetes.io/part-of: storage-infrastructure
+
+configMapGenerator:
+  - name: influxdb-backup-config
+    behavior: merge
+    literals:
+      - BACKUP_SCHEDULE="0 */6 * * *"  # Every 6 hours
+      - RETENTION_DAYS="30"
+      - BUCKET_NAME="influxdb-backups"
+      - BACKUP_METRICS_PORT="9090"
+
+secretGenerator:
+  - name: influxdb-backup-credentials
+    behavior: merge
+    files:
+      - aws-credentials=secrets/aws-credentials.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  - target:
+      kind: CronJob
+      name: influxdb-backup
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: BACKUP_METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: influxdb-backup-config
+              key: BACKUP_METRICS_PORT
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/ports
+        value:
+          - name: metrics
+            containerPort: 9090
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/livenessProbe
+        value:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10

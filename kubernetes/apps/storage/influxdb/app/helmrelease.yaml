@@ -1,0 +1,132 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: influxdb
+  namespace: storage
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: influxdb2
+      version: 2.1.1
+      sourceRef:
+        kind: HelmRepository
+        name: influxdata
+        namespace: flux-system
+  maxHistory: 2
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    nameOverride: influxdb
+    fullnameOverride: influxdb
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2
+        memory: 2Gi
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      fsGroupChangePolicy: "OnRootMismatch"
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      capabilities:
+        drop: ["ALL"]
+
+    image:
+      repository: influxdb
+      tag: 2.7.11
+      pullPolicy: IfNotPresent
+
+    replicaCount: 3
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    adminUser:
+      organization: "Production"
+      bucket: "metrics"
+      user: "${SECRET_INFLUXDB_USERNAME}"
+      retention_policy: "30d"
+      password: "${SECRET_INFLUXDB_PASSWORD}"
+      token: "${SECRET_INFLUXDB_TOKEN}"
+
+    backup:
+      enabled: true
+      schedule: "0 */6 * * *"
+      destination: "s3://${SECRET_BACKUP_BUCKET}/influxdb"
+      retention: "720h"
+
+    monitoring:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+      grafanaDashboards:
+        enabled: true
+      alerts:
+        enabled: true
+
+    security:
+      tls:
+        enabled: true
+        certManager:
+          enabled: true
+          issuerRef:
+            name: letsencrypt-production
+            kind: ClusterIssuer
+      networkPolicy:
+        enabled: true
+        ingress:
+          - from:
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: monitoring
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/part-of: application
+
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - influxdb
+            topologyKey: kubernetes.io/hostname
+
+    route:
+      app:
+        hostnames: ["influxdb.${SECRET_DOMAIN}"]
+        parentRefs:
+          - name: external
+            namespace: kube-system
+            sectionName: https
+        rules:
+          - backendRefs:
+              - identifier: app
+                port: 8086
+
+    serviceAccount:
+      create: true

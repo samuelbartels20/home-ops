@@ -1,0 +1,150 @@
+---
+# NetworkPolicy for micro-segmentation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dragonfly-netpol
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/part-of: dragonfly
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from application pods
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: services
+        - namespaceSelector:
+            matchLabels:
+              name: data-science
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+    # Allow traffic from monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9121
+    # Allow admin access from same namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+      ports:
+        - protocol: TCP
+          port: 6378
+    # Allow inter-cluster communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly
+              app.kubernetes.io/part-of: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow outbound HTTPS for external services
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow inter-cluster communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly
+              app.kubernetes.io/part-of: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+
+---
+# ServiceAccount for Dragonfly
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dragonfly-sa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT-ID:role/dragonfly-enterprise-role"
+automountServiceAccountToken: true
+
+---
+# Role for Dragonfly operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dragonfly-role
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+rules:
+  # Allow reading own pod metadata
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Allow reading configmaps and secrets
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  # Allow creating events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+  # Allow updating pod status
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["update", "patch"]
+
+---
+# RoleBinding for Dragonfly
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dragonfly-binding
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: dragonfly-role
+  apiGroup: rbac.authorization.k8s.io

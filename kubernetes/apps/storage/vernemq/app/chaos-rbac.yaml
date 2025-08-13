@@ -1,0 +1,61 @@
+---
+# Chaos Engineering ServiceAccount and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vernemq-chaos-engineering
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: chaos-engineering
+    storage.samcloud.online/tier: standard
+automountServiceAccountToken: true
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vernemq-chaos-engineering
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: chaos-engineering
+    storage.samcloud.online/tier: standard
+rules:
+  # Chaos engineering operations
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["*"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Pod management for testing
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/log"]
+    verbs: ["get", "list", "create", "delete", "patch"]
+  # StatefulSet management for scaling tests
+  - apiGroups: ["apps"]
+    resources: ["statefulsets", "statefulsets/scale"]
+    verbs: ["get", "list", "patch", "update"]
+  # Service and endpoint monitoring
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list"]
+  # Events for chaos tracking
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vernemq-chaos-engineering
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: chaos-engineering
+    storage.samcloud.online/tier: standard
+subjects:
+  - kind: ServiceAccount
+    name: vernemq-chaos-engineering
+    namespace: storage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vernemq-chaos-engineering 

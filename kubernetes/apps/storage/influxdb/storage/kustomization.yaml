@@ -1,0 +1,42 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - ./storage.yaml
+  - ./tsm-config.yaml
+  - ./monitoring.yaml
+
+commonLabels:
+  app.kubernetes.io/name: influxdb
+  app.kubernetes.io/component: storage
+  app.kubernetes.io/part-of: storage-infrastructure
+
+configMapGenerator:
+  - name: influxdb-storage-config
+    behavior: merge
+    literals:
+      - STORAGE_CLASS=influxdb-storage
+      - SNAPSHOT_CLASS=influxdb-snapshot-class
+      - REPLICATION_SCHEDULE="*/30 * * * *"
+      - TSM_CACHE_SIZE="8GB"
+      - TSM_MAX_CONCURRENT_COMPACTIONS="4"
+      - WAL_FSYNC_DELAY="100ms"
+      - COMPACTION_THROUGHPUT="48MB/s"
+
+patches:
+  - target:
+      kind: StorageClass
+      name: influxdb-storage
+    patch: |-
+      - op: add
+        path: /parameters/tsm-config
+        value: ${TSM_CACHE_SIZE}
+      - op: add
+        path: /parameters/wal-config
+        value: ${WAL_FSYNC_DELAY}
+
+generatorOptions:
+  disableNameSuffixHash: true

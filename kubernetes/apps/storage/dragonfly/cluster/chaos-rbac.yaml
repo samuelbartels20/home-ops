@@ -1,0 +1,54 @@
+---
+# ServiceAccount for Chaos Engineering
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dragonfly-chaos-sa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+automountServiceAccountToken: true
+
+---
+# Role for Chaos Engineering
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dragonfly-chaos-role
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "services"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "deletecollection"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["list", "get", "patch", "update"]
+  - apiGroups: ["litmuschaos.io"]
+    resources: ["chaosengines", "chaosexperiments", "chaosresults"]
+    verbs: ["create", "delete", "get", "list", "patch", "update"]
+
+---
+# RoleBinding for Chaos Engineering
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dragonfly-chaos-binding
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-chaos-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: dragonfly-chaos-role
+  apiGroup: rbac.authorization.k8s.io 

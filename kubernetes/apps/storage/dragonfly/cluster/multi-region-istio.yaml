@@ -1,0 +1,112 @@
+---
+# Cross-Region Service Mesh Gateway
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: dragonfly-cross-region-gateway
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  selector:
+    istio: eastwestgateway
+  servers:
+    - port:
+        number: 6379
+        name: dragonfly-cross-region
+        protocol: TCP
+      hosts:
+        - "dragonfly.storage.local"
+        - "dragonfly.us-east-1.local"
+        - "dragonfly.eu-west-1.local"
+    - port:
+        number: 6380
+        name: dragonfly-tls-cross-region
+        protocol: TLS
+      tls:
+        mode: ISTIO_MUTUAL
+      hosts:
+        - "dragonfly.storage.local"
+
+---
+# Cross-Region Virtual Service
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dragonfly-cross-region-routing
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  hosts:
+    - "dragonfly.storage.local"
+  gateways:
+    - dragonfly-cross-region-gateway
+    - mesh
+  tcp:
+    - match:
+        - port: 6379
+      route:
+        # Primary region gets 70% traffic
+        - destination:
+            host: dragonfly.storage.svc.cluster.local
+            subset: us-west-2
+          weight: 70
+        # Secondary region gets 20% traffic
+        - destination:
+            host: dragonfly.us-east-1.svc.cluster.local
+            subset: us-east-1
+          weight: 20
+        # Tertiary region gets 10% traffic
+        - destination:
+            host: dragonfly.eu-west-1.svc.cluster.local
+            subset: eu-west-1
+          weight: 10
+      fault:
+        delay:
+          percentage:
+            value: 0.1
+          fixedDelay: 5ms
+
+---
+# Cross-Region Destination Rules
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: dragonfly-cross-region-destinations
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  host: "*.local"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1000
+        connectTimeout: 30s
+      http:
+        http1MaxPendingRequests: 100
+        maxRequestsPerConnection: 10
+    loadBalancer:
+      localityLbSetting:
+        enabled: true
+        distribute:
+          - from: "region1/zone1/*"
+            to:
+              "region1/zone1/*": 80
+              "region1/zone2/*": 20
+        failover:
+          - from: region1
+            to: region2
+          - from: region2
+            to: region3
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  exportTo:
+    - "*" 

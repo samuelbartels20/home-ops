@@ -1,0 +1,481 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dragonfly-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly-backup
+    app.kubernetes.io/component: backup-system
+    app.kubernetes.io/part-of: dragonfly
+    environment: production
+    tier: storage
+    backup-tier: production
+  annotations:
+    # Backup configuration
+    backup.storage.io/schedule: "0 1 * * *"
+    backup.storage.io/retention: "90d"
+    backup.storage.io/encryption: "aes-256-gcm"
+    backup.storage.io/compression: "gzip"
+
+    # Security and compliance
+    compliance.storage.io/sox: "required"
+    compliance.storage.io/gdpr: "required"
+    compliance.storage.io/nist: "required"
+    compliance.storage.io/iso27001: "required"
+
+    # Operational metadata
+    ops.storage.io/owner: "platform-team"
+    ops.storage.io/contact: "platform@samcloud.online"
+    ops.storage.io/escalation: "sre-oncall"
+    ops.storage.io/runbook: "https://runbooks.samcloud.online/dragonfly-backup"
+spec:
+  # Daily backup at 1 AM UTC
+  schedule: "0 1 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 10
+
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly-backup
+        app.kubernetes.io/component: backup-job
+        backup-type: scheduled
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600  # 1 hour timeout
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: dragonfly-backup
+            app.kubernetes.io/component: backup-job
+            security-scan: "required"
+            app.kubernetes.io/part-of: dragonfly
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+            prometheus.io/path: "/metrics"
+        spec:
+          restartPolicy: OnFailure
+
+          # Security context
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+
+          # Service account for backup operations
+          serviceAccountName: dragonfly-sa
+
+          containers:
+            - name: backup
+              image: ghcr.io/dragonflydb/dragonfly-backup:v1.2.0
+              imagePullPolicy: IfNotPresent
+
+              command: ["/bin/bash"]
+              args:
+                - -c
+                - |
+                  set -euo pipefail
+
+                  # Initialize logging
+                  exec > >(tee -a /var/log/backup/backup.log)
+                  exec 2>&1
+
+                  echo "$(date -Iseconds) Starting Dragonfly backup..."
+
+                  # Backup configuration
+                  BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_PREFIX="dragonfly-${BACKUP_DATE}"
+
+                  # Create backup directory
+                  mkdir -p /tmp/backup
+                  cd /tmp/backup
+
+                  # Function to backup single instance
+                  backup_instance() {
+                    local host=$1
+                    local port=$2
+                    local instance_name=$3
+
+                    echo "$(date -Iseconds) Backing up instance: ${instance_name}"
+
+                    # Create RDB snapshot
+                    redis-cli -h ${host} -p ${port} -a "${DRAGONFLY_PASSWORD}" BGSAVE
+
+                    # Wait for snapshot completion
+                    while [ "$(redis-cli -h ${host} -p ${port} -a "${DRAGONFLY_PASSWORD}" LASTSAVE)" = "$(redis-cli -h ${host} -p ${port} -a "${DRAGONFLY_PASSWORD}" LASTSAVE)" ]; do
+                      sleep 5
+                    done
+
+                    # Copy RDB file
+                    kubectl cp ${instance_name}:/data/dump.rdb ./dump-${instance_name}.rdb
+
+                    # Get instance info
+                    redis-cli -h ${host} -p ${port} -a "${DRAGONFLY_PASSWORD}" INFO ALL > info-${instance_name}.txt
+                    redis-cli -h ${host} -p ${port} -a "${DRAGONFLY_PASSWORD}" CONFIG GET "*" > config-${instance_name}.txt
+
+                    echo "$(date -Iseconds) Instance backup completed: ${instance_name}"
+                  }
+
+                  # Discover and backup all instances
+                  for pod in $(kubectl get pods -n storage -l app.kubernetes.io/name=dragonfly -o jsonpath='{.items[*].metadata.name}'); do
+                    backup_instance dragonfly-service 6379 ${pod}
+                  done
+
+                  # Create manifest file
+                  cat > backup-manifest.json <<EOF
+                  {
+                    "backup_id": "${BACKUP_PREFIX}",
+                    "timestamp": "$(date -Iseconds)",
+                    "cluster_name": "dragonfly",
+                    "environment": "production",
+                    "namespace": "storage",
+                    "backup_type": "full",
+                    "encryption": "aes-256-gcm",
+                    "compression": "gzip",
+                    "retention_days": 90,
+                    "instances": []
+                  }
+                  EOF
+
+                  # Add instance information to manifest
+                  for rdb_file in dump-*.rdb; do
+                    instance=$(echo ${rdb_file} | sed 's/dump-\(.*\)\.rdb/\1/')
+                    size=$(stat -f%z ${rdb_file} 2>/dev/null || stat -c%s ${rdb_file})
+                    checksum=$(sha256sum ${rdb_file} | cut -d' ' -f1)
+
+                    # Update manifest using jq
+                    jq ".instances += [{\"name\": \"${instance}\", \"rdb_file\": \"${rdb_file}\", \"size\": ${size}, \"checksum\": \"${checksum}\"}]" backup-manifest.json > backup-manifest.tmp
+                    mv backup-manifest.tmp backup-manifest.json
+                  done
+
+                  # Compress backup files
+                  echo "$(date -Iseconds) Compressing backup files..."
+                  tar -czf ${BACKUP_PREFIX}.tar.gz *.rdb *.txt backup-manifest.json
+
+                  # Encrypt backup
+                  echo "$(date -Iseconds) Encrypting backup..."
+                  openssl enc -aes-256-cbc -salt -in ${BACKUP_PREFIX}.tar.gz -out ${BACKUP_PREFIX}.tar.gz.enc -pass pass:"${BACKUP_ENCRYPTION_KEY}"
+
+                  # Calculate final checksums
+                  COMPRESSED_SIZE=$(stat -f%z ${BACKUP_PREFIX}.tar.gz.enc 2>/dev/null || stat -c%s ${BACKUP_PREFIX}.tar.gz.enc)
+                  COMPRESSED_CHECKSUM=$(sha256sum ${BACKUP_PREFIX}.tar.gz.enc | cut -d' ' -f1)
+
+                  # Update manifest with final information
+                  jq ".compressed_size = ${COMPRESSED_SIZE} | .compressed_checksum = \"${COMPRESSED_CHECKSUM}\"" backup-manifest.json > backup-manifest-final.json
+
+                  # Upload to primary storage (MinIO/S3)
+                  echo "$(date -Iseconds) Uploading to primary storage (MinIO)..."
+                  aws --endpoint-url ${S3_ENDPOINT} s3 cp ${BACKUP_PREFIX}.tar.gz.enc s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_PREFIX}.tar.gz.enc
+                  aws --endpoint-url ${S3_ENDPOINT} s3 cp backup-manifest-final.json s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_PREFIX}-manifest.json
+
+                  # Upload to TrueNAS (secondary storage)
+                  echo "$(date -Iseconds) Uploading to secondary storage (TrueNAS)..."
+                  scp -o StrictHostKeyChecking=no ${BACKUP_PREFIX}.tar.gz.enc ${TRUENAS_HOST}:${TRUENAS_DATASET}/backups/
+                  scp -o StrictHostKeyChecking=no backup-manifest-final.json ${TRUENAS_HOST}:${TRUENAS_DATASET}/backups/${BACKUP_PREFIX}-manifest.json
+
+                  # Upload to cloud provider (tertiary storage)
+                  if [ -n "${AWS_ROLE_ARN}" ]; then
+                    echo "$(date -Iseconds) Uploading to AWS S3 (tertiary storage)..."
+                    aws s3 cp ${BACKUP_PREFIX}.tar.gz.enc s3://dragonfly-backups-aws/${BACKUP_PREFIX}.tar.gz.enc
+                    aws s3 cp backup-manifest-final.json s3://dragonfly-backups-aws/${BACKUP_PREFIX}-manifest.json
+                  fi
+
+                  # Cleanup retention policy
+                  echo "$(date -Iseconds) Applying retention policy..."
+
+                  # MinIO retention
+                  RETENTION_DATE=$(date -d "90 days ago" +%Y%m%d)
+                  aws --endpoint-url ${S3_ENDPOINT} s3 ls s3://${S3_BUCKET}/${S3_PREFIX}/ | while read -r line; do
+                    file_date=$(echo $line | awk '{print $4}' | grep -o '[0-9]\{8\}' || echo "99999999")
+                    if [ "$file_date" -lt "$RETENTION_DATE" ]; then
+                      file_name=$(echo $line | awk '{print $4}')
+                      echo "$(date -Iseconds) Deleting old backup: $file_name"
+                      aws --endpoint-url ${S3_ENDPOINT} s3 rm s3://${S3_BUCKET}/${S3_PREFIX}/$file_name
+                    fi
+                  done
+
+                  # TrueNAS retention (using snapshots)
+                  ssh -o StrictHostKeyChecking=no ${TRUENAS_HOST} "find ${TRUENAS_DATASET}/backups -name 'dragonfly-*' -mtime +90 -delete"
+
+                  # Send metrics to monitoring
+                  cat > /tmp/metrics.prom <<EOF
+                  # HELP dragonfly_backup_size_bytes Size of the backup in bytes
+                  # TYPE dragonfly_backup_size_bytes gauge
+                  dragonfly_backup_size_bytes{cluster="dragonfly",type="compressed"} ${COMPRESSED_SIZE}
+
+                  # HELP dragonfly_backup_duration_seconds Duration of backup operation
+                  # TYPE dragonfly_backup_duration_seconds gauge
+                  dragonfly_backup_duration_seconds{cluster="dragonfly"} $(($(date +%s) - ${BACKUP_START_TIME}))
+
+                  # HELP dragonfly_backup_success Whether backup completed successfully
+                  # TYPE dragonfly_backup_success gauge
+                  dragonfly_backup_success{cluster="dragonfly"} 1
+                  EOF
+
+                  # Send notification
+                  curl -X POST ${WEBHOOK_URL} \
+                    -H "Content-Type: application/json" \
+                    -d "{
+                      \"text\": \"[PASS] Dragonfly backup completed successfully\",
+                      \"attachments\": [{
+                        \"color\": \"good\",
+                        \"fields\": [
+                          {\"title\": \"Backup ID\", \"value\": \"${BACKUP_PREFIX}\", \"short\": true},
+                          {\"title\": \"Size\", \"value\": \"$(numfmt --to=iec ${COMPRESSED_SIZE})\", \"short\": true},
+                          {\"title\": \"Checksum\", \"value\": \"${COMPRESSED_CHECKSUM:0:16}...\", \"short\": true},
+                          {\"title\": \"Storage\", \"value\": \"MinIO + TrueNAS + AWS S3\", \"short\": true}
+                        ]
+                      }]
+                    }"
+
+                  echo "$(date -Iseconds) Backup completed successfully: ${BACKUP_PREFIX}"
+
+              env:
+                - name: BACKUP_START_TIME
+                  value: "$(date +%s)"
+
+              envFrom:
+                - secretRef:
+                    name: dragonfly-secrets
+
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                  ephemeral-storage: 10Gi
+                limits:
+                  cpu: 2000m
+                  memory: 4Gi
+                  ephemeral-storage: 50Gi
+
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false
+                runAsNonRoot: true
+                runAsUser: 999
+                runAsGroup: 999
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+
+              volumeMounts:
+                - name: backup-logs
+                  mountPath: /var/log/backup
+                - name: backup-workspace
+                  mountPath: /tmp/backup
+                - name: ssh-keys
+                  mountPath: /home/backup/.ssh
+                  readOnly: true
+                - name: aws-credentials
+                  mountPath: /home/backup/.aws
+                  readOnly: true
+
+          volumes:
+            - name: backup-logs
+              persistentVolumeClaim:
+                claimName: dragonfly-backup-logs-pvc
+            - name: backup-workspace
+              emptyDir:
+                sizeLimit: 50Gi
+            - name: ssh-keys
+              secret:
+                secretName: dragonfly-backup-ssh-keys
+                defaultMode: 0600
+            - name: aws-credentials
+              secret:
+                secretName: dragonfly-backup-aws-credentials
+                defaultMode: 0600
+
+          # Affinity to prefer storage nodes
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: node-type
+                        operator: In
+                        values: ["storage"]
+
+          tolerations:
+            - key: "storage-node"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+---
+# Service Account for Backup Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dragonfly-sa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly-backup
+    app.kubernetes.io/component: service-account
+automountServiceAccountToken: true
+---
+# RBAC for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dragonfly-backup-role
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["dragonflydb.io"]
+    resources: ["dragonflies"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dragonfly-backup-binding
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-sa
+    namespace: storage
+roleRef:
+  kind: Role
+  name: dragonfly-backup-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# PVC for Backup Logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dragonfly-backup-logs-pvc
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly-backup
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Backup Restore Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dragonfly-restore-template
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly-restore
+    app.kubernetes.io/component: restore-system
+    restore-type: template
+  annotations:
+    # This is a template - do not apply directly
+    template.storage.io/type: "restore-job"
+    template.storage.io/usage: "kubectl create job --from=job/dragonfly-restore-template dragonfly-restore-$(date +%s)"
+spec:
+  # Template configuration - modify before use
+  parallelism: 1
+  completions: 1
+  backoffLimit: 3
+  activeDeadlineSeconds: 7200  # 2 hours timeout
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly-restore
+        app.kubernetes.io/component: restore-job
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: dragonfly-sa
+
+      containers:
+        - name: restore
+          image: ghcr.io/dragonflydb/dragonfly-backup:v1.2.0
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "$(date -Iseconds) Starting Dragonfly restore..."
+              echo "Backup ID to restore: ${BACKUP_ID}"
+
+              # Download backup from storage
+              mkdir -p /tmp/restore
+              cd /tmp/restore
+
+              # Download from MinIO
+              aws --endpoint-url ${S3_ENDPOINT} s3 cp s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_ID}.tar.gz.enc .
+              aws --endpoint-url ${S3_ENDPOINT} s3 cp s3://${S3_BUCKET}/${S3_PREFIX}/${BACKUP_ID}-manifest.json .
+
+              # Decrypt backup
+              openssl enc -aes-256-cbc -d -in ${BACKUP_ID}.tar.gz.enc -out ${BACKUP_ID}.tar.gz -pass pass:"${BACKUP_ENCRYPTION_KEY}"
+
+              # Extract backup
+              tar -xzf ${BACKUP_ID}.tar.gz
+
+              # Validate checksums
+              echo "$(date -Iseconds) Validating backup integrity..."
+              jq -r '.instances[] | "\(.checksum) \(.rdb_file)"' backup-manifest.json | while read checksum file; do
+                if ! echo "${checksum} ${file}" | sha256sum -c; then
+                  echo "ERROR: Checksum validation failed for ${file}"
+                  exit 1
+                fi
+              done
+
+              echo "$(date -Iseconds) Backup integrity validated successfully"
+
+              # Stop cluster for restore (if requested)
+              if [ "${STOP_CLUSTER}" = "true" ]; then
+                kubectl scale dragonfly dragonfly --replicas=0 -n storage
+                echo "$(date -Iseconds) Cluster stopped for restore"
+              fi
+
+              # Restore each instance
+              jq -r '.instances[] | .name' backup-manifest.json | while read instance; do
+                echo "$(date -Iseconds) Restoring instance: ${instance}"
+                kubectl cp dump-${instance}.rdb ${instance}:/data/dump.rdb
+                echo "$(date -Iseconds) Instance restored: ${instance}"
+              done
+
+              # Restart cluster
+              if [ "${STOP_CLUSTER}" = "true" ]; then
+                kubectl scale dragonfly dragonfly --replicas=6 -n storage
+                echo "$(date -Iseconds) Cluster restarted after restore"
+              fi
+
+              echo "$(date -Iseconds) Restore completed successfully"
+
+          env:
+            - name: BACKUP_ID
+              value: "REPLACE_WITH_BACKUP_ID"  # Set this when creating the job
+            - name: STOP_CLUSTER
+              value: "false"  # Set to "true" for full cluster restore
+
+          envFrom:
+            - secretRef:
+                name: dragonfly-secrets
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi

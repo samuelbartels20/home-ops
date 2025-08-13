@@ -1,0 +1,409 @@
+---
+# VerneMQ OAuth2/OIDC 
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: vernemq-oauth2
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: vernemq-oauth2-secrets
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        OAUTH_CLIENT_ID: "{{ .client_id }}"
+        OAUTH_CLIENT_SECRET: "{{ .client_secret }}"
+  dataFrom:
+    - extract:
+        key: vernemq-oauth2
+
+---
+# OAuth2 Proxy for Web Management Interface
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vernemq-oauth2-proxy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq-oauth2-proxy
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq-oauth2-proxy
+      app.kubernetes.io/component: authentication
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vernemq-oauth2-proxy
+        app.kubernetes.io/component: authentication
+    spec:
+      serviceAccountName: vernemq-oauth2-proxy
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.4.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --provider=oidc
+            - --provider-display-name=SSO
+            - --upstream=http://vernemq.storage.svc.cluster.local:8080/
+            - --http-address=0.0.0.0:4180
+            - --metrics-address=0.0.0.0:44180
+            - --email-domain=*
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            - --cookie-expire=24h
+            - --cookie-refresh=1h
+            - --skip-provider-button=true
+            - --pass-basic-auth=false
+            - --pass-access-token=true
+            - --pass-user-headers=true
+            - --set-xauthrequest=true
+            - --skip-auth-regex=^/health$
+            - --skip-auth-regex=^/metrics$
+            - --skip-auth-regex=^/api/health$
+          env:
+            - name: OAUTH2_PROXY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: vernemq-oauth2-secrets
+                  key: VERNEMQ_OAUTH_CLIENT_ID
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vernemq-oauth2-secrets
+                  key: VERNEMQ_OAUTH_CLIENT_SECRET
+            - name: OAUTH2_PROXY_OIDC_ISSUER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: vernemq-oauth2-secrets
+                  key: VERNEMQ_OAUTH_ISSUER_URL
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: "https://mqtt.samcloud.online/oauth2/callback"
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vernemq-oauth2-secrets
+                  key: VERNEMQ_JWT_SECRET
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+            - name: metrics
+              containerPort: 44180
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+# Service for OAuth2 Proxy
+apiVersion: v1
+kind: Service
+metadata:
+  name: vernemq-oauth2-proxy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq-oauth2-proxy
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 4180
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 44180
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: vernemq-oauth2-proxy
+
+---
+# ServiceAccount for OAuth2 Proxy
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vernemq-oauth2-proxy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq-oauth2-proxy
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+automountServiceAccountToken: false
+
+---
+# Ingress with OAuth2 Protection
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vernemq-management-oauth2
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/auth-url: "https://mqtt.samcloud.online/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://mqtt.samcloud.online/oauth2/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Preferred-Username,X-Auth-Request-Groups"
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      auth_request_set $user $upstream_http_x_auth_request_user;
+      auth_request_set $email $upstream_http_x_auth_request_email;
+      auth_request_set $groups $upstream_http_x_auth_request_groups;
+      proxy_set_header X-User $user;
+      proxy_set_header X-Email $email;
+      proxy_set_header X-Groups $groups;
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - mqtt.samcloud.online
+      secretName: vernemq-tls-cert
+  rules:
+    - host: mqtt.samcloud.online
+      http:
+        paths:
+          # OAuth2 endpoints
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: vernemq-oauth2-proxy
+                port:
+                  number: 4180
+          # Management interface (protected)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vernemq
+                port:
+                  number: 8080
+
+---
+# VerneMQ Authentication Plugin Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-auth-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+data:
+  auth-plugin.conf: |
+    # VerneMQ Authentication Plugin Configuration
+
+    # OAuth2/JWT Authentication
+    plugins.vmq_auth_jwt.enabled = on
+    plugins.vmq_auth_jwt.jwks_url = https://sso.samcloud.online/application/o/vernemq/jwks/
+    plugins.vmq_auth_jwt.verify_iss = https://sso.samcloud.online
+    plugins.vmq_auth_jwt.verify_aud = vernemq-mqtt
+    plugins.vmq_auth_jwt.sign_alg = RS256
+    plugins.vmq_auth_jwt.username_key = preferred_username
+    plugins.vmq_auth_jwt.client_id_key = client_id
+
+    # LDAP Authentication (fallback)
+    plugins.vmq_auth_ldap.enabled = on
+    plugins.vmq_auth_ldap.host = ${VERNEMQ_LDAP_HOST}
+    plugins.vmq_auth_ldap.port = 636
+    plugins.vmq_auth_ldap.ssl = on
+    plugins.vmq_auth_ldap.bind_dn = ${VERNEMQ_LDAP_BIND_DN}
+    plugins.vmq_auth_ldap.password = ${VERNEMQ_LDAP_BIND_PASSWORD}
+    plugins.vmq_auth_ldap.base_dn = ${VERNEMQ_LDAP_BASE_DN}
+    plugins.vmq_auth_ldap.user_filter = (&(objectClass=person)(uid=%u))
+    plugins.vmq_auth_ldap.group_filter = (&(objectClass=group)(member=%D))
+
+    # API Key Authentication for service accounts
+    plugins.vmq_auth_api_key.enabled = on
+    plugins.vmq_auth_api_key.keys = /etc/vernemq/api-keys.conf
+
+    # ACL Configuration
+    plugins.vmq_acl.enabled = on
+    plugins.vmq_acl.acl_file = /etc/vernemq/acl.conf
+    plugins.vmq_acl.cache_ttl = 300
+
+    # Webhook Authentication (for complex scenarios)
+    plugins.vmq_webhooks.enabled = on
+    plugins.vmq_webhooks.auth_on_register.hook = auth_on_register
+    plugins.vmq_webhooks.auth_on_register.endpoint = https://auth.samcloud.online/api/v1/mqtt/auth
+    plugins.vmq_webhooks.auth_on_publish.hook = auth_on_publish
+    plugins.vmq_webhooks.auth_on_publish.endpoint = https://auth.samcloud.online/api/v1/mqtt/publish
+    plugins.vmq_webhooks.auth_on_subscribe.hook = auth_on_subscribe
+    plugins.vmq_webhooks.auth_on_subscribe.endpoint = https://auth.samcloud.online/api/v1/mqtt/subscribe
+
+  api-keys.conf: |
+    # API Keys for Service Accounts
+    # Format: api_key:client_id:permissions
+    ${VERNEMQ_API_KEY_PROMETHEUS}:prometheus:read
+    ${VERNEMQ_API_KEY_BACKUP}:backup:admin
+    ${VERNEMQ_API_KEY_CHAOS}:chaos-engineering:admin
+
+  acl.conf: |
+    # Access Control List
+    # Format: user|client_id|pattern|permission
+
+    # System accounts
+    user prometheus
+    topic read $SYS/#
+    topic read vernemq/#
+
+    user backup
+    topic read $SYS/#
+    topic write backup/#
+
+    user chaos-engineering
+    topic readwrite test/#
+    topic readwrite chaos/#
+
+    # Regular users (authenticated via OAuth2)
+    user %u
+    topic readwrite devices/%u/#
+    topic readwrite users/%u/#
+    topic read broadcasts/#
+
+    # Groups (from LDAP/OAuth2 claims)
+    group mqtt-admin
+    topic readwrite #
+
+    group mqtt-user
+    topic readwrite devices/+/+
+    topic read broadcasts/+
+
+  oauth2.conf: |
+    auth.oauth.enabled = on
+    auth.oauth.provider = keycloak
+    auth.oauth.client_id = ${OAUTH_CLIENT_ID}
+    auth.oauth.client_secret = ${OAUTH_CLIENT_SECRET}
+    auth.oauth.issuer = ${OAUTH_ISSUER}
+    auth.oauth.verify_claims = on
+    auth.oauth.claim_mappings = {
+      "sub": "client_id",
+      "scope": "permissions"
+    }
+    auth.oauth.scope_claim = "scope"
+    auth.oauth.required_scopes = ["mqtt"]
+
+---
+# Authentication Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vernemq-auth-monitoring
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq-oauth2-proxy
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# Authentication Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vernemq-auth-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: authentication
+    storage.samcloud.online/tier: standard
+spec:
+  groups:
+    - name: vernemq.authentication
+      interval: 30s
+      rules:
+        - alert: VerneMQAuthenticationFailureRate
+          expr: |
+            (
+              rate(vernemq_mqtt_connect_received_total[5m]) -
+              rate(vernemq_mqtt_connect_sent_total[5m])
+            ) / rate(vernemq_mqtt_connect_received_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            component: authentication
+            team: security
+          annotations:
+            summary: "High VerneMQ authentication failure rate"
+            description: |
+              VerneMQ authentication failure rate is {{ $value | humanizePercentage }}
+              over the last 5 minutes. This may indicate credential issues or attacks.
+
+        - alert: VerneMQOAuth2ProxyDown
+          expr: up{job="vernemq-oauth2-proxy"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: authentication
+            team: security
+          annotations:
+            summary: "VerneMQ OAuth2 proxy is down"
+            description: |
+              The OAuth2 proxy for VerneMQ management interface is unavailable.
+              Web management access is not possible.
+
+        - alert: VerneMQUnauthorizedAccess
+          expr: |
+            rate(vernemq_mqtt_auth_on_register_denied_total[5m]) > 10
+          for: 2m
+          labels:
+            severity: warning
+            component: authentication
+            team: security
+          annotations:
+            summary: "High rate of unauthorized VerneMQ access attempts"
+            description: |
+              Unauthorized access attempts to VerneMQ: {{ $value }} attempts/second
+              over the last 5 minutes. Possible attack in progress.

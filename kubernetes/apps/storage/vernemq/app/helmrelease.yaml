@@ -1,0 +1,267 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: vernemq
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: messaging
+    environment: production
+    tier: storage
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 2.6.0
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  maxHistory: 2
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      main:
+        type: statefulset
+        strategy: RollingUpdate
+        replicas: 3
+        annotations:
+          secret.reloader.stakater.com/reload: vernemq-auth-secret
+          configmap.reloader.stakater.com/reload: vernemq-config
+        containers:
+          main:
+            image:
+              repository: vernemq/vernemq
+              tag: 1.12.3
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 1
+                memory: 1Gi
+            env:
+              - name: DOCKER_VERNEMQ_ACCEPT_EULA
+                value: "yes"
+              - name: DOCKER_VERNEMQ_ALLOW_ANONYMOUS
+                value: "off"
+              - name: DOCKER_VERNEMQ_MAX_CONNECTIONS
+                value: "100000"
+              - name: DOCKER_VERNEMQ_MAX_INFLIGHT_MESSAGES
+                value: "20"
+              - name: DOCKER_VERNEMQ_MAX_MESSAGE_SIZE
+                value: "10MB"
+              - name: DOCKER_VERNEMQ_MAX_ONLINE_MESSAGES
+                value: "10000"
+              - name: DOCKER_VERNEMQ_MAX_QUEUED_MESSAGES
+                value: "10000"
+              - name: DOCKER_VERNEMQ_MAX_TOPIC_ALIAS
+                value: "100"
+              - name: DOCKER_VERNEMQ_RETRY_INTERVAL
+                value: "20"
+              - name: DOCKER_VERNEMQ_SYS_INTERVAL
+                value: "10"
+              - name: DOCKER_VERNEMQ_UPGRADE_OUTGOING_QOS
+                value: "false"
+    service:
+      main:
+        enabled: true
+        type: ClusterIP
+        ports:
+          http:
+            enabled: true
+            port: 1883
+            protocol: TCP
+          https:
+            enabled: true
+            port: 8883
+            protocol: TCP
+          websocket:
+            enabled: true
+            port: 8080
+            protocol: TCP
+          websocket-tls:
+            enabled: true
+            port: 8443
+            protocol: TCP
+          metrics:
+            enabled: true
+            port: 8888
+            protocol: TCP
+      headless:
+        enabled: true
+        type: ClusterIP
+        ports:
+          http:
+            enabled: true
+            port: 1883
+          https:
+            enabled: true
+            port: 8883
+          websocket:
+            enabled: true
+            port: 8080
+          websocket-tls:
+            enabled: true
+            port: 8443
+          metrics:
+            enabled: true
+            port: 8888
+
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        storageClass: openebs-hostpath
+        size: 10Gi
+        accessMode: ReadWriteOnce
+      logs:
+        enabled: true
+        type: persistentVolumeClaim
+        storageClass: openebs-hostpath
+        size: 5Gi
+        accessMode: ReadWriteOnce
+        globalMounts:
+          - path: /vernemq/log
+      config:
+        type: configMap
+        name: vernemq-config
+        globalMounts:
+          - path: /vernemq/etc/vernemq.conf
+            subPath: vernemq.conf
+      tls:
+        type: secret
+        name: vernemq-tls-secret
+        defaultMode: 0400
+        globalMounts:
+          - path: /tls
+            readOnly: true
+      tmpfs:
+        type: emptyDir
+        medium: Memory
+        sizeLimit: 128Mi
+        advancedMounts:
+          vernemq:
+            app:
+              - path: /tmp
+                subPath: tmp
+
+    configMaps:
+      vernemq-config:
+        data:
+          vernemq.conf: |
+            # VerneMQ Enterprise Configuration
+            # Production-grade MQTT broker settings
+
+            # Networking
+            listener.tcp.default = 0.0.0.0:1883
+            listener.ssl.default = 0.0.0.0:8883
+            listener.ws.default = 0.0.0.0:8080
+            listener.wss.default = 0.0.0.0:8443
+
+            # SSL/TLS Configuration
+            listener.ssl.default.cafile = /tls/ca.crt
+            listener.ssl.default.certfile = /tls/tls.crt
+            listener.ssl.default.keyfile = /tls/tls.key
+            listener.ssl.default.ciphers = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
+            listener.ssl.default.honor_server_cipher_order = on
+            listener.ssl.default.tls_version = tlsv1.2
+
+            # WebSocket SSL Configuration
+            listener.wss.default.cafile = /tls/ca.crt
+            listener.wss.default.certfile = /tls/tls.crt
+            listener.wss.default.keyfile = /tls/tls.key
+
+            # Performance Settings
+            max_connections = 100000
+            nr_of_acceptors = 10
+            keepalive_backlog = 1000
+
+            # Message Settings
+            max_message_size = 268435456
+            message_size_limit = 268435456
+            max_online_messages = 10000
+            max_offline_messages = 1000
+            persistent_client_expiration = 1w
+
+            # Clustering
+            distributed_cookie = vernemq_cluster
+            cluster_name = production_mqtt_cluster
+
+            # LevelDB Settings
+            leveldb.maximum_memory = 67108864
+            leveldb.write_buffer_size_min = 4194304
+            leveldb.write_buffer_size_max = 8388608
+            leveldb.compression = lz4
+
+            # Monitoring
+            prometheus_ip = 0.0.0.0
+            prometheus_port = 8888
+            health_check_ip = 0.0.0.0
+            health_check_port = 8888
+
+            # Logging
+            log.console.level = info
+            log.console.file = /vernemq/log/console.log
+            log.error.file = /vernemq/log/error.log
+            log.crash.file = /vernemq/log/crash.log
+
+    serviceAccount:
+      vernemq:
+        labels:
+          app.kubernetes.io/name: vernemq
+          app.kubernetes.io/component: messaging
+
+    rbac:
+      roles:
+        vernemq:
+          type: Role
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - pods
+                - endpoints
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - apps
+              resources:
+                - statefulsets
+                - replicasets
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - services
+              verbs:
+                - get
+                - list
+                - watch
+      bindings:
+        vernemq:
+          type: RoleBinding
+          roleRef:
+            identifier: vernemq
+          subjects:
+            - identifier: vernemq

@@ -1,0 +1,138 @@
+# VerneMQ Pod Security Policy
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: vernemq-psp
+  namespace: storage
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+
+---
+# VerneMQ Security Context Constraints
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: vernemq-restricted-scc
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: security
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+  ranges:
+    - min: 10000
+      max: 65535
+readOnlyRootFilesystem: true
+requiredDropCapabilities:
+  - ALL
+runAsUser:
+  type: MustRunAsNonRoot
+  uidRangeMin: 10000
+  uidRangeMax: 65535
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+  ranges:
+    - min: 10000
+      max: 65535
+users:
+  - system:serviceaccount:storage:vernemq
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - persistentVolumeClaim
+  - projected
+  - secret
+
+---
+# VerneMQ Security Compliance ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-security-compliance
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: security-compliance
+data:
+  security-requirements.yaml: |
+    compliance_standards:
+      - name: "SOC 2 Type II"
+        controls:
+          - CC6.1: "Logical and physical access controls"
+          - CC6.6: "Data transmission controls"
+          - CC6.7: "Data disposal controls"
+
+      - name: "ISO 27001"
+        controls:
+          - A.9.4.2: "Secure log-on procedures"
+          - A.10.1.1: "Cryptographic key management"
+          - A.12.4.1: "Event logging"
+
+      - name: "NIST Cybersecurity Framework"
+        functions:
+          - identify: "Asset management and risk assessment"
+          - protect: "Access control and data security"
+          - detect: "Security monitoring and anomaly detection"
+          - respond: "Incident response procedures"
+          - recover: "Backup and recovery procedures"
+
+    security_configurations:
+      pod_security:
+        enforce_level: "restricted"
+        audit_level: "restricted"
+        warn_level: "restricted"
+
+      container_security:
+        run_as_non_root: true
+        read_only_root_filesystem: true
+        allow_privilege_escalation: false
+        drop_all_capabilities: true
+
+      network_security:
+        network_policies_enabled: true
+        tls_encryption_required: true
+        ingress_restricted: true
+        egress_controlled: true
+
+      storage_security:
+        encryption_at_rest: true
+        backup_encryption: true
+        access_logging: true

@@ -1,0 +1,94 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - ./enterprise-network-policy.yaml
+  - ./compliance-config.yaml
+  - ./pod-security-policy.yaml
+  - ./networkpolicy.yaml
+  - ./auth-config.yaml
+  - ./audit-policy.yaml
+  - ./rbac.yaml
+  - ./secrets-config.yaml
+  - ./tls-config.yaml
+  - ./seccomp-profile.yaml
+  - ./zero-trust.yaml
+  - ./supply-chain.yaml
+  - ./runtime-security.yaml
+  - ./disaster-recovery.yaml
+
+commonLabels:
+  app.kubernetes.io/name: influxdb
+  app.kubernetes.io/component: security
+  app.kubernetes.io/part-of: storage-infrastructure
+
+configMapGenerator:
+  - name: influxdb-security-config
+    behavior: merge
+    literals:
+      - OIDC_ISSUER_URL="https://auth.example.com"
+      - OIDC_CLIENT_ID="influxdb"
+      - LDAP_HOST="ldap.example.com"
+      - LDAP_PORT="636"
+      - AUDIT_LOG_PATH="/var/log/influxdb/audit.log"
+      - COMPLIANCE_CHECK_INTERVAL="1h"
+  - name: influxdb-security-policies
+    behavior: merge
+    files:
+      - policies/rbac-policy.yaml
+      - policies/network-policy.yaml
+      - policies/audit-policy.yaml
+      - policies/seccomp-profile.json
+  - name: influxdb-runtime-config
+    behavior: merge
+    files:
+      - runtime-security.yaml
+      - zero-trust.yaml
+      - supply-chain.yaml
+  - name: influxdb-compliance-config
+    behavior: merge
+    files:
+      - compliance/hipaa.yaml
+      - compliance/pci-dss.yaml
+      - compliance/soc2.yaml
+      - compliance/gdpr.yaml
+
+secretGenerator:
+  - name: influxdb-security-secrets
+    behavior: merge
+    files:
+      - secrets/oidc-client-secret
+      - secrets/ldap-bind-password
+      - secrets/tls.key
+      - secrets/tls.crt
+      - secrets/ca.crt
+      - secrets/kms-key
+      - secrets/backup-encryption-key
+      - secrets/signing-key
+
+patches:
+  - target:
+      kind: Deployment
+      name: influxdb
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          privileged: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop: ["ALL"]
+      - op: add
+        path: /spec/template/metadata/annotations
+        value:
+          security.alpha.kubernetes.io/seccomp-profile: runtime/default
+          container.apparmor.security.beta.kubernetes.io/influxdb: runtime/default
+
+generatorOptions:
+  disableNameSuffixHash: true

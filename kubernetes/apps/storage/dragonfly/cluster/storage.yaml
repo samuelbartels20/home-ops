@@ -1,0 +1,72 @@
+---
+# Primary Data Storage PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dragonfly-data-pvc
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+    backup: "enabled"
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "fast-ssd"
+    backup.velero.io/backup-volumes: "dragonfly-data"
+    volume.kubernetes.io/selected-node: ""
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 100Gi
+  volumeMode: Filesystem
+
+---
+# Logs Storage PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dragonfly-logs-pvc
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+    backup: "enabled"
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "standard"
+    backup.velero.io/backup-volumes: "dragonfly-logs"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 20Gi
+  volumeMode: Filesystem
+
+---
+# Backup Storage PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dragonfly-backup-pvc
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+    backup: "retention-90d"
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "standard"
+    backup.velero.io/backup-volumes: "dragonfly-backup"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 200Gi
+  volumeMode: Filesystem

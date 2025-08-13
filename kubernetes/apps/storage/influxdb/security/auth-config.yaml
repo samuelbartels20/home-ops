@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-auth-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: auth
+    app.kubernetes.io/part-of: storage
+data:
+  auth.yaml: |
+    auth:
+      type: token
+      token:
+        enabled: true
+      oidc:
+        enabled: true
+        issuer: "InfluxDB"
+        clientID: "${SECRET_OIDC_CLIENT_ID}"
+        clientSecret: "${SECRET_OIDC_CLIENT_SECRET}"
+        issuerURL: "${SECRET_OIDC_ISSUER_URL}"
+      ldap:
+        enabled: true
+        servers:
+          - host: "${SECRET_LDAP_HOST}"
+            port: 636
+            useSSL: true
+            bindDN: "${SECRET_LDAP_BIND_DN}"
+            bindPassword: "${SECRET_LDAP_BIND_PASSWORD}"
+
+    # Role Mappings
+    role_mappings:
+      - ldap_group: "cn=influxdb-admins,ou=groups,dc=cluster,dc=local"
+        influxdb_role: "admin"
+      - ldap_group: "cn=influxdb-writers,ou=groups,dc=cluster,dc=local"
+        influxdb_role: "writer"
+      - ldap_group: "cn=influxdb-readers,ou=groups,dc=cluster,dc=local"
+        influxdb_role: "reader"
+
+    # Token Management
+    tokens:
+      expiration: 8h
+      renewal_period: 1h
+      max_active_tokens: 10
+      rotation_enabled: true
+      rotation_interval: 24h
+
+    # Multi-Factor Authentication
+    mfa:
+      enabled: true
+      providers:
+        - type: totp
+          issuer: "InfluxDB Enterprise"
+          algorithm: SHA1
+          digits: 6
+          period: 30
+        - type: webauthn
+          enabled: true
+          display_name: "InfluxDB Security Key"
+          resident_key: false
+          user_verification: preferred
+
+    # Session Management
+    session:
+      cookie_secure: true
+      cookie_http_only: true
+      cookie_same_site: "Lax"
+      idle_timeout: 1h
+      absolute_timeout: 24h
+      remember_me_duration: 30d

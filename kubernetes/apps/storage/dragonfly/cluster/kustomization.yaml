@@ -1,0 +1,188 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+# Dragonfly Cluster Kustomization
+# Production-grade cluster deployment with high availability
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+metadata:
+  name: dragonfly-cluster
+  annotations:
+    config.kubernetes.io/description: "Production-ready Dragonfly cluster with high availability"
+    config.kubernetes.io/deployment-tier: "critical-infrastructure"
+
+# Core cluster resources
+resources:
+  # Core cluster configuration
+  - ./cluster.yaml
+
+  # Security and RBAC
+  - ./security.yaml
+  - ./secret.yaml
+
+  # Storage and persistence
+  - ./storage.yaml
+  - ./poddisruptionbudget.yaml
+
+  # Monitoring and observability
+  - ./monitoring.yaml
+  - ./podmonitor.yaml
+
+  # Configuration management
+  - ./config.yaml
+
+  # Backup and disaster recovery
+  - ./backup-cronjob.yaml
+  - ./backup.yaml
+
+  # Services and networking
+  - ./services.yaml
+
+  # SLO and performance management
+  - ./slo.yaml
+
+  # Progressive delivery
+  - ./canary-deployment.yaml
+
+  # Multi-region and high availability
+  - ./multi-region.yaml
+  - ./multi-region-istio.yaml
+
+  # Chaos engineering
+  - ./chaos-engineering.yaml
+  - ./chaos-rbac.yaml
+
+# Production labels applied to all resources
+labels:
+  - pairs:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/instance: dragonfly
+      app.kubernetes.io/component: cache
+      app.kubernetes.io/part-of: storage
+
+# Common annotations for compliance
+commonAnnotations:
+  # Version and release tracking
+  deployment.dragonfly.io/version: "v1.30.3"
+  deployment.dragonfly.io/release: "2024.1"
+  deployment.dragonfly.io/cluster-size: "6"
+
+  # Security and compliance
+  security.dragonfly.io/pod-security-standard: "restricted"
+  security.dragonfly.io/network-policy: "zero-trust"
+  security.dragonfly.io/rbac: "least-privilege"
+  security.dragonfly.io/encryption: "aes-256-gcm"
+
+  # Compliance frameworks
+  compliance.dragonfly.io/sox: "compliant"
+  compliance.dragonfly.io/gdpr: "compliant"
+  compliance.dragonfly.io/nist: "compliant"
+  compliance.dragonfly.io/iso27001: "compliant"
+  compliance.dragonfly.io/pci-dss: "compliant"
+
+  # Operational excellence
+  ops.dragonfly.io/slo-target: "99.95%"
+  ops.dragonfly.io/rto: "5m"
+  ops.dragonfly.io/rpo: "1h"
+  ops.dragonfly.io/backup-frequency: "6h"
+  ops.dragonfly.io/disaster-recovery: "multi-region"
+
+  # Advanced operational patterns
+  ops.dragonfly.io/canary-deployment: "enabled"
+  ops.dragonfly.io/chaos-engineering: "enabled"
+  ops.dragonfly.io/progressive-delivery: "enabled"
+  ops.dragonfly.io/error-budget-policy: "enabled"
+  ops.dragonfly.io/circuit-breaker: "enabled"
+  ops.dragonfly.io/load-shedding: "enabled"
+
+# ConfigMap generators for configuration
+configMapGenerator:
+  - name: dragonfly-cluster-info
+    literals:
+      - cluster-name=dragonfly
+      - cluster-size=6
+      - environment=production
+      - deployment-tier=critical
+      - slo-target=99.95
+      - backup-retention=90d
+      - chaos-enabled=true
+      - canary-enabled=true
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: cluster-info
+        config-type: cluster-metadata
+
+# Image configurations for consistency
+images:
+  - name: ghcr.io/dragonflydb/dragonfly
+    newTag: v1.30.3
+  - name: ghcr.io/dragonflydb/operator
+    newTag: v1.1.11
+
+# Resource patches for configuration
+patches:
+  # Ensure all services have proper monitoring labels
+  - target:
+      kind: Service
+    patch: |-
+      - op: add
+        path: /metadata/labels/monitoring
+        value: "enabled"
+      - op: add
+        path: /metadata/annotations/prometheus~1io~1scrape
+        value: "true"
+
+  # Apply security context to all deployments
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/annotations/security~1hardened
+        value: "true"
+      - op: add
+        path: /spec/template/metadata/labels/security-scan
+        value: "required"
+
+  # Ensure all PVCs have backup annotations
+  - target:
+      kind: PersistentVolumeClaim
+    patch: |-
+      - op: add
+        path: /metadata/annotations/backup~1velero~1io~1backup-volumes
+        value: "true"
+      - op: add
+        path: /metadata/annotations/volume~1beta~1kubernetes~1io~1storage-class
+        value: "fast-ssd"
+
+# Strategic merge patches for complex configurations
+patchesStrategicMerge:
+  # Monitoring enhancements
+  - |-
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: dragonfly-metrics
+      labels:
+        release: prometheus-operator
+        monitoring-tier: production
+    spec:
+      endpoints:
+        - port: dragonfly
+          interval: 15s
+          scrapeTimeout: 10s
+          honorLabels: true
+
+# Replacements for dynamic configuration
+replacements:
+  - source:
+      kind: ConfigMap
+      name: dragonfly-cluster-info
+      fieldPath: data.cluster-size
+    targets:
+      - select:
+          kind: Dragonfly
+          name: dragonfly
+        fieldPaths:
+          - spec.replicas

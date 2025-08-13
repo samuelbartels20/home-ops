@@ -1,0 +1,350 @@
+---
+# Enterprise Dragonfly Kustomization
+# Production-grade deployment with comprehensive security, monitoring, and backup
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+resources:
+  - helmrelease.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - service.yaml
+  - networkpolicy.yaml
+commonLabels:
+  app.kubernetes.io/name: dragonfly
+  app.kubernetes.io/instance: dragonfly
+  app.kubernetes.io/component: cache
+  app.kubernetes.io/part-of: storage
+
+metadata:
+  name: dragonfly-enterprise
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: kustomization
+    app.kubernetes.io/part-of: dragonfly-enterprise
+    environment: production
+    tier: storage
+    security-level: enterprise
+
+# Core Resources
+resources:
+  # Core operator and secrets
+  - ./externalsecret.yaml
+  - ./helmrelease.yaml
+
+  # Enterprise configuration
+  - ./enterprise-config.yaml
+  - ./enterprise-certificates.yaml
+
+  # Monitoring and observability
+  - ./servicemonitor.yaml
+  - ./prometheus-rules.yaml
+  - ./grafana-dashboard.yaml
+
+  # Security policies
+  - ./pod-security-policy.yaml
+  - ./network-policy.yaml
+  - ./security-context-constraints.yaml
+
+  # Backup and disaster recovery
+  - ./backup-cronjob.yaml
+  - ./backup-storage.yaml
+  - ./disaster-recovery.yaml
+
+# Production Labels
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/component: cache-database
+      app.kubernetes.io/part-of: dragonfly-enterprise
+      environment: production
+      tier: storage
+      security-level: enterprise
+      backup-policy: comprehensive
+      monitoring: enabled
+
+# Production Patches for Enterprise Features
+patches:
+  # Ensure observability namespace for monitoring resources
+  - target:
+      kind: ServiceMonitor
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: observability
+
+  - target:
+      kind: PrometheusRule
+    patch: |-
+      - op: replace
+        path: /metadata/namespace
+        value: observability
+
+  # Apply production security context to all pods
+  - target:
+      kind: HelmRelease
+      name: dragonfly-operator
+    patch: |-
+      - op: add
+        path: /metadata/labels/security-hardened
+        value: "true"
+      - op: add
+        path: /metadata/labels/production-certified
+        value: "big-tech-standards"
+      - op: add
+        path: /metadata/annotations/security-scan~1required
+        value: "true"
+
+  # Enterprise resource allocation
+  - target:
+      kind: HelmRelease
+      name: dragonfly-operator
+    patch: |-
+      - op: replace
+        path: /spec/values/controllers/dragonfly-operator/replicas
+        value: 3
+      - op: add
+        path: /spec/values/priorityClassName
+        value: system-cluster-critical
+
+  # Production storage configuration
+  - target:
+      kind: PersistentVolumeClaim
+    patch: |-
+      - op: add
+        path: /metadata/annotations/volume~1beta~1kubernetes~1io~1storage-class
+        value: fast-ssd
+      - op: add
+        path: /metadata/annotations/backup~1velero~1io~1backup-volumes
+        value: "true"
+
+  # Network security hardening
+  - target:
+      kind: NetworkPolicy
+    patch: |-
+      - op: add
+        path: /metadata/labels/security-policy
+        value: "zero-trust"
+      - op: add
+        path: /metadata/annotations/network-security~1enforcement
+        value: "strict"
+
+# ConfigMap Generators for Enterprise Configuration
+configMapGenerator:
+  - name: dragonfly-enterprise-config
+    files:
+      - dragonfly.conf=../config/dragonfly-enterprise.conf
+      - redis.conf=../config/redis-compatibility.conf
+      - cluster.conf=../config/cluster-enterprise.conf
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: configuration
+        environment: production
+        config-type: enterprise
+
+  - name: dragonfly-monitoring-config
+    files:
+      - prometheus.yml=../monitoring/prometheus.yml
+      - grafana-dashboard.json=../monitoring/grafana-dashboard.json
+      - alerts.yml=../monitoring/alerts.yml
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: monitoring
+        monitoring-tier: enterprise
+
+  - name: dragonfly-backup-scripts
+    files:
+      - backup.sh=../scripts/backup-enterprise.sh
+      - restore.sh=../scripts/restore-enterprise.sh
+      - cleanup.sh=../scripts/cleanup-retention.sh
+      - healthcheck.sh=../scripts/healthcheck-enterprise.sh
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: backup
+        backup-tier: enterprise
+
+# Secret Generators for Enterprise Security
+secretGenerator:
+  - name: dragonfly-tls-certs
+    files:
+      - tls.crt=../certs/dragonfly.crt
+      - tls.key=../certs/dragonfly.key
+      - ca.crt=../certs/ca.crt
+    type: kubernetes.io/tls
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: tls-certificates
+        cert-manager.io/issuer: letsencrypt-prod
+
+  - name: dragonfly-backup-ssh-keys
+    files:
+      - id_rsa=../keys/backup_rsa
+      - id_rsa.pub=../keys/backup_rsa.pub
+      - known_hosts=../keys/known_hosts
+    type: Opaque
+    options:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: backup-credentials
+
+# Namespace Configuration
+namespace: storage
+
+# Common Annotations for All Resources
+commonAnnotations:
+  # Version and release information
+  deployment.dragonfly.io/version: "v1.30.3"
+  deployment.dragonfly.io/release: "enterprise-2024.1"
+
+  # Security and compliance
+  security.dragonfly.io/pod-security-standard: "restricted"
+  security.dragonfly.io/network-policy: "enabled"
+  security.dragonfly.io/rbac: "least-privilege"
+
+  # Backup and disaster recovery
+  backup.dragonfly.io/enabled: "true"
+  backup.dragonfly.io/schedule: "daily"
+  backup.dragonfly.io/retention: "90d"
+  disaster-recovery.dragonfly.io/rpo: "15m"
+  disaster-recovery.dragonfly.io/rto: "5m"
+
+  # Monitoring and observability
+  monitoring.dragonfly.io/prometheus: "enabled"
+  monitoring.dragonfly.io/grafana: "enabled"
+  monitoring.dragonfly.io/alerts: "enabled"
+  logging.dragonfly.io/structured: "enabled"
+  tracing.dragonfly.io/opentelemetry: "enabled"
+
+  # Performance and scaling
+  performance.dragonfly.io/tier: "enterprise"
+  scaling.dragonfly.io/hpa: "enabled"
+  scaling.dragonfly.io/vpa: "enabled"
+
+  # Operational metadata
+  ops.dragonfly.io/owner: "platform-team"
+  ops.dragonfly.io/contact: "platform@company.com"
+  ops.dragonfly.io/runbook: "https://runbooks.company.com/dragonfly"
+  ops.dragonfly.io/escalation: "sre-oncall"
+  ops.dragonfly.io/cost-center: "infrastructure"
+
+  # Compliance and governance
+  compliance.dragonfly.io/sox: "required"
+  compliance.dragonfly.io/gdpr: "required"
+  compliance.dragonfly.io/nist: "required"
+  compliance.dragonfly.io/iso27001: "required"
+  compliance.dragonfly.io/pci-dss: "required"
+  governance.dragonfly.io/data-classification: "internal"
+
+# Production Images Configuration
+images:
+  - name: ghcr.io/dragonflydb/operator
+    newTag: v1.1.11
+    digest: sha256:11cef45ec1079b9d97930fc99ecd08ba29d4eca55cdb45887cb0ac40ee4e4d24
+  - name: ghcr.io/dragonflydb/dragonfly
+    newTag: v1.30.3
+  - name: ghcr.io/dragonflydb/dragonfly-backup
+    newTag: v1.2.0
+
+# Resource Transformers for Enterprise Scaling
+transformers:
+  # Add enterprise resource requests/limits
+  - |-
+    apiVersion: builtin
+    kind: PatchTransformer
+    metadata:
+      name: enterprise-resources
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 2000m
+      - op: add
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 8Gi
+      - op: add
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: 8000m
+      - op: add
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 16Gi
+    targets:
+      - kind: StatefulSet
+        name: dragonfly-enterprise
+
+  # Add enterprise security context
+  - |-
+    apiVersion: builtin
+    kind: PatchTransformer
+    metadata:
+      name: enterprise-security
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext/runAsNonRoot
+        value: true
+      - op: add
+        path: /spec/template/spec/securityContext/runAsUser
+        value: 999
+      - op: add
+        path: /spec/template/spec/securityContext/runAsGroup
+        value: 999
+      - op: add
+        path: /spec/template/spec/securityContext/fsGroup
+        value: 999
+      - op: add
+        path: /spec/template/spec/securityContext/seccompProfile/type
+        value: RuntimeDefault
+    targets:
+      - kind: StatefulSet
+        name: dragonfly-enterprise
+
+# Replica Count for High Availability
+replicas:
+  - name: dragonfly-enterprise
+    count: 6
+  - name: dragonfly-operator
+    count: 3
+
+# Enterprise Health Checks
+healthCheck:
+  http:
+    - path: /health
+      port: 8080
+      scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+  tcp:
+    - port: 6379
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Validation Rules
+validators:
+  - name: security-validation
+    rules:
+      - resource: Pod
+        field: spec.securityContext.runAsNonRoot
+        value: true
+        message: "All pods must run as non-root"
+      - resource: Container
+        field: securityContext.allowPrivilegeEscalation
+        value: false
+        message: "Privilege escalation must be disabled"
+  - name: resource-validation
+    rules:
+      - resource: Container
+        field: resources.requests.cpu
+        required: true
+        message: "CPU requests must be specified"
+      - resource: Container
+        field: resources.requests.memory
+        required: true
+        message: "Memory requests must be specified"

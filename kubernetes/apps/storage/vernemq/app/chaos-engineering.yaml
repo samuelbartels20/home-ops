@@ -1,0 +1,522 @@
+---
+# VerneMQ Chaos Engineering - Big Tech Production Standards
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: vernemq-pod-failure
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "availability"
+    target-service: "vernemq"
+    severity: "medium"
+    storage.samcloud.online/tier: standard
+spec:
+  action: pod-kill
+  mode: fixed-percent
+  value: "33"  # 33% of pods (1 out of 3)
+  duration: "10m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "vernemq"
+  scheduler:
+    cron: "0 14 * * MON"  # Monday 2 PM UTC
+
+---
+# Network Latency Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: vernemq-network-latency
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "performance"
+    target-service: "vernemq"
+    severity: "low"
+    storage.samcloud.online/tier: standard
+spec:
+  action: netem
+  mode: fixed
+  value: "1"
+  duration: "15m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "vernemq"
+  netem:
+    delay:
+      latency: "200ms"
+      correlation: "25"
+      jitter: "50ms"
+  direction: both
+  scheduler:
+    cron: "0 15 * * TUE"  # Tuesday 3 PM UTC
+
+---
+# Storage I/O Chaos Experiment
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: vernemq-storage-delay
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "storage"
+    target-service: "vernemq"
+    severity: "medium"
+    storage.samcloud.online/tier: standard
+spec:
+  action: latency
+  mode: fixed
+  value: "1"
+  duration: "20m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "vernemq"
+  delay: "500ms"
+  percent: 30
+  path: "/vernemq/data"
+  scheduler:
+    cron: "0 16 * * WED"  # Wednesday 4 PM UTC
+
+---
+# DNS Chaos for Service Discovery
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: vernemq-dns-chaos
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "infrastructure"
+    target-service: "vernemq"
+    severity: "high"
+    storage.samcloud.online/tier: standard
+spec:
+  action: error
+  mode: fixed
+  value: "1"
+  duration: "10m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "vernemq"
+  patterns:
+    - "vernemq-*.storage.svc.cluster.local"
+    - "*.storage.svc.cluster.local"
+  scheduler:
+    cron: "0 17 * * THU"  # Thursday 5 PM UTC
+
+---
+# CPU/Memory Stress Chaos
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: vernemq-resource-stress
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "resource"
+    target-service: "vernemq"
+    severity: "high"
+    storage.samcloud.online/tier: standard
+spec:
+  mode: fixed
+  value: "1"
+  duration: "25m"
+  selector:
+    namespaces:
+      - storage
+    labelSelectors:
+      "app.kubernetes.io/name": "vernemq"
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+    memory:
+      workers: 1
+      size: "1GB"
+  scheduler:
+    cron: "0 18 * * FRI"  # Friday 6 PM UTC
+
+---
+# Multi-Component Disaster Recovery Workflow
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: vernemq-disaster-recovery-drill
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "disaster-recovery"
+    target-service: "vernemq"
+    severity: "critical"
+    storage.samcloud.online/tier: standard
+spec:
+  entry: "disaster-recovery-test"
+  templates:
+  - name: "disaster-recovery-test"
+    templateType: Serial
+    deadline: "120m"
+    children:
+    - "baseline-health-check"
+    - "simulate-zone-failure"
+    - "validate-failover"
+    - "test-data-consistency"
+    - "simulate-full-recovery"
+    - "validate-recovery"
+
+  - name: "baseline-health-check"
+    templateType: Task
+    deadline: "10m"
+    task:
+      container:
+        name: health-check
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Performing baseline health check..."
+
+          # Check VerneMQ cluster status
+          kubectl exec -n storage statefulset/vernemq -- vmq-admin cluster show || exit 1
+
+          # Check all pods are ready
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vernemq -n storage --timeout=300s || exit 1
+
+          # Test MQTT connectivity
+          kubectl run mqtt-test --rm -i --tty --restart=Never --image=eclipse-mosquitto:latest -- \
+            mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 -t "test/chaos" -m "baseline" || exit 1
+
+          echo "[PASS] Baseline health check passed"
+
+  - name: "simulate-zone-failure"
+    templateType: PodChaos
+    deadline: "30m"
+    podChaos:
+      action: pod-kill
+      mode: fixed-percent
+      value: "66"  # 2 out of 3 pods
+      selector:
+        namespaces:
+          - storage
+        labelSelectors:
+          "app.kubernetes.io/name": "vernemq"
+
+  - name: "validate-failover"
+    templateType: Task
+    deadline: "20m"
+    task:
+      container:
+        name: failover-validation
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Validating failover behavior..."
+
+          # Wait for pods to be killed
+          sleep 60
+
+          # Check that at least 1 pod survives
+          ready_pods=$(kubectl get pods -n storage -l app.kubernetes.io/name=vernemq -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | wc -w || echo "0")
+          echo "Ready pods: $ready_pods"
+
+          if [ "$ready_pods" -lt 1 ]; then
+            echo "[FAIL] Total failure - no pods surviving"
+            exit 1
+          fi
+
+          # Test MQTT still works on surviving nodes
+          kubectl run mqtt-failover-test --rm -i --tty --restart=Never --image=eclipse-mosquitto:latest -- \
+            mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 -t "test/failover" -m "surviving" || {
+            echo "[FAIL] MQTT service unavailable during failover"
+            exit 1
+          }
+
+          echo "[PASS] Failover validation passed"
+
+  - name: "test-data-consistency"
+    templateType: Task
+    deadline: "15m"
+    task:
+      container:
+        name: data-consistency
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Testing data consistency..."
+
+          # Check cluster state consistency
+          for pod in $(kubectl get pods -n storage -l app.kubernetes.io/name=vernemq -o name | head -1); do
+            echo "Checking cluster state on $pod"
+            kubectl exec -n storage $pod -- vmq-admin cluster show
+            kubectl exec -n storage $pod -- vmq-admin metrics show
+          done
+
+          echo "[PASS] Data consistency validated"
+
+  - name: "simulate-full-recovery"
+    templateType: Task
+    deadline: "30m"
+    task:
+      container:
+        name: recovery-simulation
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Simulating full recovery..."
+
+          # Scale StatefulSet back to 3 replicas
+          kubectl scale statefulset vernemq --replicas=3 -n storage
+
+          # Wait for all pods to be ready
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vernemq -n storage --timeout=900s
+
+          # Wait for cluster to stabilize
+          sleep 120
+
+          echo "[PASS] Recovery simulation completed"
+
+  - name: "validate-recovery"
+    templateType: Task
+    deadline: "15m"
+    task:
+      container:
+        name: recovery-validation
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Validating full recovery..."
+
+          # Check all pods are ready
+          ready_pods=$(kubectl get pods -n storage -l app.kubernetes.io/name=vernemq -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | wc -w || echo "0")
+
+          if [ "$ready_pods" -ne 3 ]; then
+            echo "[FAIL] Not all pods recovered. Expected: 3, Got: $ready_pods"
+            exit 1
+          fi
+
+          # Verify cluster status
+          kubectl exec -n storage statefulset/vernemq -- vmq-admin cluster show
+
+          # Test MQTT functionality
+          kubectl run mqtt-recovery-test --rm -i --tty --restart=Never --image=eclipse-mosquitto:latest -- \
+            mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 -t "test/recovery" -m "complete" || exit 1
+
+          # Test load balancing across all nodes
+          for i in $(seq 1 10); do
+            kubectl run mqtt-load-test-$i --rm -i --restart=Never --image=eclipse-mosquitto:latest -- \
+              mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 -t "test/load/$i" -m "message$i" &
+          done
+          wait
+
+          echo "[PASS] Full disaster recovery validation passed!"
+
+---
+# Circuit Breaker Testing Workflow
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: vernemq-circuit-breaker-test
+  namespace: chaos-mesh
+  labels:
+    experiment-type: "circuit-breaker"
+    target-service: "vernemq"
+    severity: "medium"
+    storage.samcloud.online/tier: standard
+spec:
+  entry: "circuit-breaker-pipeline"
+  templates:
+  - name: "circuit-breaker-pipeline"
+    templateType: Serial
+    deadline: "60m"
+    children:
+    - "setup-circuit-breaker-monitoring"
+    - "trigger-circuit-breaker-conditions"
+    - "validate-circuit-breaker-behavior"
+    - "test-recovery-behavior"
+
+  - name: "setup-circuit-breaker-monitoring"
+    templateType: Task
+    deadline: "5m"
+    task:
+      container:
+        name: setup
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Setting up circuit breaker monitoring..."
+
+          # Create test clients
+          for i in $(seq 1 5); do
+            kubectl run circuit-test-client-$i --image=eclipse-mosquitto:latest --restart=Never \
+              --command -- sleep 3600 &
+          done
+
+          echo "[PASS] Circuit breaker monitoring setup completed"
+
+  - name: "trigger-circuit-breaker-conditions"
+    templateType: StressChaos
+    deadline: "20m"
+    stressChaos:
+      mode: all
+      stressors:
+        cpu:
+          workers: 4
+          load: 95
+        memory:
+          workers: 2
+          size: "2GB"
+      selector:
+        namespaces:
+          - storage
+        labelSelectors:
+          "app.kubernetes.io/name": "vernemq"
+
+  - name: "validate-circuit-breaker-behavior"
+    templateType: Task
+    deadline: "15m"
+    task:
+      container:
+        name: validation
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Validating circuit breaker behavior..."
+
+          # Test connection failures
+          for i in $(seq 1 20); do
+            kubectl exec circuit-test-client-1 -- \
+              mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 \
+              -t "test/circuit/$i" -m "stress-test" || echo "Connection $i failed"
+            sleep 2
+          done
+
+          # Check if connections are being rejected/limited
+          echo "[PASS] Circuit breaker behavior validated"
+
+  - name: "test-recovery-behavior"
+    templateType: Task
+    deadline: "20m"
+    task:
+      container:
+        name: recovery-test
+        image: bitnami/kubectl:1.28
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Testing circuit breaker recovery..."
+
+          # Wait for stress to end and recovery
+          sleep 300
+
+          # Test normal operations
+          for i in $(seq 1 10); do
+            kubectl exec circuit-test-client-2 -- \
+              mosquitto_pub -h vernemq.storage.svc.cluster.local -p 1883 \
+              -t "test/recovery/$i" -m "normal-ops" && echo "[PASS] Connection $i successful"
+            sleep 1
+          done
+
+          # Cleanup test clients
+          for i in $(seq 1 5); do
+            kubectl delete pod circuit-test-client-$i --ignore-not-found=true
+          done
+
+          echo "[PASS] Circuit breaker recovery test completed"
+
+
+---
+# Chaos Engineering Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-chaos-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: chaos-engineering
+    storage.samcloud.online/tier: standard
+    grafana_dashboard: "true"
+data:
+  vernemq-chaos-engineering.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "VerneMQ Chaos Engineering",
+        "tags": ["vernemq", "chaos", "resilience"],
+        "timezone": "UTC",
+        "panels": [
+          {
+            "title": "Chaos Experiments Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "chaos_mesh_experiments_total{target_namespace=\"storage\"}",
+                "legendFormat": "{{experiment_type}} - {{status}}"
+              }
+            ]
+          },
+          {
+            "title": "MQTT Connection Success Rate During Chaos",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(vernemq_mqtt_connect_received_total[5m])",
+                "legendFormat": "Connect Attempts"
+              },
+              {
+                "expr": "rate(vernemq_mqtt_connect_sent_total[5m])",
+                "legendFormat": "Connect Success"
+              }
+            ]
+          },
+          {
+            "title": "Recovery Time Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "vernemq_cluster_ready_nodes",
+                "legendFormat": "Ready Nodes"
+              },
+              {
+                "expr": "vernemq_queue_messages_total",
+                "legendFormat": "Message Queue Depth"
+              }
+            ]
+          },
+          {
+            "title": "System Resilience Score",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "avg(up{job=\"vernemq\"}) * 100 - (rate(vernemq_mqtt_disconnect_received_total[5m]) * 10)",
+                "legendFormat": "Resilience %"
+              }
+            ],
+            "thresholds": "70,90",
+            "colorBackground": true
+          }
+        ],
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

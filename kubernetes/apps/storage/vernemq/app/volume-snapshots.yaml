@@ -1,0 +1,267 @@
+---
+# VerneMQ Volume Snapshot Configuration - Enterprise Storage Management
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: vernemq-snapshot-class
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: storage-snapshots
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+driver: openebs.io/local-hostpath
+deletionPolicy: Retain
+parameters:
+  schedule: "*/6h"  # Every 6 hours
+  retain: "168h"    # Retain for 7 days
+
+---
+# VerneMQ Snapshot Schedule CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vernemq-snapshot-schedule
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: storage-snapshots
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: vernemq-snapshot
+            app.kubernetes.io/component: storage-snapshots
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          containers:
+            - name: snapshot-manager
+              image: bitnami/kubectl:1.28
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+
+                  echo "Starting VerneMQ volume snapshot creation at $(date)"
+
+                  # Get all VerneMQ PVCs
+                  PVCs=$(kubectl get pvc -n storage -l app.kubernetes.io/name=vernemq -o jsonpath='{.items[*].metadata.name}')
+
+                  for pvc in $PVCs; do
+                    TIMESTAMP=$(date +%Y%m%d%H%M%S)
+                    SNAPSHOT_NAME="${pvc}-snapshot-${TIMESTAMP}"
+
+                    echo "Creating snapshot ${SNAPSHOT_NAME} for PVC ${pvc}"
+
+                    cat <<EOF | kubectl apply -f -
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: ${SNAPSHOT_NAME}
+                    namespace: storage
+                    labels:
+                      app.kubernetes.io/name: vernemq
+                      app.kubernetes.io/component: storage-snapshots
+                      vernemq.io/pvc-name: ${pvc}
+                      vernemq.io/snapshot-type: scheduled
+                  spec:
+                    volumeSnapshotClassName: vernemq-snapshot-class
+                    source:
+                      persistentVolumeClaimName: ${pvc}
+                  EOF
+
+                    echo "Snapshot ${SNAPSHOT_NAME} created successfully"
+                  done
+
+                  # Clean up old snapshots (older than 7 days)
+                  echo "Cleaning up old snapshots..."
+                  kubectl get volumesnapshot -n storage -l app.kubernetes.io/name=vernemq \
+                    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.creationTimestamp}{"\n"}{end}' | \
+                    while read name timestamp; do
+                      # Convert timestamp to epoch
+                      ts_epoch=$(date -d "$timestamp" +%s 2>/dev/null || echo 0)
+                      current_epoch=$(date +%s)
+                      age_seconds=$((current_epoch - ts_epoch))
+                      age_days=$((age_seconds / 86400))
+
+                      if [ $age_days -gt 7 ]; then
+                        echo "Deleting old snapshot: $name (age: ${age_days} days)"
+                        kubectl delete volumesnapshot -n storage "$name" || true
+                      fi
+                    done
+
+                  echo "Volume snapshot operation completed at $(date)"
+              env:
+                - name: KUBECONFIG
+                  value: /var/run/secrets/kubernetes.io/serviceaccount/token
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          serviceAccountName: vernemq-snapshot
+
+---
+# Service Account for Snapshot Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vernemq-snapshot
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: storage-snapshots
+
+---
+# RBAC for Snapshot Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vernemq-snapshot
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents", "volumesnapshotclasses"]
+    verbs: ["get", "list", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vernemq-snapshot
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: vernemq-snapshot
+    namespace: storage
+roleRef:
+  kind: Role
+  name: vernemq-snapshot
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# VerneMQ Storage Encryption Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-storage-encryption
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: storage-encryption
+    app.kubernetes.io/part-of: messaging-infrastructure
+data:
+  encryption-config.yaml: |
+    storage_encryption:
+      enabled: true
+      encryption_type: "dm-crypt"
+      key_management: "external-secrets"
+      cipher: "aes-xts-plain64"
+      key_size: 512
+
+    backup_encryption:
+      enabled: true
+      encryption_type: "gpg"
+      key_management: "external-secrets"
+      compression: "gzip"
+
+    snapshot_encryption:
+      enabled: true
+      inherit_from_source: true
+      additional_encryption: false
+
+    compliance:
+      encryption_at_rest: "required"
+      encryption_in_transit: "required"
+      key_rotation_interval: "90d"
+      audit_logging: "enabled"
+
+---
+# VerneMQ Storage Performance Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vernemq-storage-monitoring
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: storage-monitoring
+    app.kubernetes.io/part-of: messaging-infrastructure
+spec:
+  groups:
+    - name: vernemq.storage.performance
+      interval: 30s
+      rules:
+        - alert: VerneMQStorageIOLatencyHigh
+          expr: |
+            (
+              rate(node_disk_read_time_seconds_total[5m]) / rate(node_disk_reads_completed_total[5m])
+            ) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            service: vernemq
+            component: storage-performance
+          annotations:
+            summary: "VerneMQ storage I/O latency is high"
+            description: |
+              Storage I/O latency for VerneMQ volumes is {{ $value }}s.
+              This may impact message persistence and retrieval performance.
+
+        - alert: VerneMQStorageIOPSHigh
+          expr: |
+            (
+              rate(node_disk_reads_completed_total[5m]) +
+              rate(node_disk_writes_completed_total[5m])
+            ) > 1000
+          for: 5m
+          labels:
+            severity: warning
+            service: vernemq
+            component: storage-performance
+          annotations:
+            summary: "VerneMQ storage IOPS is high"
+            description: |
+              Storage IOPS for VerneMQ volumes is {{ $value }} operations/sec.
+              Monitor for potential performance bottlenecks.
+
+        - alert: VerneMQSnapshotCreationFailed
+          expr: |
+            increase(vernemq_snapshot_creation_failures_total[1h]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: vernemq
+            component: storage-snapshots
+          annotations:
+            summary: "VerneMQ volume snapshot creation failed"
+            description: |
+              VerneMQ volume snapshot creation has failed {{ $value }} times in the last hour.
+              This may impact backup and disaster recovery capabilities.

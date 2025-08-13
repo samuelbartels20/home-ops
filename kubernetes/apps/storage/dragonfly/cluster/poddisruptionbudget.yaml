@@ -1,0 +1,23 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dragonfly-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+  annotations:
+    # Production availability requirements
+    sre.samcloud.online/availability-slo: "99.9"
+    sre.samcloud.online/max-disruption-time: "5m"
+spec:
+  # Ensure at least 3 replicas remain available during disruptions
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/part-of: dragonfly
+  # Unhealthy pod eviction policy
+  unhealthyPodEvictionPolicy: AlwaysAllow

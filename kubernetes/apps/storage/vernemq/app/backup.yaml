@@ -1,0 +1,332 @@
+---
+# VerneMQ Backup CronJob for Data Protection
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vernemq-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  schedule: "0 2 * * *" # Daily at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: vernemq-backup
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          containers:
+            - name: backup
+              image: alpine:3.19
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  # Install required tools
+                  apk add --no-cache curl jq tar gzip
+
+                  # Backup timestamp
+                  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+                  BACKUP_DIR="/backup/vernemq_${TIMESTAMP}"
+
+                  echo "Starting VerneMQ backup at $(date)"
+                  echo "Backup directory: ${BACKUP_DIR}"
+
+                  mkdir -p "${BACKUP_DIR}"
+
+                  # Export cluster status
+                  echo "Exporting cluster status..."
+                  kubectl get pods -n storage -l app.kubernetes.io/name=vernemq -o json > "${BACKUP_DIR}/cluster_status.json"
+                  kubectl get statefulset vernemq -n storage -o yaml > "${BACKUP_DIR}/statefulset.yaml"
+                  kubectl get svc -n storage -l app.kubernetes.io/name=vernemq -o yaml > "${BACKUP_DIR}/services.yaml"
+
+                  # Export configuration
+                  echo "Exporting configuration..."
+                  kubectl get configmap vernemq-config -n storage -o yaml > "${BACKUP_DIR}/config.yaml"
+                  kubectl get secret vernemq-auth-secret -n storage -o yaml > "${BACKUP_DIR}/auth_secret.yaml"
+
+                  # Export persistent data (requires exec into pods)
+                  echo "Backing up persistent data..."
+                  for pod in $(kubectl get pods -n storage -l app.kubernetes.io/name=vernemq -o jsonpath='{.items[*].metadata.name}'); do
+                    echo "Backing up data from pod: ${pod}"
+                    kubectl exec -n storage "${pod}" -- tar czf - /vernemq/data | gzip > "${BACKUP_DIR}/${pod}_data.tar.gz"
+                  done
+
+                  # Create backup manifest
+                  cat > "${BACKUP_DIR}/manifest.json" << EOF
+                  {
+                    "timestamp": "${TIMESTAMP}",
+                    "backup_type": "full",
+                    "cluster_size": $(kubectl get pods -n storage -l app.kubernetes.io/name=vernemq --no-headers | wc -l),
+                    "backup_files": [
+                      "cluster_status.json",
+                      "statefulset.yaml",
+                      "services.yaml",
+                      "config.yaml",
+                      "auth_secret.yaml"
+                    ]
+                  }
+                  EOF
+
+                  # Compress backup
+                  cd /backup
+                  tar czf "vernemq_backup_${TIMESTAMP}.tar.gz" "vernemq_${TIMESTAMP}"
+
+                  # Clean up old backups (keep last 7 days)
+                  find /backup -name "vernemq_backup_*.tar.gz" -mtime +7 -delete
+
+                  echo "Backup completed successfully at $(date)"
+                  echo "Backup size: $(du -h vernemq_backup_${TIMESTAMP}.tar.gz | cut -f1)"
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backup
+              env:
+                - name: KUBECONFIG
+                  value: /var/run/secrets/kubernetes.io/serviceaccount/token
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: vernemq-backup-storage
+          serviceAccountName: vernemq-backup
+
+---
+# VerneMQ Backup Storage PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vernemq-backup-storage
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: messaging-infrastructure
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Service Account for Backup Operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vernemq-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: backup
+
+---
+# RBAC for Backup Operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vernemq-backup
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vernemq-backup
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: vernemq-backup
+    namespace: storage
+roleRef:
+  kind: Role
+  name: vernemq-backup
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Velero Backup Schedule for VerneMQ
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: vernemq-daily-backup
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: messaging-infrastructure
+spec:
+  schedule: "0 3 * * *" # Daily at 3 AM
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vernemq-velero-backup
+    spec:
+      includedNamespaces:
+        - storage
+      includedResources:
+        - statefulsets
+        - persistentvolumeclaims
+        - persistentvolumes
+        - configmaps
+        - secrets
+        - services
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: vernemq
+      snapshotVolumes: true
+      ttl: 720h # 30 days
+      storageLocation: default
+      volumeSnapshotLocations:
+        - default
+
+---
+# Disaster Recovery Instructions ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-disaster-recovery
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: messaging-infrastructure
+data:
+  recovery-instructions.md: |
+    # VerneMQ Disaster Recovery Guide
+
+    ## Prerequisites
+    - Kubernetes cluster with Velero installed
+    - Access to backup storage location
+    - Sufficient storage capacity for restoration
+
+    ## Recovery Steps
+
+    ### Option 1: Full Cluster Recovery (Velero)
+    ```bash
+    # List available backups
+    velero backup get
+
+    # Restore from latest backup
+    velero restore create vernemq-restore-$(date +%Y%m%d) \
+      --from-backup vernemq-daily-backup-<TIMESTAMP>
+
+    # Monitor restore progress
+    velero restore get
+    velero restore describe vernemq-restore-<TIMESTAMP>
+    ```
+
+    ### Option 2: Partial Recovery (Custom Backup)
+    ```bash
+    # Extract backup
+    tar xzf vernemq_backup_<TIMESTAMP>.tar.gz
+    cd vernemq_<TIMESTAMP>
+
+    # Restore configuration
+    kubectl apply -f config.yaml
+    kubectl apply -f auth_secret.yaml
+
+    # Restore StatefulSet
+    kubectl apply -f statefulset.yaml
+
+    # Restore services
+    kubectl apply -f services.yaml
+
+    # Wait for pods to be ready
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vernemq -n storage --timeout=300s
+
+    # Restore data (if needed)
+    for pod in vernemq-0 vernemq-1 vernemq-2; do
+      kubectl exec -n storage "${pod}" -- rm -rf /vernemq/data/*
+      kubectl cp "${pod}_data.tar.gz" storage/"${pod}":"/tmp/"
+      kubectl exec -n storage "${pod}" -- tar xzf /tmp/"${pod}_data.tar.gz" -C /
+    done
+    ```
+
+    ### Option 3: Point-in-Time Recovery
+    ```bash
+    # Scale down StatefulSet
+    kubectl scale statefulset vernemq -n storage --replicas=0
+
+    # Restore PVCs from snapshot
+    kubectl get volumesnapshot -n storage
+
+    # Restore from specific snapshot
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: vernemq-data-restore
+      namespace: storage
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: openebs-hostpath
+      dataSource:
+        name: <snapshot-name>
+        kind: VolumeSnapshot
+        apiGroup: snapshot.storage.k8s.io
+      resources:
+        requests:
+          storage: 10Gi
+    EOF
+
+    # Scale up StatefulSet
+    kubectl scale statefulset vernemq -n storage --replicas=3
+    ```
+
+    ## Verification Steps
+    1. Check cluster status: `kubectl get pods -n storage -l app.kubernetes.io/name=vernemq`
+    2. Verify connectivity: `kubectl exec -n storage vernemq-0 -- vernemq ping`
+    3. Check cluster formation: `kubectl exec -n storage vernemq-0 -- vernemq cluster show`
+    4. Test MQTT connectivity: Connect test client to mqtt.samcloud.online:1883
+    5. Monitor metrics: Check Grafana dashboards
+
+    ## Troubleshooting
+    - If pods fail to start: Check logs with `kubectl logs -n storage vernemq-0`
+    - If cluster doesn't form: Verify network policies and DNS resolution
+    - If data is corrupted: Consider restoring from earlier backup
+    - If performance issues: Check resource limits and scaling requirements

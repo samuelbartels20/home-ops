@@ -1,0 +1,202 @@
+---
+# Service Level Indicators (SLI) and Service Level Objectives (SLO)
+apiVersion: sloth.slok.dev/v1
+kind: PrometheusServiceLevel
+metadata:
+  name: dragonfly-slo
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    slo.samcloud.online/tier: "critical"
+spec:
+  service: "dragonfly"
+  labels:
+    team: "platform"
+    service: "dragonfly"
+    tier: "storage"
+  slos:
+    # Availability SLO - 99.95% uptime (21.9 minutes downtime per month)
+    - name: "availability"
+      objective: 99.95
+      description: "Dragonfly instances must be available and responding to requests"
+      sli:
+        events:
+          error_query: |
+            sum(rate(dragonfly_connection_errors_total[5m])) +
+            sum(rate(dragonfly_command_errors_total[5m])) +
+            (1 - up{job="dragonfly-metrics"})
+          total_query: |
+            sum(rate(dragonfly_commands_total[5m])) +
+            sum(rate(dragonfly_connections_total[5m]))
+      alerting:
+        name: DragonflyAvailabilitySLO
+        labels:
+          severity: critical
+          category: slo
+        annotations:
+          summary: "Dragonfly availability SLO is being burned"
+          description: "Error budget for availability is being consumed at {{ $value }}x rate"
+        page_alert:
+          labels:
+            severity: critical
+            routing_key: "dragonfly-slo"
+
+    # Latency SLO - 95% of requests under 5ms, 99% under 20ms
+    - name: "latency"
+      objective: 95.0
+      description: "95% of Dragonfly operations must complete within 5ms"
+      sli:
+        events:
+          error_query: |
+            sum(rate(dragonfly_command_duration_seconds_bucket{le="0.005"}[5m]))
+          total_query: |
+            sum(rate(dragonfly_command_duration_seconds_count[5m]))
+      alerting:
+        name: DragonflyLatencySLO
+        labels:
+          severity: warning
+          category: slo
+
+    # Throughput SLO - Handle 100k ops/sec per instance
+    - name: "throughput"
+      objective: 99.0
+      description: "Dragonfly must maintain required throughput capacity"
+      sli:
+        events:
+          error_query: |
+            (
+              sum(rate(dragonfly_commands_total[5m])) <
+              (count(up{job="dragonfly-metrics"} == 1) * 100000)
+            )
+          total_query: "1"
+
+    # Error Rate SLO - Less than 0.1% error rate
+    - name: "error-rate"
+      objective: 99.9
+      description: "Less than 0.1% of requests should result in errors"
+      sli:
+        events:
+          error_query: |
+            sum(rate(dragonfly_command_errors_total[5m]))
+          total_query: |
+            sum(rate(dragonfly_commands_total[5m]))
+
+---
+# Error Budget Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-error-budget-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+data:
+  policy.yaml: |
+    # Error Budget Policy for Dragonfly
+    error_budget_policy:
+      availability:
+        # 99.95% = 21.9 minutes downtime per month
+        monthly_budget_minutes: 21.9
+        burn_rate_thresholds:
+          # If burning at 14.4x rate, alert immediately (1 hour to exhaustion)
+          - burn_rate: 14.4
+            duration: "1h"
+            severity: "critical"
+            action: "page"
+          # If burning at 6x rate, alert in 2 hours
+          - burn_rate: 6.0
+            duration: "2h"
+            severity: "warning"
+            action: "ticket"
+          # If burning at 1x rate, alert in 6 hours
+          - burn_rate: 1.0
+            duration: "6h"
+            severity: "info"
+            action: "notify"
+
+        actions:
+          budget_exhausted:
+            - "Halt all non-critical deployments"
+            - "Focus engineering on reliability"
+            - "Review incident response procedures"
+          budget_low:
+            - "Increase monitoring frequency"
+            - "Review recent changes"
+            - "Schedule reliability review"
+
+---
+# SLO Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-slo-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    grafana_dashboard: "true"
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Dragonfly SLO Dashboard",
+        "tags": ["dragonfly", "slo", "reliability"],
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-24h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "title": "Availability SLO",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "dragonfly_availability_slo_ratio",
+                "legendFormat": "Current SLO"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0.9995},
+                    {"color": "yellow", "value": 0.999},
+                    {"color": "green", "value": 0.9999}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Error Budget Burn Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dragonfly_availability_slo_burn_rate",
+                "legendFormat": "Burn Rate"
+              }
+            ]
+          },
+          {
+            "title": "Latency Distribution",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(dragonfly_command_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.99, rate(dragonfly_command_duration_seconds_bucket[5m]))",
+                "legendFormat": "99th percentile"
+              }
+            ]
+          }
+        ]
+      }
+    }

@@ -1,0 +1,18 @@
+---
+# VerneMQ Pod Disruption Budget for High Availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vernemq-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq

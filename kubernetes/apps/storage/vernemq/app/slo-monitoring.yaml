@@ -1,0 +1,70 @@
+# VerneMQ SLI/SLO Configuration - Service Level Management
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vernemq-slo
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: messaging
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'vernemq_mqtt_.*'
+          action: keep
+  namespaceSelector:
+    matchNames:
+      - storage
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vernemq-slo-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: messaging
+spec:
+  groups:
+    - name: vernemq.sli.rules
+      interval: 30s
+      rules:
+        # VerneMQ Availability SLI
+        - record: vernemq:availability:ratio_rate5m
+          expr: |
+            sum(rate(vernemq_mqtt_publish_received_total{job="vernemq"}[5m]))
+            /
+            (
+              sum(rate(vernemq_mqtt_publish_received_total{job="vernemq"}[5m])) +
+              sum(rate(vernemq_mqtt_publish_error_total{job="vernemq"}[5m]))
+            )
+
+        # VerneMQ Latency SLI
+        - record: vernemq:latency:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(vernemq_mqtt_message_latency_seconds_bucket{job="vernemq"}[5m]))
+              by (le)
+            )
+
+        # VerneMQ Throughput SLI
+        - record: vernemq:throughput:rate5m
+          expr: |
+            sum(rate(vernemq_mqtt_publish_received_total{job="vernemq"}[5m]))
+
+        # VerneMQ Connection Utilization SLI
+        - record: vernemq:connections:utilization_ratio
+          expr: |
+            sum(vernemq_mqtt_connected_clients{job="vernemq"})
+            /
+            sum(vernemq_mqtt_max_connections{job="vernemq"})

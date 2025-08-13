@@ -1,0 +1,351 @@
+---
+# Argo Rollouts for Canary Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: dragonfly-rollout
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    deployment.company.com/strategy: "canary"
+  annotations:
+    rollout.argoproj.io/revision: "1"
+    deployment.company.com/slo-gate: "dragonfly-slo"
+    deployment.company.com/blast-radius: "low"
+spec:
+  # Total replicas across stable and canary
+  replicas: 6
+
+  # Rollout strategy: Blue/Green + Canary
+  strategy:
+    canary:
+      # Start with 1 replica (16% of traffic)
+      canaryReplicas: 1
+
+      # Maximum surge during rollout
+      maxSurge: "25%"
+      maxUnavailable: 1
+
+      # Anti-affinity between canary and stable
+      antiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          preferredWeight: 100
+
+      # Traffic splitting steps
+      steps:
+        # Step 1: Deploy canary, 0% traffic for smoke tests
+        - setWeight: 0
+          pause:
+            duration: "2m"
+
+        # Step 2: Send 10% traffic to canary
+        - setWeight: 10
+          pause:
+            duration: "5m"
+
+        # Step 3: Automated analysis gate
+        - setWeight: 10
+          pause: {}
+
+        # Step 4: Send 25% traffic to canary
+        - setWeight: 25
+          pause:
+            duration: "10m"
+
+        # Step 5: Send 50% traffic to canary
+        - setWeight: 50
+          pause:
+            duration: "10m"
+
+        # Step 6: Send 75% traffic to canary
+        - setWeight: 75
+          pause:
+            duration: "5m"
+
+        # Step 7: Full promotion
+        - setWeight: 100
+
+      # Automated analysis during rollout
+      analysis:
+        templates:
+          - templateName: dragonfly-canary-analysis
+        startingStep: 2
+        args:
+          - name: service-name
+            value: dragonfly
+          - name: canary-hash
+            valueFrom:
+              podTemplateHashValue: Latest
+
+      # Traffic management via Istio
+      trafficRouting:
+        istio:
+          virtualService:
+            name: dragonfly-vsvc
+            routes:
+              - primary
+            tlsRoutes:
+              - port: 6380
+          destinationRule:
+            name: dragonfly-dest
+            canarySubsetName: canary
+            stableSubsetName: stable
+
+      # Automatic rollback triggers
+      abortConditions:
+        - analysisRunFailed: true
+        - pauseConditions:
+            - conditionType: "CanaryRolloutPaused"
+              status: "True"
+              reason: "ErrorBudgetExhausted"
+
+  # Pod template
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/part-of: dragonfly
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/part-of: dragonfly
+        version: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "6379"
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: dragonfly-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dragonfly
+          image: ghcr.io/dragonflydb/dragonfly:v1.30.3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 6379
+              name: dragonfly
+            - containerPort: 6380
+              name: dragonfly-tls
+            - containerPort: 6378
+              name: admin
+          env:
+            - name: DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dragonfly-auth
+                  key: DRAGONFLY_PASSWORD
+          resources:
+            requests:
+              cpu: "2000m"
+              memory: "8Gi"
+            limits:
+              cpu: "8000m"
+              memory: "16Gi"
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(DRAGONFLY_PASSWORD)
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(DRAGONFLY_PASSWORD)
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 30
+
+---
+# Analysis Template for Canary Validation
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: dragonfly-canary-analysis
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  args:
+    - name: service-name
+    - name: canary-hash
+
+  metrics:
+    # Success Rate Analysis
+    - name: success-rate
+      interval: 60s
+      count: 5
+      successCondition: result[0] >= 0.99
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.observability.svc.cluster.local:9090
+          query: |
+            sum(rate(dragonfly_commands_total{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"}[2m])) -
+            sum(rate(dragonfly_command_errors_total{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"}[2m])) /
+            sum(rate(dragonfly_commands_total{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"}[2m]))
+
+    # Latency Analysis
+    - name: avg-latency
+      interval: 60s
+      count: 5
+      successCondition: result[0] <= 0.005
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.observability.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.95,
+              sum(rate(dragonfly_command_duration_seconds_bucket{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"}[2m])) by (le)
+            )
+
+    # Memory Usage Analysis
+    - name: memory-usage
+      interval: 60s
+      count: 5
+      successCondition: result[0] <= 0.85
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus.observability.svc.cluster.local:9090
+          query: |
+            max(dragonfly_memory_used_bytes{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"} /
+                dragonfly_memory_max_bytes{pod=~"{{args.service-name}}-{{args.canary-hash}}-.*"})
+
+    # Error Budget Burn Rate
+    - name: error-budget-burn
+      interval: 120s
+      count: 3
+      successCondition: result[0] <= 2.0
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: http://prometheus.observability.svc.cluster.local:9090
+          query: |
+            dragonfly_availability_slo_burn_rate{service="{{args.service-name}}"}
+
+---
+# Istio Virtual Service for Traffic Splitting
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dragonfly-vsvc
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  hosts:
+    - dragonfly.storage.svc.cluster.local
+  tcp:
+    - match:
+        - port: 6379
+      route:
+        # Traffic split managed by Argo Rollouts
+        - destination:
+            host: dragonfly.storage.svc.cluster.local
+            subset: stable
+          weight: 100
+        - destination:
+            host: dragonfly.storage.svc.cluster.local
+            subset: canary
+          weight: 0
+    - match:
+        - port: 6380
+      route:
+        - destination:
+            host: dragonfly.storage.svc.cluster.local
+            subset: stable
+          weight: 100
+        - destination:
+            host: dragonfly.storage.svc.cluster.local
+            subset: canary
+          weight: 0
+
+---
+# Istio Destination Rule for Subset Definitions
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: dragonfly-dest
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  host: dragonfly.storage.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 1000
+        connectTimeout: 30s
+        keepAlive:
+          time: 7200s
+          interval: 75s
+    loadBalancer:
+      consistentHash:
+        useSourceIp: true
+  subsets:
+    - name: stable
+      labels:
+        rollouts-pod-template-hash-stable: ""
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 800
+    - name: canary
+      labels:
+        rollouts-pod-template-hash-canary: ""
+      trafficPolicy:
+        connectionPool:
+          tcp:
+            maxConnections: 200
+
+---
+# Circuit Breaker Configuration
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: dragonfly-circuit-breaker
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  host: dragonfly.storage.svc.cluster.local
+  trafficPolicy:
+    outlierDetection:
+      # Remove unhealthy instances
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+    connectionPool:
+      tcp:
+        maxConnections: 1000
+        connectTimeout: 10s
+        keepAlive:
+          time: 600s
+          interval: 60s
+      http:
+        http1MaxPendingRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 3
+        idleTimeout: 90s
+        h2UpgradePolicy: UPGRADE

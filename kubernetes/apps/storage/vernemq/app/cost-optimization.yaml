@@ -1,0 +1,245 @@
+---
+# VerneMQ Cost Optimization & Resource Governance - Big Tech Standards
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: vernemq-resource-quota
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+spec:
+  hard:
+    # Compute Resources
+    requests.cpu: "6"      # Total CPU requests
+    requests.memory: "12Gi" # Total memory requests
+    limits.cpu: "12"       # Total CPU limits
+    limits.memory: "24Gi"  # Total memory limits
+
+    # Storage Resources
+    requests.storage: "300Gi"    # Total storage requests
+    persistentvolumeclaims: "6"  # Max PVCs (3 replicas + snapshots)
+
+    # Object counts
+    pods: "10"                   # Max pods (includes chaos testing)
+    services: "5"
+    configmaps: "20"
+    secrets: "10"
+
+    # Networking
+    services.nodeports: "0"      # Disable NodePort for cost optimization
+    services.loadbalancers: "2"  # Limit LoadBalancers
+
+---
+# Limit Range for Cost Control
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: vernemq-limits
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+spec:
+  limits:
+    # Container limits
+    - type: Container
+      default:  # Default limits
+        cpu: "2"
+        memory: "4Gi"
+        ephemeral-storage: "10Gi"
+      defaultRequest:  # Default requests
+        cpu: "500m"
+        memory: "1Gi"
+        ephemeral-storage: "1Gi"
+      max:  # Maximum allowed
+        cpu: "4"
+        memory: "8Gi"
+        ephemeral-storage: "50Gi"
+      min:  # Minimum required
+        cpu: "100m"
+        memory: "256Mi"
+        ephemeral-storage: "100Mi"
+
+    # Pod limits
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: "8Gi"
+        ephemeral-storage: "50Gi"
+      min:
+        cpu: "100m"
+        memory: "256Mi"
+        ephemeral-storage: "100Mi"
+
+    # PVC limits
+    - type: PersistentVolumeClaim
+      max:
+        storage: "100Gi"
+      min:
+        storage: "10Gi"
+
+---
+# VPA for Right-sizing
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: vernemq-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: vernemq
+  updatePolicy:
+    updateMode: "Off"  # Recommendation only, manual updates
+  resourcePolicy:
+    containerPolicies:
+      - containerName: vernemq
+        maxAllowed:
+          cpu: "4"
+          memory: "8Gi"
+        minAllowed:
+          cpu: "500m"
+          memory: "1Gi"
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+
+---
+# Cost Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-cost-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+    grafana_dashboard: "true"
+data:
+  vernemq-cost-optimization.json: |
+    {
+      "dashboard": {
+        "title": "VerneMQ Cost Optimization",
+        "tags": ["vernemq", "cost", "finops"],
+        "timezone": "UTC",
+        "panels": [
+          {
+            "title": "Monthly Cost Projection",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"storage\", pod=~\"vernemq-.*\"}[5m])) * 0.048 * 730",
+                "legendFormat": "Monthly CPU Cost ($)"
+              }
+            ],
+            "format": "currencyUSD",
+            "valueName": "current"
+          },
+          {
+            "title": "Resource Utilization vs Requests",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{namespace=\"storage\", pod=~\"vernemq-.*\"}[5m])",
+                "legendFormat": "CPU Usage"
+              },
+              {
+                "expr": "kube_pod_container_resource_requests{namespace=\"storage\", pod=~\"vernemq-.*\", resource=\"cpu\"}",
+                "legendFormat": "CPU Requests"
+              }
+            ]
+          },
+          {
+            "title": "Storage Cost Tracking",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kubelet_volume_stats_used_bytes{namespace=\"storage\", persistentvolumeclaim=~\"data-vernemq-.*\"} * 0.10 / 1073741824",
+                "legendFormat": "Storage Cost ($/GB/month)"
+              }
+            ]
+          },
+          {
+            "title": "Cost Efficiency Score",
+            "type": "gauge",
+            "targets": [
+              {
+                "expr": "(rate(vernemq_mqtt_messages_received_total[5m]) / (rate(container_cpu_usage_seconds_total{namespace=\"storage\", pod=~\"vernemq-.*\"}[5m]) * 100)) * 100",
+                "legendFormat": "Messages per CPU Cost"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "min": 0,
+                "max": 1000,
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 100},
+                    {"color": "green", "value": 500}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Right-sizing Recommendations",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_pod_container_resource_requests{namespace=\"storage\", pod=~\"vernemq-.*\", resource=\"cpu\"} - rate(container_cpu_usage_seconds_total{namespace=\"storage\", pod=~\"vernemq-.*\"}[5m])",
+                "format": "table",
+                "legendFormat": "CPU Overprovisioning"
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+---
+# Budget Alert Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-budget-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+data:
+  budget-config.yaml: |
+    # VerneMQ Budget Configuration
+    monthly_budget: 500  # USD
+    cost_center: "mqtt-infrastructure"
+
+    # Alert thresholds
+    alerts:
+      - threshold: 0.5   # 50% of budget
+        severity: info
+        action: notify
+      - threshold: 0.8   # 80% of budget
+        severity: warning
+        action: notify
+      - threshold: 0.95  # 95% of budget
+        severity: critical
+        action: "scale_down"
+
+    # Cost optimization policies
+    policies:
+      auto_scale_down_threshold: 0.2  # Scale down if utilization < 20%
+      max_idle_time: 3600             # 1 hour idle before scaling consideration
+      required_cost_labels:
+        - "cost-center"
+        - "environment"
+        - "team"

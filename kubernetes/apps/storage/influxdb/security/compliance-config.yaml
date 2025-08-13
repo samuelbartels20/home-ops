@@ -1,0 +1,133 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-compliance-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: compliance
+data:
+  compliance.yaml: |
+    # Compliance Framework Settings
+    compliance:
+      # Data Privacy
+      data_privacy:
+        enabled: true
+        pii_detection:
+          enabled: true
+          patterns:
+            - type: credit_card
+              regex: '\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}'
+            - type: email
+              regex: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            - type: ip_address
+              regex: '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+        data_masking:
+          enabled: true
+          rules:
+            - fields: ["email", "phone", "address"]
+              method: "hash"
+            - fields: ["credit_card", "ssn"]
+              method: "redact"
+        data_encryption:
+          at_rest: true
+          in_transit: true
+          key_rotation_interval: 90d
+
+      # Regulatory Compliance
+      regulatory:
+        gdpr:
+          enabled: true
+          data_retention:
+            personal_data: 30d
+            consent_records: 365d
+          right_to_forget: true
+          data_portability: true
+        hipaa:
+          enabled: true
+          audit_trail: true
+          encryption_required: true
+        sox:
+          enabled: true
+          change_tracking: true
+          access_controls: true
+
+    # Audit Configuration
+    audit:
+      enabled: true
+      log_format: json
+      retention_period: 365d
+      events:
+        - category: authentication
+          actions: ["login", "logout", "failed_login"]
+        - category: authorization
+          actions: ["permission_grant", "permission_revoke"]
+        - category: data_access
+          actions: ["read", "write", "delete"]
+        - category: configuration
+          actions: ["setting_change", "policy_update"]
+        - category: administration
+          actions: ["user_create", "user_modify", "user_delete"]
+      destinations:
+        - type: file
+          path: /var/log/influxdb/audit.log
+          format: json
+        - type: syslog
+          facility: local0
+          tag: influxdb-audit
+        - type: http
+          endpoint: https://audit-collector.samcloud.online/ingest
+          headers:
+            Content-Type: application/json
+            X-Audit-Source: influxdb
+
+    # Data Governance
+    governance:
+      data_classification:
+        enabled: true
+        levels:
+          - name: public
+            description: "Non-sensitive data"
+            retention: 30d
+          - name: internal
+            description: "Company internal data"
+            retention: 90d
+          - name: confidential
+            description: "Sensitive business data"
+            retention: 365d
+          - name: restricted
+            description: "Highly sensitive data"
+            retention: 730d
+      data_lineage:
+        enabled: true
+        tracking_level: detailed
+        metadata_retention: 365d
+      access_reviews:
+        enabled: true
+        frequency: 90d
+        automated_reminders: true
+
+    # Security Controls
+    security_controls:
+      password_policy:
+        min_length: 12
+        require_uppercase: true
+        require_lowercase: true
+        require_numbers: true
+        require_special: true
+        max_age: 90d
+        history: 12
+      session_policy:
+        max_duration: 8h
+        idle_timeout: 30m
+        concurrent_sessions: 3
+      api_security:
+        rate_limiting:
+          enabled: true
+          requests_per_second: 100
+          burst: 200
+        jwt:
+          enabled: true
+          expiration: 1h
+          refresh_token_expiration: 24h

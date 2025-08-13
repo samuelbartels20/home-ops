@@ -1,0 +1,412 @@
+---
+# Chaos Engineering with Litmus
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: dragonfly-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    chaos.company.com/experiment-suite: "resilience"
+  annotations:
+    chaos.alpha.kubernetes.io/engine-state: "active"
+    chaos.company.com/blast-radius: "controlled"
+    chaos.company.com/approval-required: "false"
+spec:
+  # Target application
+  appinfo:
+    appns: storage
+    applabel: "app.kubernetes.io/name=dragonfly"
+    appkind: deployment
+
+  # Chaos service account
+  chaosServiceAccount: dragonfly-chaos-sa
+
+  # Monitoring during chaos
+  engineState: 'active'
+  auxiliaryAppInfo: ''
+
+  # Chaos experiments
+  experiments:
+    # Pod Failure Chaos
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            # Kill 1 pod every 30 seconds for 5 minutes
+            - name: TOTAL_CHAOS_DURATION
+              value: '300'
+            - name: CHAOS_INTERVAL
+              value: '30'
+            - name: FORCE
+              value: 'false'
+            # Ensure minimum replicas remain
+            - name: PODS_AFFECTED_PERC
+              value: '16'  # Max 1 out of 6 pods
+        probe:
+          # Service availability probe during chaos
+          - name: "service-availability-probe"
+            type: "httpProbe"
+            mode: "Continuous"
+            httpProbe/inputs:
+              url: "http://dragonfly.storage.svc.cluster.local:6379"
+              insecureSkipTLS: false
+              method:
+                get:
+                  criteria: "=="
+                  responseCode: "200"
+            runProperties:
+              probeTimeout: 5
+              retry: 3
+              interval: 10
+              probePollingInterval: 2
+              initialDelaySeconds: 10
+              stopOnFailure: false
+
+    # Network Chaos - Partition
+    - name: pod-network-partition
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '120'
+            - name: NETWORK_INTERFACE
+              value: 'eth0'
+            - name: NETWORK_PACKET_LOSS_PERCENTAGE
+              value: '100'
+            - name: DESTINATION_IPS
+              value: ''  # Will be auto-discovered
+            - name: PODS_AFFECTED_PERC
+              value: '16'
+        probe:
+          # Cluster connectivity probe
+          - name: "cluster-connectivity-probe"
+            type: "cmdProbe"
+            mode: "Edge"
+            cmdProbe/inputs:
+              command: "redis-cli -h dragonfly.storage.svc.cluster.local -p 6379 ping"
+              expectedResult: "PONG"
+              source:
+                image: "redis:7-alpine"
+            runProperties:
+              probeTimeout: 10
+              retry: 5
+              interval: 5
+
+    # Memory Stress Chaos
+    - name: pod-memory-hog
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '180'
+            - name: MEMORY_CONSUMPTION
+              value: '2048'  # 2GB additional memory stress
+            - name: PODS_AFFECTED_PERC
+              value: '16'
+        probe:
+          # Memory usage probe
+          - name: "memory-usage-probe"
+            type: "promProbe"
+            mode: "Continuous"
+            promProbe/inputs:
+              endpoint: "http://prometheus.observability.svc.cluster.local:9090"
+              query: "dragonfly_memory_used_bytes / dragonfly_memory_max_bytes"
+              comparator:
+                type: "float"
+                criteria: "<"
+                value: "0.9"
+            runProperties:
+              probeTimeout: 5
+              retry: 3
+              interval: 15
+
+    # CPU Stress Chaos
+    - name: pod-cpu-hog
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '120'
+            - name: CPU_CORES
+              value: '2'
+            - name: PODS_AFFECTED_PERC
+              value: '16'
+        probe:
+          # CPU usage probe
+          - name: "cpu-usage-probe"
+            type: "promProbe"
+            mode: "Continuous"
+            promProbe/inputs:
+              endpoint: "http://prometheus.observability.svc.cluster.local:9090"
+              query: "rate(process_cpu_seconds_total{job='dragonfly-enterprise-metrics'}[5m]) * 100"
+              comparator:
+                type: "float"
+                criteria: "<"
+                value: "90"
+            runProperties:
+              probeTimeout: 5
+              retry: 3
+              interval: 15
+
+---
+# Chaos Schedule for Automated Resilience Testing
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosSchedule
+metadata:
+  name: dragonfly-chaos-schedule
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  # Run chaos experiments during business hours (controlled)
+  schedule:
+    now: false
+    repeat:
+      timeRange:
+        startTime: "02:00"  # 2 AM UTC
+        endTime: "04:00"    # 4 AM UTC
+      workDays:
+        includedDays: "Mon,Tue,Wed,Thu,Fri"
+      minChaosInterval: "8h"
+
+  # Engine template
+  engineTemplateSpec:
+    appinfo:
+      appns: storage
+      applabel: "app.kubernetes.io/name=dragonfly"
+      appkind: deployment
+    chaosServiceAccount: dragonfly-chaos-sa
+    engineState: 'active'
+    experiments:
+      - name: pod-delete
+        spec:
+          components:
+            env:
+              - name: TOTAL_CHAOS_DURATION
+                value: '60'
+              - name: PODS_AFFECTED_PERC
+                value: '16'
+
+  # Chaos history and concurrency
+  concurrencyPolicy: Forbid
+  historyLimit: 10
+
+---
+# Chaos Experiments Custom Resources
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: dragonfly-custom-chaos
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    name: dragonfly-custom-chaos
+spec:
+  definition:
+    scope: Namespaced
+    permissions:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["create","delete","get","list","patch","update","deletecollection"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create","get","list","patch","update"]
+      - apiGroups: [""]
+        resources: ["configmaps"]
+        verbs: ["get","list"]
+      - apiGroups: [""]
+        resources: ["pods/log"]
+        verbs: ["get","list","watch"]
+      - apiGroups: [""]
+        resources: ["pods/exec"]
+        verbs: ["get","list","create"]
+      - apiGroups: ["apps"]
+        resources: ["deployments","statefulsets","replicasets","daemonsets"]
+        verbs: ["list","get"]
+      - apiGroups: [""]
+        resources: ["services"]
+        verbs: ["get","list"]
+    image: "litmuschaos/go-runner:latest"
+    imagePullPolicy: Always
+    args:
+      - -c
+      - ./experiments -name dragonfly-custom-chaos
+    command:
+      - /bin/bash
+    env:
+      - name: TOTAL_CHAOS_DURATION
+        value: '300'
+      - name: RAMP_TIME
+        value: ''
+      - name: PODS_AFFECTED_PERC
+        value: '16'
+      - name: LIB
+        value: 'litmus'
+      - name: LIB_IMAGE
+        value: 'litmuschaos/go-runner:latest'
+    labels:
+      name: dragonfly-custom-chaos
+      app.kubernetes.io/part-of: litmus
+
+---
+# Game Day Runbook ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-game-day-runbook
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    chaos.company.com/runbook: "game-day"
+data:
+  game-day-scenarios.yaml: |
+    # Dragonfly Game Day Scenarios
+    scenarios:
+      - name: "single-pod-failure"
+        description: "Simulate single pod failure during peak traffic"
+        duration: "10m"
+        blast_radius: "low"
+        expected_behavior:
+          - "Traffic should be redistributed to remaining pods"
+          - "No data loss should occur"
+          - "Recovery should complete within 30 seconds"
+        validation_queries:
+          - "dragonfly_connected_clients should remain stable"
+          - "dragonfly_commands_total rate should not drop significantly"
+
+      - name: "network-partition"
+        description: "Simulate network partition between replicas"
+        duration: "5m"
+        blast_radius: "medium"
+        expected_behavior:
+          - "Cluster should maintain read availability"
+          - "Write operations should queue until partition heals"
+          - "Automatic recovery after partition resolution"
+
+      - name: "memory-pressure"
+        description: "Simulate memory pressure on database nodes"
+        duration: "8m"
+        blast_radius: "low"
+        expected_behavior:
+          - "Memory eviction policies should activate"
+          - "Performance may degrade but service remains available"
+          - "No out-of-memory kills should occur"
+
+      - name: "cascading-failure"
+        description: "Simulate cascading failure scenario"
+        duration: "15m"
+        blast_radius: "high"
+        expected_behavior:
+          - "Circuit breakers should activate"
+          - "Graceful degradation should occur"
+          - "Automatic recovery within SLO bounds"
+
+  incident-response.md: |
+    # Incident Response Playbook
+
+    ## Severity Levels
+    - **SEV1**: Service completely down, data loss risk
+    - **SEV2**: Significant degradation, SLO breach
+    - **SEV3**: Minor issues, monitoring alerts
+
+    ## Response Actions
+
+    ### SEV1 Response (< 5 minutes)
+    1. Page on-call engineer immediately
+    2. Start incident bridge
+    3. Check error budget status
+    4. Implement immediate mitigation
+
+    ### SEV2 Response (< 15 minutes)
+    1. Alert engineering team
+    2. Assess blast radius
+    3. Check canary deployment status
+    4. Consider rollback if recent deployment
+
+    ### Recovery Procedures
+    1. Validate service health
+    2. Check data consistency
+    3. Update incident timeline
+    4. Schedule post-mortem
+
+    ## Escalation Matrix
+    - Primary: SRE On-call
+    - Secondary: Platform Team Lead
+    - Executive: CTO (for SEV1 > 30min)
+
+---
+# Resilience Testing Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-resilience-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    grafana_dashboard: "true"
+data:
+  resilience-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Dragonfly - Resilience Testing",
+        "tags": ["dragonfly", "chaos", "resilience", "sre"],
+        "timezone": "browser",
+        "refresh": "10s",
+        "panels": [
+          {
+            "title": "Active Chaos Experiments",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "chaos_experiment_runs_total{namespace=\"storage\"}",
+                "legendFormat": "Active Experiments"
+              }
+            ]
+          },
+          {
+            "title": "Service Availability During Chaos",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "up{job=\"dragonfly-metrics\"}",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "min": 0,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "title": "Error Budget Burn During Chaos",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dragonfly_availability_slo_burn_rate",
+                "legendFormat": "Burn Rate"
+              }
+            ]
+          },
+          {
+            "title": "Chaos Experiment Results",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "chaos_experiment_verdict",
+                "format": "table",
+                "instant": true
+              }
+            ]
+          }
+        ]
+      }
+    }

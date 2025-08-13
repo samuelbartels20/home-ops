@@ -1,0 +1,27 @@
+# VerneMQ Prometheus Rules and Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vernemq-alerts
+  namespace: storage
+spec:
+  groups:
+    - name: vernemq.rules
+      rules:
+        - alert: VerneMQClusterQuorum
+          expr: count(up{job="vernemq"} == 1) < 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "VerneMQ cluster quorum lost"
+            description: "Less than 2 VerneMQ nodes are running, cluster quorum is lost"
+
+        - alert: VerneMQNodeDown
+          expr: up{job="vernemq"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "VerneMQ node is down"
+            description: "VerneMQ node has been down for more than 5 minutes"

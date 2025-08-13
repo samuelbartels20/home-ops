@@ -1,0 +1,50 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  - helmrelease.yaml
+  - pvc.yaml
+  - service.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - monitoring.yaml
+  - prometheus-operator-rules.yaml
+
+commonLabels:
+  app.kubernetes.io/name: influxdb
+  app.kubernetes.io/part-of: storage-infrastructure
+  app.kubernetes.io/component: time-series-database
+  app.kubernetes.io/version: "2.7.11"
+
+configMapGenerator:
+  - name: influxdb-env
+    literals:
+      - CLUSTER_DOMAIN=cluster.local
+      - OIDC_CLIENT_ID=influxdb
+  - name: influxdb-audit-policy
+    files:
+      - audit.yaml=security/audit-policy.yaml
+  - name: influxdb-dashboard
+    files:
+      - dashboard.json=monitoring/grafana-dashboard.json
+  - name: influxdb-compliance
+    files:
+      - compliance.yaml=security/compliance-config.yaml
+
+secretGenerator:
+  - name: influxdb-secrets
+    files:
+      - secrets/oidc-client-secret
+      - secrets/tls.crt
+      - secrets/tls.key
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+patches:
+  - path: patches/resources.yaml
+    target:
+      kind: HelmRelease

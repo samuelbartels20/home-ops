@@ -1,0 +1,177 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: influxdb-alerts
+  namespace: storage
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+    - name: influxdb.rules
+      rules:
+        # High Availability Alerts
+        - alert: InfluxDBHighAvailabilityCompromised
+          expr: |
+            sum(up{app_kubernetes_io_name="influxdb"}) < 2
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+          annotations:
+            summary: "InfluxDB high availability is compromised"
+            description: "Less than 2 InfluxDB instances are running for 5 minutes"
+
+        # Resource Usage Alerts
+        - alert: InfluxDBHighMemoryUsage
+          expr: |
+            (container_memory_usage_bytes{container="influxdb"} / container_spec_memory_limit_bytes{container="influxdb"} * 100) > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB high memory usage (> 85%)
+            description: "InfluxDB instance {{ $labels.pod }} is using {{ $value }}% of its memory limit"
+
+        - alert: InfluxDBHighCPUUsage
+          expr: |
+            (rate(container_cpu_usage_seconds_total{container="influxdb"}[5m]) / container_spec_cpu_quota{container="influxdb"} * 100) > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB high CPU usage (> 85%)
+            description: "InfluxDB instance {{ $labels.pod }} is using {{ $value }}% of its CPU limit"
+
+        # Storage Alerts
+        - alert: InfluxDBHighDiskUsage
+          expr: |
+            (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"influxdb-.*"} / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"influxdb-.*"} * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB high disk usage (> 80%)
+            description: "InfluxDB volume {{ $labels.persistentvolumeclaim }} is {{ $value }}% full"
+
+        # Performance Alerts
+        - alert: InfluxDBHighQueryDuration
+          expr: |
+            rate(influxdb_http_request_duration_seconds_sum{handler="query"}[5m])
+            /
+            rate(influxdb_http_request_duration_seconds_count{handler="query"}[5m]) > 10
+          for: 15m
+          labels:
+            severity: warning
+            category: performance
+          annotations:
+            summary: "InfluxDB high query duration"
+            description: "InfluxDB queries are taking more than 10 seconds on average for 15 minutes"
+
+        - alert: InfluxDBHighWriteErrors
+          expr: |
+            rate(influxdb_write_error_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: errors
+          annotations:
+            summary: InfluxDB write errors detected
+            description: "InfluxDB instance {{ $labels.pod }} is experiencing write errors"
+
+        - alert: InfluxDBQueryErrors
+          expr: |
+            rate(influxdb_query_error_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB query errors detected
+            description: "InfluxDB instance {{ $labels.pod }} is experiencing query errors"
+
+        # Backup Alerts
+        - alert: InfluxDBBackupFailed
+          expr: |
+            max_over_time(kube_job_status_failed{job_name=~"influxdb-backup.*"}[1d]) > 0
+          for: 1h
+          labels:
+            severity: critical
+            category: backup
+          annotations:
+            summary: "InfluxDB backup failed"
+            description: "The last InfluxDB backup job has failed"
+
+        - alert: InfluxDBNoRecentBackup
+          expr: |
+            time() - max(kube_job_completion_time{job_name=~"influxdb-backup.*"}) > 86400
+          for: 1h
+          labels:
+            severity: warning
+            category: backup
+          annotations:
+            summary: "No recent InfluxDB backup"
+            description: "No successful InfluxDB backup in the last 24 hours"
+
+        - alert: InfluxDBHighCardinality
+          expr: |
+            influxdb_storage_series_total > 10000000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB high cardinality detected
+            description: "InfluxDB instance {{ $labels.pod }} has {{ $value }} series"
+
+        - alert: InfluxDBCompactionLag
+          expr: |
+            influxdb_compaction_queue_size > 100
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB compaction queue growing
+            description: "InfluxDB instance {{ $labels.pod }} has {{ $value }} files waiting for compaction"
+
+        - alert: InfluxDBDown
+          expr: |
+            up{job="influxdb"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: InfluxDB instance down
+            description: "InfluxDB instance {{ $labels.pod }} has been down for more than 5 minutes"
+
+        - alert: InfluxDBReplicationLag
+          expr: |
+            max(influxdb_replication_lag_seconds) by (pod) > 300
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: InfluxDB replication lag detected
+            description: "InfluxDB instance {{ $labels.pod }} has a replication lag of {{ $value }} seconds"
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: influxdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  endpoints:
+    - port: http
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'go_.*|process_.*'
+          action: drop 

@@ -1,0 +1,138 @@
+---
+# Cost Monitoring ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vernemq-cost-monitoring
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  endpoints:
+    - port: metrics
+      interval: 60s
+      path: /metrics
+      relabelings:
+        # Add cost labels
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          targetLabel: cost_center
+          replacement: "mqtt-infrastructure"
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+          targetLabel: service_tier
+          replacement: "production"
+
+---
+# Cost Optimization Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vernemq-cost-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: cost-optimization
+    storage.samcloud.online/tier: standard
+spec:
+  groups:
+    - name: vernemq.cost-optimization
+      interval: 5m
+      rules:
+        - alert: VerneMQHighCPUCost
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{namespace="storage", pod=~"vernemq-.*"}[5m]) *
+              kube_node_status_allocatable{resource="cpu", unit="core"}
+            ) /
+            kube_node_status_allocatable{resource="cpu", unit="core"} > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VerneMQ high CPU cost detected"
+            description: |
+              VerneMQ pod {{ $labels.pod }} is consuming {{ $value | humanizePercentage }}
+              of node CPU capacity, leading to high compute costs.
+            runbook_url: "https://runbooks.company.io/cost-optimization/high-cpu"
+            cost_impact: "High"
+
+        - alert: VerneMQHighMemoryCost
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="storage", pod=~"vernemq-.*"} /
+              kube_node_status_allocatable{resource="memory", unit="byte"}
+            ) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VerneMQ high memory cost detected"
+            description: |
+              VerneMQ pod {{ $labels.pod }} is consuming {{ $value | humanizePercentage }}
+              of node memory capacity, leading to high memory costs.
+            cost_impact: "High"
+
+        - alert: VerneMQUnderutilizedResources
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{namespace="storage", pod=~"vernemq-.*"}[5m]) /
+              kube_pod_container_resource_requests{namespace="storage", pod=~"vernemq-.*", resource="cpu"}
+            ) < 0.2
+          for: 30m
+          labels:
+            severity: info
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VerneMQ resources underutilized"
+            description: |
+              VerneMQ pod {{ $labels.pod }} CPU utilization is {{ $value | humanizePercentage }}
+              of requested resources. Consider right-sizing to reduce costs.
+            cost_impact: "Medium"
+            recommendation: "Reduce CPU requests or implement HPA"
+
+        - alert: VerneMQStorageCostAlert
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes{namespace="storage", persistentvolumeclaim=~"data-vernemq-.*"} /
+              kubelet_volume_stats_capacity_bytes{namespace="storage", persistentvolumeclaim=~"data-vernemq-.*"}
+            ) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VerneMQ storage cost optimization needed"
+            description: |
+              VerneMQ PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full.
+              High storage utilization leads to increased costs.
+            cost_impact: "Medium"
+
+        - alert: VerneMQIdlePods
+          expr: |
+            (
+              time() - kube_pod_start_time{namespace="storage", pod=~"vernemq-.*"}
+            ) > 86400 and
+            (
+              rate(vernemq_mqtt_connect_received_total[1h]) == 0
+            )
+          for: 1h
+          labels:
+            severity: info
+            component: cost-optimization
+            team: platform
+          annotations:
+            summary: "VerneMQ pod appears idle"
+            description: |
+              VerneMQ pod {{ $labels.pod }} has been running for over 24 hours
+              with no MQTT connections. Consider scaling down if not needed.
+            cost_impact: "Low" 

@@ -1,0 +1,137 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: influxdb-tsm-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+spec:
+  groups:
+    - name: influxdb.tsm.rules
+      rules:
+        - alert: InfluxDBTSMCompactionBacklog
+          expr: |
+            influxdb_tsm_compaction_queue > 20
+          for: 15m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "TSM compaction queue is building up"
+            description: "TSM compaction queue has {{ $value }} files waiting."
+
+        - alert: InfluxDBTSMCacheMemoryHigh
+          expr: |
+            influxdb_tsm_cache_memory_bytes / influxdb_tsm_cache_memory_max_bytes > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "TSM cache memory usage is high"
+            description: "TSM cache is using {{ $value | humanizePercentage }} of allocated memory."
+
+        - alert: InfluxDBWALWritesFailing
+          expr: |
+            rate(influxdb_wal_write_errors_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: storage
+          annotations:
+            summary: "WAL writes are failing"
+            description: "Write-ahead log is experiencing write errors."
+
+        - alert: InfluxDBTSMFileHandlesHigh
+          expr: |
+            influxdb_tsm_files_open / influxdb_tsm_files_max > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "High number of open TSM files"
+            description: "{{ $value | humanizePercentage }} of maximum TSM file handles are in use."
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: influxdb-tsm-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  endpoints:
+    - port: metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'influxdb_tsm_.+'
+          action: keep
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-tsm-grafana-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+    grafana_dashboard: "true"
+data:
+  tsm-dashboard.json: |
+    {
+      "title": "InfluxDB TSM Storage",
+      "panels": [
+        {
+          "title": "TSM Compaction Queue",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "influxdb_tsm_compaction_queue"
+            }
+          ]
+        },
+        {
+          "title": "TSM Cache Memory Usage",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "influxdb_tsm_cache_memory_bytes / influxdb_tsm_cache_memory_max_bytes * 100"
+            }
+          ]
+        },
+        {
+          "title": "WAL Write Errors",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "rate(influxdb_wal_write_errors_total[5m])"
+            }
+          ]
+        },
+        {
+          "title": "TSM File Handles",
+          "type": "gauge",
+          "targets": [
+            {
+              "expr": "influxdb_tsm_files_open / influxdb_tsm_files_max * 100"
+            }
+          ]
+        }
+      ]
+    }

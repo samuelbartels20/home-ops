@@ -1,0 +1,67 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-tsm-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+data:
+  tsm-config.toml: |
+    # TSM Engine Settings
+    [data]
+      # Maximum size of TSM files
+      max-tsm-filesize = "2GB"
+      # Maximum number of TSM files to keep open
+      max-index-log-filesize = "1MB"
+      # Whether to enable TSM file compression
+      enable-tsm-compression = true
+      # Compression algorithm to use (snappy or gzip)
+      tsm-compression-algorithm = "snappy"
+      # Maximum number of concurrent compactions
+      max-concurrent-compactions = 4
+      # Compact TSM files if they haven't been modified in this duration
+      compact-full-write-cold-duration = "24h"
+      # Maximum series per database
+      max-series-per-database = 1000000
+      # Maximum values per tag
+      max-values-per-tag = 100000
+
+    [cache]
+      # Memory size of TSM cache
+      max-memory-size = "8GB"
+      # Snapshot size that triggers a flush to disk
+      snapshot-write-cold-duration = "10m"
+      # Whether to enable memory cache for TSM files
+      enable-memory-cache = true
+
+    [compaction]
+      # Throughput limit for background compaction
+      throughput-limit = "48MB/s"
+      # Minimum age of TSM files to be considered for compaction
+      age-threshold = "1h"
+      # Level-specific compaction settings
+      level0-compression = true
+      level1-compression = true
+      level2-compression = true
+      level3-compression = true
+
+    [wal]
+      # Write Ahead Log settings
+      enabled = true
+      # Maximum size of WAL segment files
+      max-segment-size = "10MB"
+      # How often to fsync WAL
+      fsync-delay = "100ms"
+      # Maximum WAL size before flushing to TSM
+      max-size = "1GB"
+      # Compression for WAL files
+      compression-enabled = true
+      compression-algorithm = "snappy"
+
+    [retention]
+      # How often to check for data that can be removed
+      check-interval = "30m"
+      # Whether to enable series file compaction
+      enable-series-file-compaction = true

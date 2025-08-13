@@ -1,0 +1,175 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: influxdb-restricted
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+    kubernetes.io/description: 'Production hardened PSP for InfluxDB'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+  forbiddenSysctls:
+    - '*'
+  seccompProfile:
+    type: RuntimeDefault
+
+---
+# Security Context for InfluxDB workloads
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-security-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  security-context.yaml: |
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      seLinuxOptions:
+        type: influxdb_t
+        level: "s0"
+
+  pod-security-context.yaml: |
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+      supplementalGroups: [999]
+      sysctls:
+        - name: kernel.core_pattern
+          value: "|/bin/false"
+        - name: kernel.unprivileged_userns_clone
+          value: "0"
+
+---
+# AppArmor Profile for InfluxDB
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-apparmor-profile
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  influxdb.profile: |
+    #include <tunables/global>
+    profile influxdb flags=(attach_disconnected) {
+      #include <abstractions/base>
+      #include <abstractions/nameservice>
+      #include <abstractions/openssl>
+      #include <abstractions/ssl_certs>
+
+      # InfluxDB binaries
+      /usr/bin/influxd rm,
+      /usr/bin/influx rm,
+
+      # Data directories
+      /var/lib/influxdb/** rwk,
+      /etc/influxdb/** r,
+
+      # Configuration
+      /etc/influxdb/influxdb.conf r,
+      /etc/ssl/openssl.cnf r,
+
+      # Required system access
+      /proc/sys/kernel/random/uuid r,
+      /proc/meminfo r,
+      /proc/stat r,
+      /sys/fs/cgroup/** r,
+
+      # Network access
+      network tcp,
+      network udp,
+
+      # Deny dangerous capabilities
+      deny capability sys_admin,
+      deny capability sys_module,
+      deny capability sys_rawio,
+    }
+
+---
+# SELinux Policy for InfluxDB
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-selinux-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  influxdb.te: |
+    policy_module(influxdb_custom, 1.0)
+
+    require {
+        type container_t;
+        type influxdb_port_t;
+        type influxdb_data_t;
+        type influxdb_log_t;
+        class tcp_socket { bind listen accept };
+        class file { read write create unlink };
+        class dir { add_name remove_name };
+    }
+
+    # Allow InfluxDB to bind to its port
+    allow container_t influxdb_port_t:tcp_socket { bind listen accept };
+
+    # Allow access to InfluxDB data files
+    allow container_t influxdb_data_t:file { read write create unlink };
+    allow container_t influxdb_data_t:dir { add_name remove_name };
+
+    # Allow logging
+    allow container_t influxdb_log_t:file { read write create };

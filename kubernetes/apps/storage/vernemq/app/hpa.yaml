@@ -1,0 +1,169 @@
+---
+# VerneMQ Horizontal Pod Autoscaler - Standard Scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vernemq-hpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: autoscaling
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: vernemq
+  minReplicas: 3
+  maxReplicas: 9  # Always keep odd numbers for quorum
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300  # Scale down by 1 pod every 5 minutes max
+        - type: Percent
+          value: 25  # Scale down by max 25% of current replicas
+          periodSeconds: 600
+    scaleUp:
+      stabilizationWindowSeconds: 180  # 3 minutes
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 300  # Scale up by 2 pods every 5 minutes max
+        - type: Percent
+          value: 50  # Scale up by max 50% of current replicas
+          periodSeconds: 300
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+    # MQTT connection count scaling
+    - type: Pods
+      pods:
+        metric:
+          name: vernemq_mqtt_connected_clients
+        target:
+          type: AverageValue
+          averageValue: "3000"  # Scale up when avg > 3000 connections per pod
+
+    # Message queue depth scaling
+    - type: Pods
+      pods:
+        metric:
+          name: vernemq_queue_message_count
+        target:
+          type: AverageValue
+          averageValue: "500"  # Scale up when avg > 500 queued messages per pod
+
+---
+# VerneMQ Vertical Pod Autoscaler - Resource Right-sizing
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: vernemq-vpa
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: vpa
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: vernemq
+  updatePolicy:
+    updateMode: "Auto"  # Automatically apply recommendations
+  resourcePolicy:
+    containerPolicies:
+      - containerName: app
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+# VerneMQ Scaling Policy Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-scaling-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: scaling
+    app.kubernetes.io/part-of: messaging-infrastructure
+data:
+  scaling-policy.yaml: |
+    scaling_policies:
+      hpa:
+        enabled: true
+        metrics:
+          cpu_threshold: 70
+          memory_threshold: 80
+          connection_threshold: 3000
+          queue_threshold: 500
+
+        behavior:
+          scale_up:
+            stabilization_window: 180
+            max_pods_per_period: 2
+            max_percent_per_period: 50
+          scale_down:
+            stabilization_window: 600
+            max_pods_per_period: 1
+            max_percent_per_period: 25
+
+      vpa:
+        enabled: true
+        update_mode: "Auto"
+        resource_limits:
+          min_cpu: "100m"
+          max_cpu: "4000m"
+          min_memory: "256Mi"
+          max_memory: "8Gi"
+
+    scaling_triggers:
+      - name: "high_connection_load"
+        condition: "avg(vernemq_mqtt_connected_clients) > 8000"
+        action: "scale_up"
+        target_replicas: "+2"
+
+      - name: "message_queue_backlog"
+        condition: "avg(vernemq_queue_message_count) > 1000"
+        action: "scale_up"
+        target_replicas: "+1"
+
+      - name: "low_resource_utilization"
+        condition: "avg(cpu_utilization) < 30 AND avg(memory_utilization) < 40"
+        action: "scale_down"
+        target_replicas: "-1"
+        min_replicas: 3
+
+    maintenance_windows:
+      - name: "planned_maintenance"
+        schedule: "0 2 * * 0"  # Sundays at 2 AM
+        action: "pause_scaling"
+        duration: "2h"

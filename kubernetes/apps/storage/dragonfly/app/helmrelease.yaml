@@ -1,0 +1,485 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s-labs/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: dragonfly
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: storage
+  annotations:
+    # Pod Security Standards
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+    # Security scanning
+    trivy-scanner/scan: "true"
+    falco-security/monitor: "true"
+
+    # Compliance Framework
+    compliance.storage.io/sox: "required"
+    compliance.storage.io/gdpr: "required"
+    compliance.storage.io/nist: "required"
+    compliance.storage.io/iso27001: "required"
+
+    # Operational Metadata
+    ops.storage.io/owner: "platform-team"
+    ops.storage.io/contact: "platform@samcloud.online"
+    ops.storage.io/escalation: "sre-oncall"
+    ops.storage.io/runbook: "https://runbooks.samcloud.online/dragonfly"
+spec:
+  interval: 15m
+  timeout: 10m
+  chart:
+    spec:
+      chart: app-template
+      version: 4.1.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      interval: 15m
+  maxHistory: 3
+  install:
+    createNamespace: false
+    timeout: 10m
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    timeout: 10m
+    remediation:
+      strategy: rollback
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    controllers:
+      main:
+        replicas: 3
+        strategy: RollingUpdate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        labels:
+          app.kubernetes.io/name: dragonfly-operator
+          app.kubernetes.io/component: cache-operator
+          monitoring: "true"
+          security-scan: "required"
+        containers:
+          app:
+            image:
+              repository: dragonflydb/dragonfly
+              tag: v1.12.0
+              pullPolicy: IfNotPresent
+
+            command: ["/manager"]
+            args:
+              - --health-probe-bind-address=:8081
+              - --metrics-bind-address=:8080
+              - --leader-elect
+              - --log-level=info
+              - --zap-development=false
+
+            env:
+              - name: WATCH_NAMESPACE
+                value: ""
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: OPERATOR_NAME
+                value: "dragonfly-operator"
+              - name: ENABLE_WEBHOOKS
+                value: "true"
+
+            envFrom:
+              - secretRef:
+                  name: dragonfly-operator-secrets
+
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: &healthPort 8081
+                    scheme: HTTP
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+                  successThreshold: 1
+
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /readyz
+                    port: *healthPort
+                    scheme: HTTP
+                  initialDelaySeconds: 10
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+                  successThreshold: 1
+
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /readyz
+                    port: *healthPort
+                    scheme: HTTP
+                  initialDelaySeconds: 10
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+                  successThreshold: 1
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 1
+                memory: 1Gi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 65534
+              runAsGroup: 65534
+              capabilities:
+                drop: ["ALL"]
+              seccompProfile:
+                type: RuntimeDefault
+
+          # Metrics exporter sidecar for enhanced monitoring
+          metrics-exporter:
+            image:
+              repository: prom/node-exporter
+              tag: v1.9.1
+              pullPolicy: IfNotPresent
+
+            args:
+              - --path.procfs=/host/proc
+              - --path.rootfs=/host/root
+              - --path.sysfs=/host/sys
+              - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)
+              - --web.listen-address=:9100
+
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /metrics
+                    port: 9100
+                    scheme: HTTP
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /metrics
+                    port: 9100
+                    scheme: HTTP
+                  initialDelaySeconds: 10
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              runAsNonRoot: true
+              runAsUser: 65534
+              capabilities:
+                drop: ["ALL"]
+
+    # Production Pod Security Context (Pod Level)
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups: [65534]
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Production Anti-Affinity Rules
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: dragonfly-operator
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: dragonfly-operator
+                topologyKey: topology.kubernetes.io/zone
+
+      # Production Topology Spread Constraints
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly-operator
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly-operator
+
+      # Production Node Selection
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-type: "compute"
+
+      # Production Tolerations
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+
+      # Production Annotations
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+      # Production Labels
+      labels:
+        app.kubernetes.io/name: dragonfly-operator
+        app.kubernetes.io/component: cache-operator
+        monitoring: "true"
+        security-scan: "required"
+
+    # Service Configuration
+    service:
+      app:
+        controller: main
+        type: ClusterIP
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "8080"
+          prometheus.io/path: "/metrics"
+        ports:
+          http:
+            port: 8081
+            targetPort: 8081
+            protocol: TCP
+          metrics:
+            port: 8080
+            targetPort: 8080
+            protocol: TCP
+          node-metrics:
+            port: 9100
+            targetPort: 9100
+            protocol: TCP
+
+    # Service Account Configuration
+    serviceAccount:
+      main:
+        annotations:
+          eks.amazonaws.com/role-arn: ""
+          azure.workload.identity/client-id: ""
+
+    # Enhanced ServiceMonitor for Monitoring
+    serviceMonitor:
+      app:
+        serviceName: main
+        endpoints:
+          - port: metrics
+            scheme: http
+            path: /metrics
+            interval: 30s
+            scrapeTimeout: 10s
+            metricRelabelings:
+              - sourceLabels: [__name__]
+                regex: 'dragonfly_operator_.*'
+                action: keep
+            relabelings:
+              - sourceLabels: [__meta_kubernetes_pod_name]
+                targetLabel: pod
+              - sourceLabels: [__meta_kubernetes_namespace]
+                targetLabel: namespace
+
+          - port: node-metrics
+            scheme: http
+            path: /metrics
+            interval: 30s
+            scrapeTimeout: 10s
+            metricRelabelings:
+              - sourceLabels: [__name__]
+                regex: 'node_.*'
+                action: keep
+
+    # RBAC Configuration with Least Privilege
+    rbac:
+      roles:
+        main:
+          type: ClusterRole
+          rules:
+            # Core Kubernetes resources
+            - apiGroups: [""]
+              resources: ["pods", "services", "serviceaccounts", "configmaps", "secrets"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+            - apiGroups: [""]
+              resources: ["events"]
+              verbs: ["create", "patch"]
+            - apiGroups: [""]
+              resources: ["nodes"]
+              verbs: ["get", "list", "watch"]
+
+            # Apps resources
+            - apiGroups: ["apps"]
+              resources: ["statefulsets", "deployments"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+            # Coordination for leader election
+            - apiGroups: ["coordination.k8s.io"]
+              resources: ["leases"]
+              verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+            # DragonflyCRDs
+            - apiGroups: ["dragonflydb.io"]
+              resources: ["dragonflies"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+            - apiGroups: ["dragonflydb.io"]
+              resources: ["dragonflies/finalizers"]
+              verbs: ["update"]
+            - apiGroups: ["dragonflydb.io"]
+              resources: ["dragonflies/status"]
+              verbs: ["get", "patch", "update"]
+
+            # Monitoring resources
+            - apiGroups: ["monitoring.coreos.com"]
+              resources: ["servicemonitors", "prometheusrules"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+            # Policy resources
+            - apiGroups: ["policy"]
+              resources: ["poddisruptionbudgets"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+            # Networking
+            - apiGroups: ["networking.k8s.io"]
+              resources: ["networkpolicies"]
+              verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+      bindings:
+        main:
+          type: ClusterRoleBinding
+          subjects:
+            - kind: ServiceAccount
+              name: main
+              namespace: storage
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: main
+
+    # Persistent Storage for Operator Data
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        storageClass: fast-ssd
+        accessMode: ReadWriteOnce
+        size: 10Gi
+        globalMounts:
+          - path: /var/lib/dragonfly-operator
+
+      cache:
+        enabled: true
+        type: persistentVolumeClaim
+        storageClass: fast-ssd
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        globalMounts:
+          - path: /var/cache/dragonfly-operator
+
+      # System mounts for node-exporter
+      proc:
+        enabled: true
+        type: hostPath
+        hostPath: /proc
+        hostPathType: Directory
+
+      sys:
+        enabled: true
+        type: hostPath
+        hostPath: /sys
+        hostPathType: Directory
+
+      root:
+        enabled: true
+        type: hostPath
+        hostPath: /
+        hostPathType: Directory
+
+    # Pod Disruption Budget
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    # Priority Class
+    priorityClassName: system-cluster-critical
+
+    # Horizontal Pod Autoscaler
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 60
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 60

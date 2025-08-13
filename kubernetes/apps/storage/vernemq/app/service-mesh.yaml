@@ -1,0 +1,484 @@
+---
+# VerneMQ Service Mesh Integration - Istio Configuration
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: vernemq-service-mesh
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  values:
+    global:
+      meshID: vernemq-mesh
+      multiCluster:
+        clusterName: primary
+      network: storage-network
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 1Gi
+          limits:
+            cpu: 500m
+            memory: 2Gi
+    ingressGateways:
+      - name: vernemq-gateway
+        enabled: true
+        k8s:
+          service:
+            type: LoadBalancer
+            ports:
+              - port: 1883
+                targetPort: 1883
+                name: mqtt
+              - port: 8883
+                targetPort: 8883
+                name: mqtt-tls
+              - port: 8080
+                targetPort: 8080
+                name: websocket
+              - port: 8443
+                targetPort: 8443
+                name: websocket-tls
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+---
+# Peer Authentication - Enforce mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: vernemq-mtls
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    1883:
+      mode: PERMISSIVE  # Allow both mTLS and plaintext for MQTT
+    8883:
+      mode: STRICT      # Enforce mTLS for secure MQTT
+    8080:
+      mode: PERMISSIVE  # Allow both for WebSocket
+    8443:
+      mode: STRICT      # Enforce mTLS for secure WebSocket
+
+---
+# Authorization Policy - Fine-grained Access Control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: vernemq-authz
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  rules:
+    # Allow inter-cluster communication
+    - from:
+        - source:
+            principals: ["cluster.local/ns/storage/sa/vernemq"]
+      to:
+        - operation:
+            ports: ["1883", "8883", "4369", "8080", "8443"]
+
+    # Allow monitoring systems
+    - from:
+        - source:
+            principals: ["cluster.local/ns/observability/sa/prometheus"]
+        - source:
+            principals: ["cluster.local/ns/observability/sa/alloy"]
+      to:
+        - operation:
+            ports: ["8888"]  # Metrics port
+            methods: ["GET"]
+
+    # Allow health checks
+    - from:
+        - source:
+            principals: ["cluster.local/ns/kube-system/sa/default"]
+      to:
+        - operation:
+            ports: ["8080"]
+            paths: ["/health", "/status"]
+            methods: ["GET"]
+
+    # Allow backup operations
+    - from:
+        - source:
+            principals: ["cluster.local/ns/storage/sa/vernemq-backup"]
+      to:
+        - operation:
+            ports: ["8888"]
+            methods: ["GET", "POST"]
+
+    # Allow IoT devices (external)
+    - from:
+        - source:
+            notPrincipals: ["*"]  # External traffic
+      to:
+        - operation:
+            ports: ["1883", "8883", "8080", "8443"]
+      when:
+        - key: source.ip
+          values: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]  # Private networks
+
+---
+# Network Policy for Defense in Depth
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vernemq-service-mesh-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Istio sidecar communication
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 15001  # Envoy admin port
+        - protocol: TCP
+          port: 15090  # Envoy stats port
+
+    # Allow VerneMQ cluster communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vernemq
+      ports:
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 8883
+        - protocol: TCP
+          port: 4369   # Erlang Port Mapper Daemon
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 8888   # Metrics
+
+    # Allow monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 8888
+
+    # Allow external MQTT traffic through Istio gateway
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 8883
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow Istio control plane
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 15010  # Pilot discovery
+        - protocol: TCP
+          port: 15011  # Pilot config
+
+    # Allow cluster communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vernemq
+      ports:
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 8883
+        - protocol: TCP
+          port: 4369
+
+---
+# Destination Rule for Load Balancing and Circuit Breaking
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: vernemq-destination-rule
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  host: vernemq.storage.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN  # Use least connection for MQTT
+    connectionPool:
+      tcp:
+        maxConnections: 1000
+        connectTimeout: 30s
+        keepalive:
+          time: 7200s
+          interval: 60s
+      http:
+        http1MaxPendingRequests: 100
+        maxRequestsPerConnection: 2
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  portLevelSettings:
+    - port:
+        number: 1883
+      loadBalancer:
+        consistentHash:
+          useSourceIp: true  # Sticky sessions for MQTT clients
+    - port:
+        number: 8883
+      loadBalancer:
+        consistentHash:
+          useSourceIp: true
+      connectionPool:
+        tcp:
+          maxConnections: 500  # Limit TLS connections
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: stable
+      labels:
+        track: stable
+
+---
+# Virtual Service for Traffic Management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vernemq
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: messaging
+spec:
+  hosts:
+    - vernemq.storage.svc.cluster.local
+  gateways:
+    - mesh
+  http:
+    - route:
+        - destination:
+            host: vernemq.storage.svc.cluster.local
+            port:
+              number: 1883
+
+---
+# Gateway for External Access
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: vernemq-gateway
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  selector:
+    istio: vernemq-gateway
+  servers:
+    # MQTT Plain
+    - port:
+        number: 1883
+        name: mqtt
+        protocol: TCP
+      hosts:
+        - mqtt.samcloud.online
+        - "*.mqtt.samcloud.online"
+
+    # MQTT TLS
+    - port:
+        number: 8883
+        name: mqtt-tls
+        protocol: TLS
+      hosts:
+        - mqtt.samcloud.online
+        - "*.mqtt.samcloud.online"
+      tls:
+        mode: SIMPLE
+        credentialName: vernemq-tls-cert
+
+    # WebSocket
+    - port:
+        number: 8080
+        name: websocket
+        protocol: HTTP
+      hosts:
+        - mqtt.samcloud.online
+        - "*.mqtt.samcloud.online"
+
+    # WebSocket TLS
+    - port:
+        number: 8443
+        name: websocket-tls
+        protocol: HTTPS
+      hosts:
+        - mqtt.samcloud.online
+        - "*.mqtt.samcloud.online"
+      tls:
+        mode: SIMPLE
+        credentialName: vernemq-tls-cert
+
+---
+# Service Entry for External Dependencies
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: vernemq-external-deps
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  hosts:
+    - time.cloudflare.com
+    - auth.samcloud.online
+  ports:
+    - number: 443
+      name: https
+      protocol: HTTPS
+    - number: 123
+      name: ntp
+      protocol: UDP
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# Service Mesh Monitoring
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: vernemq-istio-proxy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh
+    storage.samcloud.online/tier: standard
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  endpoints:
+    - port: http-monitoring
+      interval: 30s
+      path: /stats/prometheus
+      targetPort: 15090
+
+---
+# Network Configuration for VerneMQ Service Mesh
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-service-mesh-network
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: service-mesh-network
+    storage.samcloud.online/tier: standard
+data:
+  network.yaml: |
+    components:
+      - name: broker
+        replicas: 3
+        ports:
+          - name: mqtt
+            port: 1883
+          - name: websocket
+            port: 8080
+
+      - name: proxy
+        replicas: 2
+        ports:
+          - name: mqtt
+            port: 1883
+
+    networking:
+      load_balancing: enabled
+      failover: automatic
+      latency_threshold: 100ms
+
+    monitoring:
+      metrics:
+        - "Connection count"
+        - "Message throughput"
+        - "Error rates"
+      alerts:
+        - "High latency"
+        - "Connection spikes"
+        - "Error threshold"

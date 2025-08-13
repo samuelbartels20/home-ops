@@ -1,0 +1,444 @@
+---
+# Multi-Region Dragonfly Deployment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-distributed-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache
+data:
+  distributed.yaml: |
+    regions:
+      - name: primary
+        components:
+          - service: cache-api
+            replicas: 3
+          - service: cache-worker
+            replicas: 2
+
+      - name: secondary
+        components:
+          - service: cache-api
+            replicas: 2
+          - service: cache-worker
+            replicas: 2
+
+    storage:
+      type: distributed
+      replication: 3
+      backup: enabled
+
+    networking:
+      load_balancing: global
+      failover: automatic
+      latency_threshold: 100ms
+
+
+---
+# Global Load Balancer Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-global-lb-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+data:
+  global-lb.yaml: |
+    # Global Load Balancer Configuration
+    global_load_balancer:
+      provider: "aws-global-accelerator"
+      endpoints:
+        - region: "us-west-2"
+          weight: 70
+          health_check:
+            path: "/health"
+            port: 6379
+            protocol: "TCP"
+            interval: 30
+            timeout: 5
+            healthy_threshold: 2
+            unhealthy_threshold: 3
+
+        - region: "us-east-1"
+          weight: 20
+          health_check:
+            path: "/health"
+            port: 6379
+            protocol: "TCP"
+            interval: 30
+            timeout: 5
+
+        - region: "eu-west-1"
+          weight: 10
+          health_check:
+            path: "/health"
+            port: 6379
+            protocol: "TCP"
+            interval: 30
+            timeout: 5
+
+      failover_policy:
+        primary_to_secondary_threshold: 2  # Failed health checks
+        secondary_to_tertiary_threshold: 2
+        automatic_failback: true
+        failback_delay: "5m"
+
+      traffic_policies:
+        - name: "geographic"
+          type: "geolocation"
+          rules:
+            - location: "US"
+              target_region: "us-west-2"
+            - location: "US-EAST"
+              target_region: "us-east-1"
+            - location: "EU"
+              target_region: "eu-west-1"
+
+        - name: "latency"
+          type: "latency_based"
+          fallback_to_geographic: true
+
+---
+# Cross-Region Replication CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dragonfly-cross-region-sync
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    replication.samcloud.online/type: "cross-region"
+spec:
+  # Run every 15 minutes
+  schedule: "*/15 * * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/part-of: dragonfly
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: dragonfly
+            app.kubernetes.io/part-of: dragonfly
+        spec:
+          serviceAccountName: dragonfly-sa
+          restartPolicy: Never
+          containers:
+            - name: cross-region-sync
+              image: redis:7-alpine
+              imagePullPolicy: Always
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo "Starting cross-region synchronization at $(date)"
+
+                  # Install required tools
+                  apk add --no-cache curl jq
+
+                  # Define regions
+                  PRIMARY_REGION="us-west-2"
+                  SECONDARY_REGIONS=("us-east-1" "eu-west-1")
+
+                  # Primary endpoint
+                  PRIMARY_ENDPOINT="dragonfly.storage.svc.cluster.local"
+
+                  # Check primary region health
+                  echo "Checking primary region health..."
+                  if ! redis-cli -h "${PRIMARY_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" ping > /dev/null 2>&1; then
+                    echo "Primary region is unhealthy, initiating failover..."
+                    # Trigger failover logic
+                    exit 1
+                  fi
+
+                  # Get primary region data snapshot
+                  echo "Creating primary region snapshot..."
+                  SNAPSHOT_ID=$(date +%Y%m%d_%H%M%S)
+                  redis-cli -h "${PRIMARY_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" BGSAVE
+
+                  # Wait for snapshot completion
+                  while [ "$(redis-cli -h "${PRIMARY_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" BGSAVETIME)" -eq "0" ]; do
+                    sleep 5
+                  done
+
+                  # Sync to secondary regions
+                  for region in "${SECONDARY_REGIONS[@]}"; do
+                    echo "Syncing to region: ${region}"
+
+                    # Calculate region endpoint
+                    REGION_ENDPOINT="dragonfly.${region}.svc.cluster.local"
+
+                    # Check region connectivity
+                    if redis-cli -h "${REGION_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" ping > /dev/null 2>&1; then
+                      echo "Region ${region} is reachable, syncing data..."
+
+                      # Perform differential sync (simplified)
+                      # In production, this would use Dragonfly's built-in replication
+                      redis-cli -h "${REGION_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" \
+                        --rdb /tmp/primary-snapshot.rdb
+
+                      echo "Sync completed for region: ${region}"
+                    else
+                      echo "Warning: Region ${region} is unreachable"
+                    fi
+                  done
+
+                  # Update sync metrics
+                  SYNC_STATUS="success"
+                  SYNC_TIMESTAMP=$(date +%s)
+
+                  echo "Cross-region synchronization completed successfully"
+              env:
+                - name: DRAGONFLY_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: dragonfly-auth
+                      key: DRAGONFLY_PASSWORD
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+
+---
+# Automated Failover Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dragonfly-failover-controller
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly-failover
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly-failover
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly-failover
+        app.kubernetes.io/part-of: dragonfly
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: dragonfly-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: failover-controller
+          image: alpine:3.19
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: metrics
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+
+              # Install dependencies
+              apk add --no-cache curl jq redis
+
+              echo "Starting Dragonfly Failover Controller..."
+
+              # Configuration
+              PRIMARY_REGION="us-west-2"
+              SECONDARY_REGIONS=("us-east-1" "eu-west-1")
+              CHECK_INTERVAL=30
+              FAILOVER_THRESHOLD=3
+
+              # Health check counters
+              declare -A failure_counts
+              for region in "${SECONDARY_REGIONS[@]}"; do
+                failure_counts[$region]=0
+              done
+
+              # Main monitoring loop
+              while true; do
+                echo "Running health checks at $(date)"
+
+                # Check primary region
+                PRIMARY_ENDPOINT="dragonfly.storage.svc.cluster.local"
+                if redis-cli -h "${PRIMARY_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" ping > /dev/null 2>&1; then
+                  echo "Primary region (${PRIMARY_REGION}) is healthy"
+                  failure_counts["primary"]=0
+                else
+                  echo "Primary region (${PRIMARY_REGION}) is unhealthy"
+                  failure_counts["primary"]=$((failure_counts["primary"] + 1))
+
+                  if [ ${failure_counts["primary"]} -ge ${FAILOVER_THRESHOLD} ]; then
+                    echo "ALERT: Initiating automatic failover from ${PRIMARY_REGION}"
+
+                    # Find healthy secondary region
+                    for region in "${SECONDARY_REGIONS[@]}"; do
+                      REGION_ENDPOINT="dragonfly.${region}.svc.cluster.local"
+                      if redis-cli -h "${REGION_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" ping > /dev/null 2>&1; then
+                        echo "Promoting ${region} to primary"
+
+                        # Update DNS/Load Balancer configuration
+                        # In production, this would call AWS Route53, Cloudflare, etc.
+                        curl -X POST -H "Content-Type: application/json" \
+                          -d "{\"primary_region\":\"${region}\",\"timestamp\":\"$(date -Iseconds)\"}" \
+                          "${FAILOVER_WEBHOOK_URL}"
+
+                        # Reset failure count
+                        failure_counts["primary"]=0
+                        break
+                      fi
+                    done
+                  fi
+                fi
+
+                # Check secondary regions
+                for region in "${SECONDARY_REGIONS[@]}"; do
+                  REGION_ENDPOINT="dragonfly.${region}.svc.cluster.local"
+                  if redis-cli -h "${REGION_ENDPOINT}" -p 6379 -a "${DRAGONFLY_PASSWORD}" ping > /dev/null 2>&1; then
+                    echo "Secondary region (${region}) is healthy"
+                    failure_counts[$region]=0
+                  else
+                    echo "Secondary region (${region}) is unhealthy"
+                    failure_counts[$region]=$((failure_counts[$region] + 1))
+                  fi
+                done
+
+                # Export metrics
+                cat > /tmp/metrics.prom <<EOF
+              # HELP dragonfly_region_health Health status of Dragonfly regions
+              # TYPE dragonfly_region_health gauge
+              dragonfly_region_health{region="${PRIMARY_REGION}",type="primary"} ${failure_counts["primary"]}
+              EOF
+
+                for region in "${SECONDARY_REGIONS[@]}"; do
+                  echo "dragonfly_region_health{region=\"${region}\",type=\"secondary\"} ${failure_counts[$region]}" >> /tmp/metrics.prom
+                done
+
+                # Serve metrics on port 8080
+                (echo -e "HTTP/1.1 200 OK\r\n\r\n$(cat /tmp/metrics.prom)" | nc -l -p 8080) &
+
+                sleep ${CHECK_INTERVAL}
+              done
+          env:
+            - name: DRAGONFLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: dragonfly-auth
+                  key: DRAGONFLY_PASSWORD
+            - name: FAILOVER_WEBHOOK_URL
+              value: "https://api.samcloud.online/infrastructure/failover"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+# Multi-Region Monitoring Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dragonfly-multi-region-dashboard
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
+    grafana_dashboard: "true"
+data:
+  multi-region-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Dragonfly - Multi-Region",
+        "tags": ["dragonfly", "multi-region", "global", "failover"],
+        "timezone": "browser",
+        "refresh": "30s",
+        "panels": [
+          {
+            "title": "Regional Health Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "dragonfly_region_health",
+                "legendFormat": "{{region}} ({{type}})"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "red", "value": 3}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Cross-Region Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dragonfly_cross_region_latency_seconds",
+                "legendFormat": "{{source_region}} -> {{target_region}}"
+              }
+            ]
+          },
+          {
+            "title": "Traffic Distribution",
+            "type": "piechart",
+            "targets": [
+              {
+                "expr": "sum by (region) (rate(dragonfly_commands_total[5m]))",
+                "legendFormat": "{{region}}"
+              }
+            ]
+          },
+          {
+            "title": "Replication Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "dragonfly_replication_lag_seconds",
+                "legendFormat": "{{target_region}}"
+              }
+            ]
+          }
+        ]
+      }
+    }

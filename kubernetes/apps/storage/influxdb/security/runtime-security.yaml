@@ -1,0 +1,178 @@
+---
+apiVersion: falco.security.falco.org/v1beta1
+kind: FalcoRule
+metadata:
+  name: influxdb-runtime-rules
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  rules:
+    - rule: "Unauthorized Process in InfluxDB Container"
+      desc: "Detect unauthorized process execution in InfluxDB container"
+      condition: >
+        container.name = influxdb and
+        not proc.name in (influxd, influx)
+      output: "Unauthorized process in InfluxDB container (user=%user.name proc=%proc.name)"
+      priority: CRITICAL
+      tags: ["process", "mitre_execution"]
+
+    - rule: "InfluxDB File System Tampering"
+      desc: "Detect unauthorized file system modifications"
+      condition: >
+        container.name = influxdb and
+        (evt.type = open or evt.type = create) and
+        not (fd.directory in (/var/lib/influxdb, /etc/influxdb))
+      output: "File system tampering in InfluxDB container (user=%user.name file=%fd.name)"
+      priority: WARNING
+      tags: ["filesystem", "mitre_persistence"]
+
+    - rule: "InfluxDB Network Anomaly"
+      desc: "Detect suspicious network activity"
+      condition: >
+        container.name = influxdb and
+        not port.number in (8086, 8088) and
+        evt.type = connect
+      output: "Suspicious network activity in InfluxDB container (port=%fd.sport)"
+      priority: WARNING
+      tags: ["network", "mitre_command_and_control"]
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-runtime-security
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  runtime-security.yaml: |
+    # Runtime Security Configuration
+    runtime_security:
+      # Process Security
+      process_security:
+        allowed_processes:
+          - path: /usr/bin/influxd
+            hash: "${INFLUXD_BINARY_HASH}"
+          - path: /usr/bin/influx
+            hash: "${INFLUX_BINARY_HASH}"
+        process_tracking:
+          enabled: true
+          audit_all: true
+        memory_protection:
+          enabled: true
+          enforce_wx: true
+          stack_guard: true
+
+      # File System Security
+      filesystem_security:
+        read_only_paths:
+          - /usr/bin
+          - /usr/lib
+          - /etc/influxdb/config
+        write_allowed_paths:
+          - /var/lib/influxdb/data
+          - /var/lib/influxdb/wal
+        integrity_monitoring:
+          enabled: true
+          paths:
+            - /etc/influxdb
+            - /usr/bin/influxd
+        watch_operations:
+          - create
+          - modify
+          - delete
+          - attribute_change
+
+      # Network Security
+      network_security:
+        allowed_ports:
+          - port: 8086
+            protocol: tcp
+          - port: 8088
+            protocol: tcp
+        network_monitoring:
+          enabled: true
+          capture_payload: false
+        connection_tracking:
+          enabled: true
+          max_connections: 1000
+        anomaly_detection:
+          enabled: true
+          baseline_period: 7d
+
+      # Behavioral Analysis
+      behavioral_analysis:
+        enabled: true
+        learning_period: 7d
+        analysis_types:
+          - process_execution
+          - file_access
+          - network_activity
+        alert_on:
+          - new_process
+          - unusual_file_access
+          - unusual_network
+
+      # Threat Detection
+      threat_detection:
+        enabled: true
+        detection_types:
+          - malware
+          - rootkits
+          - privilege_escalation
+        response_actions:
+          - type: "kill_process"
+            triggers: ["unauthorized_process"]
+          - type: "block_ip"
+            triggers: ["suspicious_connection"]
+          - type: "quarantine_file"
+            triggers: ["malware_detected"]
+
+      # Runtime Compliance
+      runtime_compliance:
+        enabled: true
+        frameworks:
+          - name: "CIS"
+            version: "1.6"
+          - name: "NIST"
+            version: "800-53"
+        check_interval: 1h
+        enforcement: true
+
+      # Incident Response
+      incident_response:
+        enabled: true
+        automatic_response:
+          enabled: true
+          actions:
+            - trigger: "critical_security_event"
+              action: "isolate_container"
+            - trigger: "multiple_warnings"
+              action: "increase_monitoring"
+        notification:
+          channels:
+            - type: "slack"
+              severity: ["critical", "high"]
+            - type: "email"
+              severity: ["critical", "high", "medium"]
+            - type: "pagerduty"
+              severity: ["critical"]
+
+      # Forensics
+      forensics:
+        enabled: true
+        capture_types:
+          - process_execution
+          - file_access
+          - network_traffic
+        retention:
+          duration: 30d
+          storage_location: "s3://security-logs"
+        automated_analysis:
+          enabled: true
+          tools:
+            - "yara"
+            - "volatility"

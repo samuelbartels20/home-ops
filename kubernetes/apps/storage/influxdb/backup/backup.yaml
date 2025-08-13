@@ -1,0 +1,269 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: influxdb-backup
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: backup
+  annotations:
+    backup.influxdata.com/version: "2.7.11"
+    backup.influxdata.com/type: "enterprise"
+spec:
+  # Primary full backup daily at 2 AM
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600  # 1 hour timeout
+      template:
+        metadata:
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "${BACKUP_METRICS_PORT}"
+        spec:
+          serviceAccountName: influxdb-backup
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backup
+              image: influxdb:2.7
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
+              envFrom:
+                - secretRef:
+                    name: influxdb-creds
+              env:
+                - name: INFLUXDB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: influxdb-backup
+                      key: token
+                - name: BUCKET
+                  value: "main"
+                - name: ORG
+                  value: "home"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  influx backup \
+                    -t ${INFLUXDB_TOKEN} \
+                    --host http://influxdb:8086 \
+                    /backup/$(date +%Y%m%d)
+
+                  # Compress backup
+                  tar -czf "${BACKUP_DIR}.tar.gz" /backup
+
+                  # Upload to storage
+                  mc cp "${BACKUP_DIR}.tar.gz" "backup/${S3_BUCKET}/influxdb/"
+
+                  # Verify uploaded backup
+                  REMOTE_CHECKSUM=$(mc cat "backup/${S3_BUCKET}/influxdb/${BACKUP_DIR}.tar.gz.sha256")
+                  if [ "$CHECKSUM" != "$REMOTE_CHECKSUM" ]; then
+                    echo "Backup verification failed: checksum mismatch"
+                    exit 1
+                  fi
+
+                  # Cleanup old backups (configurable retention)
+                  find /backup -name "influxdb_*.tar.gz*" -type f -mtime +${RETENTION_DAYS} -delete
+                  mc rm --recursive --force --older-than ${RETENTION_DAYS}d "backup/${S3_BUCKET}/influxdb/"
+
+                  # Export success metrics
+                  END_TIME=$(date +%s)
+                  DURATION=$((END_TIME - START_TIME))
+
+                  echo "# HELP influxdb_backup_success Indicates backup success"
+                  echo "# TYPE influxdb_backup_success gauge"
+                  echo "influxdb_backup_success 1"
+
+                  echo "# HELP influxdb_backup_duration_seconds Duration of backup in seconds"
+                  echo "# TYPE influxdb_backup_duration_seconds gauge"
+                  echo "influxdb_backup_duration_seconds $DURATION"
+
+                  echo "# HELP influxdb_backup_size_bytes Size of backup in bytes"
+                  echo "# TYPE influxdb_backup_size_bytes gauge"
+                  echo "influxdb_backup_size_bytes $(stat -f%z "${BACKUP_DIR}.tar.gz")"
+
+                  echo "Backup completed successfully"
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
+                - name: influxdb-license
+                  mountPath: /etc/influxdb/license
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 1000m
+                  memory: 1Gi
+                limits:
+                  cpu: 4000m
+                  memory: 4Gi
+              startupProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "influx ping"]
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                failureThreshold: 30
+              readinessProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "mc alias list | grep backup"]
+                initialDelaySeconds: 10
+                periodSeconds: 30
+              livenessProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "influx backup info --token $INFLUXDB_TOKEN"]
+                initialDelaySeconds: 15
+                periodSeconds: 30
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: influxdb-backup-pvc
+            - name: tmp
+              emptyDir: {}
+            - name: influxdb-license
+              secret:
+                secretName: influxdb-enterprise-license
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: app.kubernetes.io/name
+                          operator: In
+                          values: ["influxdb"]
+                    topologyKey: kubernetes.io/hostname
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/storage
+                        operator: Exists
+          tolerations:
+            - key: "node.kubernetes.io/disk-pressure"
+              operator: "Exists"
+              effect: "NoSchedule"
+            - key: "node-role.kubernetes.io/storage"
+              operator: "Exists"
+              effect: "NoSchedule"
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-backup-pvc
+  namespace: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-zfs-localpv
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: influxdb-backup
+  namespace: storage
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: influxdb-backup
+  namespace: storage
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/log"]
+    verbs: ["get", "list", "create"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: influxdb-backup
+  namespace: storage
+subjects:
+  - kind: ServiceAccount
+    name: influxdb-backup
+    namespace: storage
+roleRef:
+  kind: Role
+  name: influxdb-backup
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: influxdb-backup
+  namespace: storage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+      app.kubernetes.io/component: backup
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'influxdb_backup_.+'
+          action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: influxdb-backup
+  namespace: storage
+spec:
+  groups:
+    - name: influxdb.backup.rules
+      rules:
+        - alert: InfluxDBBackupFailed
+          expr: influxdb_backup_failure > 0
+          for: 0m
+          labels:
+            severity: critical
+            category: backup
+          annotations:
+            summary: "InfluxDB backup failed"
+            description: "The InfluxDB backup job has failed. Check the backup pod logs for details."
+
+        - alert: InfluxDBBackupMissing
+          expr: absent(influxdb_backup_success) > 86400
+          for: 0m
+          labels:
+            severity: warning
+            category: backup
+          annotations:
+            summary: "InfluxDB backup missing"
+            description: "No successful InfluxDB backup has been recorded in the last 24 hours."

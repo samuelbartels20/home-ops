@@ -1,0 +1,167 @@
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: influxdb-mtls
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  mtls:
+    mode: STRICT
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  portLevelMtls:
+    8086:
+      mode: STRICT
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: influxdb-authz
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/monitoring/sa/prometheus"]
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/metrics"]
+    - from:
+        - source:
+            principals: ["cluster.local/ns/*/sa/*"]
+            namespaces: ["data-science", "observability"]
+      to:
+        - operation:
+            methods: ["POST", "GET"]
+            paths: ["/api/v2/*"]
+    - from:
+        - source:
+            principals: ["cluster.local/ns/storage/sa/influxdb"]
+            namespaces: ["storage"]
+      to:
+        - operation:
+            methods: ["*"]
+            paths: ["*"]
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-zero-trust-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  zero-trust.yaml: |
+    # Zero Trust Configuration
+    zero_trust:
+      # Identity and Access Management
+      identity:
+        authentication:
+          mfa:
+            required: true
+            methods:
+              - type: totp
+              - type: webauthn
+          session:
+            max_duration: 8h
+            renewal_window: 1h
+          jwt:
+            issuer: "https://auth.${CLUSTER_DOMAIN}"
+            audience: "influxdb"
+            key_rotation: 24h
+
+      # Network Security
+      network:
+        mtls:
+          enabled: true
+          min_protocol_version: "TLS1.3"
+          certificate_rotation: 30d
+        microsegmentation:
+          enabled: true
+          default_deny: true
+        api_security:
+          rate_limiting:
+            enabled: true
+            per_ip: 100
+            per_user: 200
+          ddos_protection:
+            enabled: true
+            threshold: 1000
+
+      # Workload Security
+      workload:
+        pod_security:
+          enforce_immutability: true
+          block_privilege_escalation: true
+          read_only_root: true
+        runtime_security:
+          seccomp: runtime/default
+          selinux:
+            type: influxdb_t
+            level: s0
+          capabilities:
+            drop: ["ALL"]
+
+      # Data Security
+      data:
+        encryption:
+          at_rest:
+            enabled: true
+            key_rotation: 90d
+          in_transit:
+            enabled: true
+            protocol: TLSv1.3
+        access_control:
+          rbac:
+            enabled: true
+            review_interval: 90d
+          data_classification:
+            enabled: true
+            levels: ["public", "internal", "confidential", "restricted"]
+
+      # Monitoring and Response
+      security_monitoring:
+        threat_detection:
+          enabled: true
+          scan_interval: 1h
+        vulnerability_scanning:
+          enabled: true
+          scan_schedule: "0 0 * * *"
+        incident_response:
+          automated_response:
+            enabled: true
+            policies:
+              - trigger: "brute_force_attempt"
+                action: "block_ip"
+              - trigger: "data_exfiltration"
+                action: "terminate_session"
+
+      # Compliance and Audit
+      compliance:
+        frameworks:
+          - name: "SOC2"
+            enabled: true
+          - name: "HIPAA"
+            enabled: true
+          - name: "PCI-DSS"
+            enabled: true
+        audit:
+          enabled: true
+          retention: 365d
+          tamper_proof: true

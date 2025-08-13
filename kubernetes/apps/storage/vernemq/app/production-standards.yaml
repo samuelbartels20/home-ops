@@ -1,0 +1,65 @@
+# Production Standards Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vernemq-standards
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: standards
+    app.kubernetes.io/part-of: messaging
+data:
+  standards.yaml: |
+    # Security Standards
+    security:
+      tls:
+        minVersion: "TLSv1.2"
+        preferServerCiphers: true
+        cipherSuites:
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      authentication:
+        required: true
+        methods:
+          - certificate
+          - password
+      authorization:
+        enabled: true
+        aclFile: "/etc/vernemq/acl.conf"
+
+    # High Availability Standards
+    availability:
+      minReplicas: 3
+      maxUnavailable: 1
+      podAntiAffinity: true
+      topologySpread: true
+
+    # Performance Standards
+    performance:
+      maxConnections: 100000
+      maxQueueSize: 100000
+      maxMessageSize: 10MB
+      maxInflightMessages: 20
+
+    # Monitoring Standards
+    monitoring:
+      metrics: true
+      healthChecks: true
+      logging:
+        level: info
+        format: json
+
+    # Backup Standards
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"
+      retention: "30d"
+
+    # Resource Standards
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"

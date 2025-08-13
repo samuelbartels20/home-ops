@@ -1,0 +1,61 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: influxdb-cert
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  secretName: influxdb-tls
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+  subject:
+    organizations:
+      - Example Corp
+  commonName: influxdb.storage.svc.cluster.local
+  dnsNames:
+    - influxdb
+    - influxdb.storage
+    - influxdb.storage.svc
+    - influxdb.storage.svc.cluster.local
+    - "*.influxdb.storage.svc.cluster.local"
+  usages:
+    - server auth
+    - client auth
+  issuerRef:
+    name: cluster-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-tls-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  tls.conf: |
+    [tls]
+    min-version = "TLS1.2"
+    max-version = "TLS1.3"
+    cipher-suites = [
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+      "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+    ]
+    prefer-server-cipher-suites = true
+    require-and-verify-client-cert = true
+    client-ca-file = "/etc/ssl/certs/ca.crt"
+    cert-file = "/etc/ssl/certs/tls.crt"
+    key-file = "/etc/ssl/private/tls.key"
+    strict-ciphers = true
+    verify-incoming = true
+    verify-outgoing = true

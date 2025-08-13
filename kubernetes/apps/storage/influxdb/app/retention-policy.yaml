@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-retention-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: data-lifecycle
+data:
+  retention.yaml: |
+    # Data Lifecycle Management
+    retention_policies:
+      # Hot Data (High precision, frequently accessed)
+      - name: hot_data
+        duration: 7d
+        shard_group_duration: 1h
+        replication_factor: 3
+        default: true
+        continuous_queries:
+          - name: downsampled_metrics_1m
+            query: >
+              SELECT mean(*) INTO hot_data_1m FROM hot_data GROUP BY time(1m)
+          - name: downsampled_metrics_5m
+            query: >
+              SELECT mean(*) INTO hot_data_5m FROM hot_data GROUP BY time(5m)
+
+      # Warm Data (Medium precision, occasionally accessed)
+      - name: warm_data
+        duration: 30d
+        shard_group_duration: 1d
+        replication_factor: 2
+        continuous_queries:
+          - name: downsampled_metrics_1h
+            query: >
+              SELECT mean(*) INTO warm_data_1h FROM warm_data GROUP BY time(1h)
+
+      # Cold Data (Low precision, rarely accessed)
+      - name: cold_data
+        duration: 365d
+        shard_group_duration: 7d
+        replication_factor: 2
+        continuous_queries:
+          - name: downsampled_metrics_1d
+            query: >
+              SELECT mean(*) INTO cold_data_1d FROM cold_data GROUP BY time(1d)
+
+    # Data Tiering
+    tiering:
+      enabled: true
+      rules:
+        - source_bucket: hot_data
+          target_bucket: warm_data
+          age: 7d
+          aggregation_function: mean
+          aggregation_interval: 5m
+        - source_bucket: warm_data
+          target_bucket: cold_data
+          age: 30d
+          aggregation_function: mean
+          aggregation_interval: 1h
+
+    # Data Compression
+    compression:
+      enabled: true
+      algorithm: zstd
+      level: 3
+      min_time_delta: 1h
+      min_values: 1000
+
+    # Bucket Management
+    buckets:
+      # System Metrics
+      - name: system_metrics
+        retention_policy: hot_data
+        measurement_retention:
+          cpu: 7d
+          memory: 7d
+          disk: 7d
+          network: 7d
+
+      # Application Metrics
+      - name: app_metrics
+        retention_policy: warm_data
+        measurement_retention:
+          requests: 30d
+          latency: 30d
+          errors: 90d
+          transactions: 90d
+
+      # Business Metrics
+      - name: business_metrics
+        retention_policy: cold_data
+        measurement_retention:
+          revenue: 365d
+          users: 365d
+          conversions: 365d
+
+    # Shard Management
+    shards:
+      precreate_enabled: true
+      precreate_window: 24h
+      max_size: 1GB
+      max_age: 7d
+      compact_threshold: 0.5
+      compact_full_write_cold_duration: 4h
+
+    # Query Management
+    queries:
+      max_select_point: 1000000
+      max_select_series: 100000
+      max_select_buckets: 10000

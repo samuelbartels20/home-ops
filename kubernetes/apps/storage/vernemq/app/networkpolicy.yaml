@@ -1,0 +1,143 @@
+---
+# VerneMQ Network Security Policy - Ingress Rules
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vernemq-ingress-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # MQTT Traffic
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: services
+        - namespaceSelector:
+            matchLabels:
+              name: security
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: services
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 8883
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+
+    # Cluster Internal Communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vernemq
+      ports:
+        - protocol: TCP
+          port: 4369  # EPMD
+        - protocol: TCP
+          port: 44053 # Clustering
+        - protocol: TCP
+          port: 9100  # Node discovery
+
+    # Monitoring Access
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - protocol: TCP
+          port: 8888
+
+    # Load Balancer Health Checks
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8888
+
+  egress:
+    # DNS Resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Kubernetes API Access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 443
+
+    # Cluster Internal Communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vernemq
+      ports:
+        - protocol: TCP
+          port: 4369
+        - protocol: TCP
+          port: 44053
+        - protocol: TCP
+          port: 9100
+
+---
+# VerneMQ Network Security Policy - External Access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vernemq-external-access
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: vernemq
+    app.kubernetes.io/component: mqtt-broker
+    app.kubernetes.io/part-of: messaging-infrastructure
+    environment: production
+    tier: storage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vernemq
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow external MQTT clients
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 8883
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443

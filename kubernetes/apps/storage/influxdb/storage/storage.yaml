@@ -1,0 +1,196 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: influxdb-storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    storage.kubernetes.io/topology-aware: "true"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+parameters:
+  type: pd-ssd
+  fstype: ext4
+  iopsPerGB: "10"
+  encrypted: "true"
+  encryption-kms-key: "${KMS_KEY_ARN}"
+  replication-type: "regional-pd"
+  performance-mode: "maxIO"
+  throughputMode: "provisioned"
+  provisionedThroughput: "1000"
+mountOptions:
+  - noatime
+  - nodiratime
+  - nobarrier
+  - data=ordered
+
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: influxdb-snapshot-class
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "false"
+driver: kubernetes.io/no-provisioner
+deletionPolicy: Retain
+parameters:
+  # Snapshot settings
+  type: pd-snapshot
+  incremental: "true"
+  encrypted: "true"
+  encryption-kms-key: "${KMS_KEY_ARN}"
+  snapshot-frequency: "4h"
+  retention-duration: "720h"  # 30 days
+  max-snapshots: "180"
+  snapshot-tier: "STANDARD"
+  snapshot-labels: "environment=production,app=influxdb"
+
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: influxdb-replication
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+spec:
+  sourcePVC: influxdb-data
+  trigger:
+    schedule: ${REPLICATION_SCHEDULE}
+  restic:
+    repository: influxdb-backup-repo
+    retention:
+      hourly: 24    # Keep 24 hourly snapshots
+      daily: 30     # Keep 30 daily snapshots
+      weekly: 52    # Keep 52 weekly snapshots
+      monthly: 12   # Keep 12 monthly snapshots
+    copyMethod: Snapshot
+    pruneIntervalDays: 7
+    volumeSnapshotClassName: influxdb-snapshot-class
+    storageClassName: influxdb-storage
+    cacheCapacity: "20Gi"
+    cacheStorageClassName: openebs-zfs-localpv
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+    encryption:
+      kms: aws
+      kmsKeyId: "${KMS_KEY_ARN}"
+    compression: "auto"
+    backupType: "full"
+    verify: true
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-data
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+  annotations:
+    backup.velero.io/backup-volumes: data
+    volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/no-provisioner
+    volume.kubernetes.io/selected-node: "${STORAGE_NODE}"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: influxdb-storage
+  resources:
+    requests:
+      storage: 100Gi
+  selector:
+    matchLabels:
+      type: local-ssd
+      performance: high-iops
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: influxdb-storage-monitor
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: influxdb
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'influxdb_storage_.+'
+          action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: influxdb-storage-alerts
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: storage
+spec:
+  groups:
+    - name: influxdb.storage.rules
+      rules:
+        - alert: InfluxDBStorageNearlyFull
+          expr: |
+            kubelet_volume_stats_available_bytes{persistentvolumeclaim="influxdb-data"}
+            / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="influxdb-data"}
+            < 0.10
+          for: 5m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "InfluxDB storage is nearly full"
+            description: "Storage volume is {{ $value | humanizePercentage }} full."
+
+        - alert: InfluxDBStorageCriticallyFull
+          expr: |
+            kubelet_volume_stats_available_bytes{persistentvolumeclaim="influxdb-data"}
+            / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="influxdb-data"}
+            < 0.05
+          for: 5m
+          labels:
+            severity: critical
+            category: storage
+          annotations:
+            summary: "InfluxDB storage is critically full"
+            description: "Storage volume is {{ $value | humanizePercentage }} full."
+
+        - alert: InfluxDBStorageLatencyHigh
+          expr: |
+            rate(node_disk_read_time_seconds_total{device=~"influxdb.*"}[5m])
+            / rate(node_disk_reads_completed_total{device=~"influxdb.*"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            category: storage
+          annotations:
+            summary: "InfluxDB storage latency is high"
+            description: "Storage read latency is {{ $value | humanizeTimeMilli }}."

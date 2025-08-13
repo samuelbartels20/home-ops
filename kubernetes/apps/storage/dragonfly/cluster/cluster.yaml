@@ -1,0 +1,243 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dragonfly
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: storage
+    app.kubernetes.io/version: "v1.30.3"
+    environment: production
+    tier: storage
+    security-level: standard
+    backup-policy: comprehensive
+  annotations:
+    # Cluster configuration
+    dragonflydb.io/cluster-size: "6"
+    dragonflydb.io/update-strategy: "rolling"
+    dragonflydb.io/hibernation: "off"
+
+    # Security annotations
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+    # Backup and retention
+    backup.dragonflydb.io/retention-policy: "90d"
+    backup.dragonflydb.io/schedule: "0 2 * * *"
+
+    # Security scanning
+    trivy-scanner/scan: "true"
+    falco-security/monitor: "true"
+
+    # Compliance Framework
+    compliance.storage.io/sox: "required"
+    compliance.storage.io/gdpr: "required"
+    compliance.storage.io/nist: "required"
+    compliance.storage.io/iso27001: "required"
+    compliance.storage.io/pci-dss: "required"
+
+    # Monitoring and observability
+    monitoring.dragonflydb.io/enabled: "true"
+    monitoring.dragonflydb.io/prometheus: "true"
+    monitoring.dragonflydb.io/grafana: "true"
+
+    # Operational metadata
+    ops.storage.io/owner: "platform-team"
+    ops.storage.io/contact: "platform@samcloud.online"
+    ops.storage.io/escalation: "sre-oncall"
+    ops.storage.io/runbook: "https://runbooks.samcloud.online/dragonfly"
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/instance: dragonfly
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/instance: dragonfly
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: storage
+        app.kubernetes.io/version: "v1.30.3"
+        environment: production
+        tier: storage
+        security-level: standard
+        backup-policy: comprehensive
+    spec:
+      containers:
+      - name: dragonfly
+        image: ghcr.io/dragonflydb/dragonfly:v1.30.3
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2000m"
+            memory: "8Gi"
+            ephemeral-storage: "20Gi"
+          limits:
+            cpu: "8000m"
+            memory: "16Gi"
+            ephemeral-storage: "40Gi"
+        ports:
+        - containerPort: 6379
+          name: redis
+        - containerPort: 8080
+          name: metrics
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        env:
+        - name: DFLY_cluster_mode
+          value: "true"
+        - name: DFLY_requirepass
+          valueFrom:
+            secretKeyRef:
+              name: dragonfly-auth
+              key: DRAGONFLY_PASSWORD
+        - name: DFLY_maxmemory
+          value: "$(MAX_MEMORY)Mi"
+        - name: DFLY_snapshot_cron
+          value: "0 */6 * * *"
+        - name: CLUSTER_NAME
+          value: "dragonfly"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DATACENTER
+          value: "primary"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        livenessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 5
+          periodSeconds: 10
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: mayastor-two-replica
+      resources:
+        requests:
+          storage: 10Gi
+
+  # Production Affinity and Anti-Affinity
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly
+              app.kubernetes.io/part-of: dragonfly
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: dragonfly
+                app.kubernetes.io/part-of: dragonfly
+            topologyKey: topology.kubernetes.io/zone
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values: ["amd64"]
+              - key: node-type
+                operator: In
+                values: ["storage", "compute"]
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node-type
+                operator: In
+                values: ["storage"]
+
+  # Production Topology Spread Constraints
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: dragonfly
+          app.kubernetes.io/part-of: dragonfly
+    - maxSkew: 2
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: dragonfly
+          app.kubernetes.io/part-of: dragonfly
+
+  # Production Node Selection
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  # Production Tolerations
+  tolerations:
+    - key: "node.kubernetes.io/not-ready"
+      operator: "Exists"
+      effect: "NoExecute"
+      tolerationSeconds: 300
+    - key: "node.kubernetes.io/unreachable"
+      operator: "Exists"
+      effect: "NoExecute"
+      tolerationSeconds: 300
+    - key: "storage-node"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+  # Production Annotations
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "6379"
+    prometheus.io/path: "/metrics"
+    cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    backup.velero.io/backup-volumes: "data,logs"
+
+  # Production Labels
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    monitoring: "true"
+    security-scan: "required"
+    backup: "enabled"
+
+  # Priority Class for Critical Workloads
+  priorityClassName: system-cluster-critical
+
+  # Service Configuration
+  serviceSpec:
+    type: ClusterIP
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "6379"
+      prometheus.io/path: "/metrics"
+
+

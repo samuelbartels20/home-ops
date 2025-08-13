@@ -1,0 +1,467 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dragonfly-service
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+    environment: production
+    tier: storage
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "6379"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  selector:
+    app.kubernetes.io/name: dragonfly
+  ports:
+    - name: dragonfly
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+    - name: dragonfly-tls
+      port: 6380
+      targetPort: 6380
+      protocol: TCP
+    - name: admin
+      port: 6378
+      targetPort: 6378
+      protocol: TCP
+    - name: metrics
+      port: 9121
+      targetPort: 9121
+      protocol: TCP
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: dragonfly-monitor
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: dragonfly
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+  namespaceSelector:
+    matchNames:
+      - storage
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'dragonfly_.*'
+          action: keep
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_part_of]
+          targetLabel: cluster
+---
+# Prometheus Rules for Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dragonfly-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: dragonfly
+    prometheus: kube-prometheus
+    role: alert-rules
+    release: prometheus-operator
+    environment: production
+spec:
+  groups:
+    - name: dragonfly.availability
+      interval: 30s
+      rules:
+        - alert: DragonflyClusterDown
+          expr: |
+            count(up{job="dragonfly-service"} == 1) < 3
+          for: 2m
+          labels:
+            severity: critical
+            service: dragonfly
+            component: cache-database
+            tier: storage
+          annotations:
+            summary: "Dragonfly cluster has insufficient instances"
+            description: |
+              Dragonfly cluster has only {{ $value }} instances running.
+              Minimum required: 3 instances for high availability.
+
+              Immediate action required:
+              1. Check cluster status: kubectl get dragonfly -n storage
+              2. Check pod status: kubectl get pods -n storage -l app.kubernetes.io/name=dragonfly
+              3. Check logs: kubectl logs -n storage -l app.kubernetes.io/name=dragonfly --tail=100
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-cluster-down
+
+        - alert: DragonflyInstanceDown
+          expr: up{job="dragonfly-service"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: dragonfly
+            component: cache-database
+          annotations:
+            summary: "Dragonfly instance {{ $labels.pod }} is down"
+            description: |
+              Dragonfly instance {{ $labels.pod }} has been down for more than 1 minute.
+              This may affect cache availability and application performance.
+
+              Investigation steps:
+              1. Check pod status: kubectl get pod {{ $labels.pod }} -n storage
+              2. Check pod events: kubectl describe pod {{ $labels.pod }} -n storage
+              3. Check logs: kubectl logs {{ $labels.pod }} -n storage --tail=100
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-instance-down
+
+    - name: dragonfly.performance
+      interval: 30s
+      rules:
+        - alert: DragonflyHighMemoryUsage
+          expr: |
+            (dragonfly_memory_used_bytes / dragonfly_memory_max_bytes) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: performance
+          annotations:
+            summary: "Dragonfly high memory usage on {{ $labels.pod }}"
+            description: |
+              Dragonfly memory usage is {{ $value | humanizePercentage }} on {{ $labels.pod }}.
+              High memory usage may lead to:
+              - Key evictions
+              - Performance degradation
+              - OOM kills
+
+              Recommended actions:
+              1. Check memory usage patterns
+              2. Review eviction policies
+              3. Consider scaling horizontally
+              4. Analyze key patterns and TTLs
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-memory
+
+        - alert: DragonflyHighConnectionCount
+          expr: |
+            (dragonfly_connected_clients / dragonfly_maxclients) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: performance
+          annotations:
+            summary: "Dragonfly approaching connection limit"
+            description: |
+              Dragonfly connection usage is {{ $value | humanizePercentage }} on {{ $labels.pod }}.
+              Current connections: {{ dragonfly_connected_clients }}
+              Maximum connections: {{ dragonfly_maxclients }}
+
+              Recommended actions:
+              1. Check connection pooling configuration
+              2. Review client connection patterns
+              3. Consider increasing maxclients
+              4. Analyze connection leaks
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-connections
+
+        - alert: DragonflySlowQueries
+          expr: |
+            rate(dragonfly_slow_queries_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: performance
+          annotations:
+            summary: "Dragonfly has high rate of slow queries"
+            description: |
+              Dragonfly has {{ $value }} slow queries per second on {{ $labels.pod }}.
+              This may indicate:
+              - Inefficient query patterns
+              - Large data structures
+              - Resource contention
+
+              Investigation steps:
+              1. Check slow log: SLOWLOG GET 10
+              2. Analyze query patterns
+              3. Review data structure sizes
+              4. Check system resources
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-slow-queries
+
+        - alert: DragonflyHighLatency
+          expr: |
+            histogram_quantile(0.95, rate(dragonfly_command_duration_seconds_bucket[5m])) > 0.01
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: performance
+          annotations:
+            summary: "Dragonfly high command latency"
+            description: |
+              Dragonfly 95th percentile command latency is {{ $value | humanizeDuration }} on {{ $labels.pod }}.
+              This may affect application response times.
+
+              Recommended actions:
+              1. Check system resources (CPU, memory, disk I/O)
+              2. Analyze command patterns
+              3. Review persistence configuration
+              4. Check network latency
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-latency
+
+    - name: dragonfly.storage
+      interval: 30s
+      rules:
+        - alert: DragonflyHighDiskUsage
+          expr: |
+            (dragonfly_disk_used_bytes / dragonfly_disk_total_bytes) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: storage
+          annotations:
+            summary: "Dragonfly high disk usage"
+            description: |
+              Dragonfly disk usage is {{ $value | humanizePercentage }} on {{ $labels.pod }}.
+
+              Recommended actions:
+              1. Check RDB/AOF file sizes
+              2. Review persistence settings
+              3. Consider data cleanup
+              4. Plan storage expansion
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-disk
+
+        - alert: DragonflyPersistenceFailure
+          expr: |
+            dragonfly_last_save_time < (time() - 3600)
+          for: 10m
+          labels:
+            severity: critical
+            service: dragonfly
+            component: persistence
+          annotations:
+            summary: "Dragonfly persistence failure"
+            description: |
+              Dragonfly has not successfully saved data for more than 1 hour on {{ $labels.pod }}.
+              Last successful save: {{ $value | humanizeTimestamp }}
+
+              This is critical for data durability.
+
+              Immediate actions:
+              1. Check disk space and permissions
+              2. Check error logs
+              3. Verify backup storage availability
+              4. Consider manual BGSAVE
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-persistence
+
+    - name: dragonfly.replication
+      interval: 30s
+      rules:
+        - alert: DragonflyReplicationLag
+          expr: |
+            dragonfly_replication_lag_seconds > 30
+          for: 5m
+          labels:
+            severity: warning
+            service: dragonfly
+            component: replication
+          annotations:
+            summary: "Dragonfly replication lag detected"
+            description: |
+              Dragonfly replica {{ $labels.pod }} has {{ $value | humanizeDuration }} replication lag.
+
+              This may indicate:
+              - Network issues between master and replica
+              - High load on master
+              - Slow disk I/O on replica
+
+              Investigation steps:
+              1. Check master-replica connectivity
+              2. Check system resources on both master and replica
+              3. Review replication logs
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-replication
+
+        - alert: DragonflyReplicaDisconnected
+          expr: |
+            dragonfly_connected_slaves == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: dragonfly
+            component: replication
+          annotations:
+            summary: "Dragonfly has no connected replicas"
+            description: |
+              Dragonfly master {{ $labels.pod }} has no connected replicas.
+              This reduces data redundancy and failover capability.
+
+              Immediate actions:
+              1. Check replica pod status
+              2. Check network connectivity
+              3. Review replication configuration
+              4. Check authentication settings
+
+              Runbook: https://runbooks.samcloud.online/dragonfly-replica-disconnect
+---
+# Pod Disruption Budget for High Availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dragonfly-pdb
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: cache-database
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dragonfly-network-policy
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: network-security
+    app.kubernetes.io/part-of: dragonfly
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from applications
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: services
+        - namespaceSelector:
+            matchLabels:
+              name: data-science
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+    # Allow monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 9121
+    # Allow intra-cluster communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+        - protocol: TCP
+          port: 6378
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow external secrets
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: security
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow S3/MinIO access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    # Allow PostgreSQL metadata store
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow LDAP authentication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: security
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: lldap
+      ports:
+        - protocol: TCP
+          port: 389
+    # Allow intra-cluster communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 6380
+        - protocol: TCP
+          port: 6378

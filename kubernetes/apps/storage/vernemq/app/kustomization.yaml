@@ -1,0 +1,48 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: storage
+
+resources:
+  # Core deployment
+  - helmrelease.yaml
+  - externalsecret.yaml
+
+  # Monitoring & observability
+  - servicemonitor.yaml
+  - prometheusrule.yaml
+  - grafana-dashboard.yaml
+  - slo-monitoring.yaml
+
+  # High availability & scaling
+  - poddisruptionbudget.yaml
+  - hpa.yaml
+
+  # Security & compliance
+  - networkpolicy.yaml
+  - certificate.yaml
+  - pod-security-policy.yaml
+
+  # Storage & backup
+  - backup.yaml
+  - volume-snapshots.yaml
+
+
+
+  # Chaos Engineering
+  - chaos-engineering.yaml
+  - chaos-rbac.yaml
+
+  # Service Mesh Integration
+  - service-mesh.yaml
+
+  # Cost Optimization & Resource Governance
+  - cost-optimization.yaml
+  - cost-monitoring.yaml
+
+  # OAuth2/OIDC Authentication
+  - oauth2-integration.yaml
+
+  # Production standards compliance
+  - production-standards.yaml

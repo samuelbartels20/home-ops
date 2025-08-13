@@ -1,0 +1,138 @@
+---
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: influxdb-image-policy
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+spec:
+  images:
+    - glob: "docker.io/influxdb/**"
+  authorities:
+    - name: keyless
+      keyless:
+        url: "https://fulcio.sigstore.dev"
+      ctlog:
+        url: "https://rekor.sigstore.dev"
+    - name: key
+      key:
+        kms: "hashicorp-vault"
+        id: "influxdb-signing-key"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-supply-chain-config
+  namespace: storage
+  labels:
+    app.kubernetes.io/name: influxdb
+    app.kubernetes.io/component: security
+data:
+  supply-chain.yaml: |
+    # Supply Chain Security Configuration
+    supply_chain:
+      # Image Security
+      image_security:
+        scanning:
+          enabled: true
+          providers:
+            - name: "trivy"
+              schedule: "0 0 * * *"
+              threshold:
+                critical: 0
+                high: 0
+            - name: "snyk"
+              schedule: "0 12 * * *"
+              threshold:
+                critical: 0
+                high: 0
+        signing:
+          required: true
+          key_type: "cosign"
+          key_rotation: 180d
+        registry:
+          allowed_registries:
+            - "docker.io/influxdb"
+            - "gcr.io/influxdata"
+          image_pull_policy: Always
+
+      # Dependency Security
+      dependency_security:
+        scanning:
+          enabled: true
+          schedule: "0 0 * * *"
+        policy:
+          allowed_licenses:
+            - "Apache-2.0"
+            - "MIT"
+            - "BSD-3-Clause"
+          blocked_licenses:
+            - "GPL"
+            - "AGPL"
+        updates:
+          automatic: true
+          schedule: "0 2 * * 0"
+          approval_required: true
+
+      # Build Security
+      build_security:
+        reproducible_builds: true
+        build_integrity:
+          enabled: true
+          verification: true
+        artifact_signing:
+          enabled: true
+          key_type: "pgp"
+        source_verification:
+          enabled: true
+          commit_signing_required: true
+
+      # Continuous Security
+      continuous_security:
+        vulnerability_monitoring:
+          enabled: true
+          scan_interval: 6h
+          notification_threshold:
+            critical: immediate
+            high: 24h
+        compliance_monitoring:
+          enabled: true
+          frameworks:
+            - "NIST"
+            - "CIS"
+          scan_interval: 24h
+        secret_scanning:
+          enabled: true
+          providers:
+            - "gitleaks"
+            - "trufflehog"
+
+      # Security Gates
+      security_gates:
+        deployment:
+          block_on:
+            - unsigned_images
+            - critical_vulnerabilities
+            - license_violations
+            - failed_compliance
+        runtime:
+          block_on:
+            - unauthorized_access
+            - suspicious_activity
+            - policy_violation
+
+      # Audit and Compliance
+      audit:
+        enabled: true
+        events:
+          - "image_pull"
+          - "image_scan"
+          - "deployment"
+          - "policy_violation"
+        retention: 365d
+        export:
+          enabled: true
+          destination: "s3"
+          format: "json"
