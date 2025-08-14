@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app tailscale
+  namespace: security
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: tailscale-operator
+      version: 1.84.0
+      sourceRef:
+        kind: HelmRepository
+        name: tailscale
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  valuesFrom:
+    - kind: Secret
+      name: tailscale-secret
+      valuesKey: client_id
+      targetPath: accessKeyId
+    - kind: Secret
+      name: tailscale-secret
+      valuesKey: client_secret
+      targetPath: secretAccessKey
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: storage
+  values:
+    fullnameOverride: *app
+    installCRDs: true
+    ingressClass:
+      enabled: false
+    operatorConfig:
+      logging: debug
+      hostname: "hive-operator"
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+      defaultTags:
+        - "tag:hive-operator"
+    proxyConfig:
+      defaultTags: "tag:hive"
+    apiServerProxyConfig:
+      mode: "true"
