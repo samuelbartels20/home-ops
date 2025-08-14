@@ -1,0 +1,116 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wazuh-incident-response-alerts
+  namespace: security
+spec:
+  groups:
+    - name: incident.response
+      rules:
+        # Playbook Execution Monitoring
+        - alert: IncidentResponsePlaybookFailure
+          expr: sum(increase(wazuh_incident_playbook_failures_total[5m])) > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: "Incident response playbook execution failure"
+            description: "One or more incident response playbooks have failed to execute"
+            runbook_url: "https://runbooks.example.com/wazuh/playbook-failures"
+
+        - alert: IncidentResponsePlaybookDelay
+          expr: wazuh_incident_playbook_execution_seconds > 300
+          for: 5m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: "Delayed incident response playbook execution"
+            description: "Playbook execution is taking longer than 5 minutes"
+            runbook_url: "https://runbooks.example.com/wazuh/playbook-delays"
+
+        # Forensics System Monitoring
+        - alert: ForensicsStorageNearCapacity
+          expr: wazuh_forensics_storage_bytes / wazuh_forensics_storage_capacity_bytes * 100 > 80
+          for: 15m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: "Forensics storage near capacity"
+            description: "Forensics storage is over 80% capacity"
+            runbook_url: "https://runbooks.example.com/wazuh/forensics-storage"
+
+        - alert: ForensicsToolFailure
+          expr: sum(increase(wazuh_forensics_tool_failures_total[15m])) > 2
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: "Multiple forensics tool failures"
+            description: "More than 2 forensics tool failures in 15 minutes"
+            runbook_url: "https://runbooks.example.com/wazuh/forensics-failures"
+
+        # Integration Health
+        - alert: SlackIntegrationFailure
+          expr: sum(increase(wazuh_integration_failures_total{integration="slack"}[5m])) > 2
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: "Slack integration failures"
+            description: "Multiple failures sending alerts to Slack"
+            runbook_url: "https://runbooks.example.com/wazuh/slack-integration"
+
+        - alert: PagerDutyIntegrationFailure
+          expr: sum(increase(wazuh_integration_failures_total{integration="pagerduty"}[5m])) > 2
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: "PagerDuty integration failures"
+            description: "Multiple failures sending alerts to PagerDuty"
+            runbook_url: "https://runbooks.example.com/wazuh/pagerduty-integration"
+
+        # Reporting System
+        - alert: ReportGenerationFailure
+          expr: sum(increase(wazuh_report_generation_failures_total[1h])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: "Report generation failure"
+            description: "Failed to generate incident response reports"
+            runbook_url: "https://runbooks.example.com/wazuh/report-generation"
+
+        # SLO Recording Rules
+        - record: wazuh:slo:incident_response:success_ratio
+          expr: sum(rate(wazuh_incident_playbook_success_total[30d])) / sum(rate(wazuh_incident_playbook_total[30d])) * 100
+
+        - record: wazuh:slo:forensics:capture_success_ratio
+          expr: sum(rate(wazuh_forensics_capture_success_total[30d])) / sum(rate(wazuh_forensics_capture_total[30d])) * 100
+
+        # SLO Breach Alerts
+        - alert: IncidentResponseSLOBreach
+          expr: wazuh:slo:incident_response:success_ratio < 99.9
+          for: 1h
+          labels:
+            severity: critical
+            category: slo
+            team: sre
+          annotations:
+            summary: "Incident response SLO breach"
+            description: "Incident response success rate below 99.9% target"
+            runbook_url: "https://runbooks.example.com/wazuh/slo-breach"

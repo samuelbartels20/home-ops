@@ -1,0 +1,134 @@
+---
+# Server Configuration
+server:
+  name: wazuh-dashboard
+  host: "0.0.0.0"
+  port: 5601
+  maxPayloadBytes: 10485760
+  ssl:
+    enabled: true
+    certificate: /usr/share/wazuh-dashboard/certs/tls.crt
+    key: /usr/share/wazuh-dashboard/certs/tls.key
+    certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/ca.crt"]
+
+# Security Configuration
+opensearch_security:
+  enabled: true
+  multitenancy:
+    enabled: true
+    tenants:
+      private: true
+      global: false
+  readonly_mode:
+    roles: ["kibana_read_only"]
+  auth:
+    type: "openid"
+    openid:
+      connect_url: "https://auth.${SECRET_DOMAIN}/.well-known/openid-configuration"
+      client_id: "${OIDC_CLIENT_ID}"
+      client_secret: "${OIDC_CLIENT_SECRET}"
+      scope: ["openid", "profile", "email", "groups"]
+      response_type: "code"
+      jwt:
+        principal_field: "sub"
+        roles_field: "groups"
+    mfa:
+      enabled: true
+      provider: totp
+      issuer: "Wazuh Security"
+      config_file: "/usr/share/wazuh-dashboard/config/mfa.yaml"
+    ip_allowlist:
+      enabled: true
+      config_file: "/usr/share/wazuh-dashboard/config/mfa.yaml"
+  session:
+    ttl: 3600000
+    keepalive: true
+    secure: true
+    sameSite: "Strict"
+    httpOnly: true
+
+# OpenSearch Connection
+opensearch:
+  hosts: ["https://wazuh-indexer:9200"]
+  ssl:
+    verificationMode: full
+    certificateAuthorities: ["/usr/share/wazuh-dashboard/certs/ca.crt"]
+    certificate: /usr/share/wazuh-dashboard/certs/tls.crt
+    key: /usr/share/wazuh-dashboard/certs/tls.key
+  requestHeadersWhitelist: ["securitytenant", "Authorization"]
+  username: "${OPENSEARCH_USERNAME}"
+  password: "${OPENSEARCH_PASSWORD}"
+  requestTimeout: 30000
+  shardTimeout: 30000
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  ui:
+    container:
+      opensearch:
+        enabled: true
+  cluster_alerts:
+    enabled: true
+    email_notifications:
+      enabled: true
+      email: "${ALERT_EMAIL}"
+
+# Logging Configuration
+logging:
+  appenders:
+    file:
+      type: file
+      fileName: /var/log/wazuh-dashboard/opensearch_dashboards.log
+      layout:
+        type: json
+  root:
+    appenders: [file]
+    level: info
+
+# Performance Tuning
+ops:
+  cGroupOverrides:
+    cpus: 2
+  maxWorkerCount: 4
+  maxOldSpaceSize: 2048
+  gc:
+    enabled: true
+    interval: 30000
+
+# UI Settings
+uiSettings:
+  overrides:
+    "theme:darkMode": true
+    "dateFormat:tz": "UTC"
+    "timepicker:quickRanges":
+      - from: "now-24h"
+        to: "now"
+        display: "Last 24 hours"
+      - from: "now-7d"
+        to: "now"
+        display: "Last 7 days"
+      - from: "now-30d"
+        to: "now"
+        display: "Last 30 days"
+    "wazuh.monitoring.frequency": 60
+    "wazuh.monitoring.enabled": true
+    "wazuh.monitoring.pattern": "wazuh-monitoring-*"
+
+# CSP and Security Headers
+csp:
+  rules:
+    - "default-src 'self'"
+    - "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+    - "style-src 'self' 'unsafe-inline'"
+    - "img-src 'self' data: https:"
+    - "font-src 'self' data:"
+  reportOnly: false
+
+# Rate Limiting
+rateLimit:
+  enabled: true
+  maxRequestsPerIP: 1000
+  windowMs: 900000
+  delayAfter: 500
+  delayMs: 100

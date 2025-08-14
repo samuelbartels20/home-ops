@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-compliance-config
+  namespace: security
+data:
+  compliance.yaml: |
+    scans:
+      - name: pci-dss
+        schedule: "0 2 * * *"
+        standards:
+          - pci-dss-4.0
+        rules:
+          - rule_id: "pci_dss_10.2.2"
+            description: "Audit all actions taken by users with administrative privileges"
+          - rule_id: "pci_dss_10.5.2"
+            description: "Secure audit trails from unauthorized modifications"
+          - rule_id: "pci_dss_10.5.5"
+            description: "Use file integrity monitoring on audit logs"
+      - name: hipaa
+        schedule: "0 3 * * *"
+        standards:
+          - hipaa-hitech
+        rules:
+          - rule_id: "hipaa_164.312.a.1"
+            description: "Access Control and Authentication"
+          - rule_id: "hipaa_164.312.c.1"
+            description: "Data Integrity Controls"
+          - rule_id: "hipaa_164.312.e.1"
+            description: "Transmission Security"
+      - name: nist-800-53
+        schedule: "0 4 * * *"
+        standards:
+          - nist-800-53-rev5
+        rules:
+          - rule_id: "au-2"
+            description: "Audit Events"
+          - rule_id: "cm-6"
+            description: "Configuration Settings"
+          - rule_id: "sc-7"
+            description: "Boundary Protection"
+      - name: gdpr
+        schedule: "0 5 * * *"
+        standards:
+          - gdpr
+        rules:
+          - rule_id: "gdpr_32.1.b"
+            description: "Ability to ensure confidentiality, integrity, availability"
+          - rule_id: "gdpr_30.1.g"
+            description: "Technical and organizational security measures"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wazuh-compliance-scan
+  namespace: security
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: wazuh-compliance-scanner
+          containers:
+            - name: compliance-scanner
+              image: wazuh/wazuh-compliance-scanner:4.9.0
+              args:
+                - --config=/etc/wazuh/compliance.yaml
+                - --report-format=json
+                - --output=/var/log/wazuh/compliance
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/wazuh/compliance.yaml
+                  subPath: compliance.yaml
+                  readOnly: true
+                - name: reports
+                  mountPath: /var/log/wazuh/compliance
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: config
+              configMap:
+                name: wazuh-compliance-config
+            - name: reports
+              persistentVolumeClaim:
+                claimName: wazuh-compliance-reports
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wazuh-compliance-reports
+  namespace: security
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-mfa-config
+  namespace: security
+data:
+  mfa.yaml: |
+    authentication:
+      mfa:
+        enabled: true
+        provider: totp
+        issuer: "Wazuh Security"
+        period: 30
+        digits: 6
+        window: 1
+        qr_size: 200
+        algorithm: SHA1
+        backup_codes: 5
+      session:
+        max_duration: 8h
+        inactivity_timeout: 15m
+        max_concurrent: 3
+      ip_allowlist:
+        enabled: true
+        rules:
+          - name: "Internal Network"
+            cidr: "10.0.0.0/8"
+            description: "Internal corporate network"
+          - name: "VPN Network"
+            cidr: "172.16.0.0/12"
+            description: "Corporate VPN network"
+          - name: "Development Network"
+            cidr: "192.168.0.0/16"
+            description: "Development environment"
+      rate_limiting:
+        enabled: true
+        window: 5m
+        max_attempts: 5
+        lockout_duration: 30m

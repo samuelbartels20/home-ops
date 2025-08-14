@@ -1,0 +1,508 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wazuh-manager-master
+  namespace: security
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: wazuh-manager
+      version: 4.9.0
+      sourceRef:
+        kind: HelmRepository
+        name: wazuh
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+    crds: CreateReplace
+  uninstall:
+    keepHistory: false
+  values:
+    # High Availability Configuration
+    replicaCount: 3
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    # Advanced Deployment Strategy
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+
+    # Resource Management
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+    # Pod Placement and Scheduling
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values: ["wazuh-manager"]
+            topologyKey: kubernetes.io/hostname
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
+
+    # Security Context
+    securityContext:
+      runAsUser: 101
+      runAsGroup: 101
+      fsGroup: 101
+      capabilities:
+        drop: ["ALL"]
+        add: ["SYS_CHROOT"]
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      seLinuxOptions:
+        type: wazuh_manager_t
+        level: "s0"
+      appArmorProfile: "runtime/default"
+
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      fsGroup: 101
+      supplementalGroups: [101]
+      sysctls:
+        - name: kernel.core_pattern
+          value: "|/bin/false"
+        - name: kernel.unprivileged_userns_clone
+          value: "0"
+
+    # Storage Configuration
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 50Gi
+      accessModes:
+        - ReadWriteOnce
+      retainPolicy: Retain
+      backup:
+        enabled: true
+        schedule: "0 2 * * *"
+        retention:
+          keep: 7
+          prune: true
+
+    # Network Configuration
+    service:
+      type: ClusterIP
+      ports:
+        - name: registration
+          port: 1515
+          protocol: TCP
+        - name: cluster
+          port: 1516
+          protocol: TCP
+        - name: api
+          port: 55000
+          protocol: TCP
+      loadBalancer:
+        enabled: false
+        sourceRanges: []
+
+    # Monitoring & Observability
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+        labels: {}
+      prometheusRule:
+        enabled: true
+        additionalLabels: {}
+
+    # Logging Configuration
+    logging:
+      json: true
+      level: info
+      output:
+        elasticsearch:
+          enabled: true
+          hosts: ["https://wazuh-indexer:9200"]
+          indices:
+            alerts: wazuh-alerts
+            archives: wazuh-archives
+        loki:
+          enabled: true
+          url: http://loki.monitoring:3100
+          labels:
+            app: wazuh
+            component: manager
+
+    # Advanced Security Features
+    security:
+      tls:
+        enabled: true
+        auto: true
+        certificatesDuration: 2160h
+        api:
+          enabled: true
+          generateCerts: true
+        cluster:
+          enabled: true
+          generateCerts: true
+        filebeat:
+          enabled: true
+          generateCerts: true
+      audit:
+        enabled: true
+        logPath: /var/ossec/logs/audit
+        logFormat: json
+        rules:
+          - level: Metadata
+            users: ["system:serviceaccount:*"]
+            resources: ["secrets", "configmaps"]
+          - level: RequestResponse
+            users: ["system:serviceaccount:*"]
+            resources: ["*"]
+      networkPolicy:
+        enabled: true
+        ingressRules:
+          - from:
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: wazuh-agent
+                ports:
+                  - port: 1514
+                    protocol: TCP
+          - from:
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: wazuh-manager-worker
+                ports:
+                  - port: 1516
+                    protocol: TCP
+        egressRules:
+          - to:
+              - podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: wazuh-indexer
+                ports:
+                  - port: 9200
+                    protocol: TCP
+
+    # Cluster Configuration
+    cluster:
+      enabled: true
+      key: "${WAZUH_CLUSTER_KEY}"
+      nodeType: master
+      nodeCount: 3
+      masterNode: wazuh-manager-master-0.wazuh-cluster
+
+    # Circuit Breaker and Retry Policies
+    resilience:
+      circuitBreaker:
+        enabled: true
+        maxRequests: 100
+        interval: 1m
+        timeout: 30s
+        consecutiveFailures: 5
+      retryPolicy:
+        enabled: true
+        maxRetries: 3
+        initialInterval: 1s
+        maxInterval: 10s
+        multiplier: 2
+      rateLimiting:
+        enabled: true
+        rps: 1000
+        burst: 2000
+        timeout: 5s
+      connectionPool:
+        maxIdleConns: 100
+        maxOpenConns: 200
+        connMaxLifetime: 1h
+
+    # Advanced Features
+    features:
+      activeResponse:
+        enabled: true
+        timeout: 300
+      vulnerabilityDetection:
+        enabled: true
+        interval: 1h
+        ignore:
+          - package: "linux-*"
+          - cve: "CVE-2016-*"
+      osquery:
+        enabled: true
+        interval: 30m
+        packPath: /var/ossec/etc/osquery
+      ciscat:
+        enabled: true
+        interval: 1d
+        java_path: /usr/bin/java
+        ciscat_path: /var/ossec/wodles/ciscat
+      openscap:
+        enabled: true
+        interval: 1d
+        timeout: 1800
+      syscheck:
+        frequency: 43200
+        scan_on_start: true
+        directories:
+          - path: /etc
+            check_all: true
+          - path: /usr/bin
+            check_all: true
+          - path: /usr/sbin
+            check_all: true
+        ignore:
+          - /etc/mtab
+          - /etc/hosts.deny
+          - /etc/mail/statistics
+          - /etc/random-seed
+      rootcheck:
+        frequency: 43200
+        check_unixaudit: true
+        check_files: true
+        check_trojans: true
+        check_dev: true
+        check_sys: true
+        check_pids: true
+        check_ports: true
+        check_if: true
+
+    # Integration Settings
+    integrations:
+      slack:
+        enabled: true
+        hook_url: "${SLACK_WEBHOOK_URL}"
+        alert_level: 12
+      pagerduty:
+        enabled: true
+        service_key: "${PAGERDUTY_SERVICE_KEY}"
+        alert_level: 15
+      elasticsearch:
+        enabled: true
+        url: https://wazuh-indexer:9200
+        username: "${ELASTIC_USERNAME}"
+        password: "${ELASTIC_PASSWORD}"
+      s3:
+        enabled: true
+        bucket: wazuh-archives
+        access_key: "${AWS_ACCESS_KEY}"
+        secret_key: "${AWS_SECRET_KEY}"
+        interval: 12h
+
+    # Health Checks
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+      successThreshold: 1
+
+    # Additional Security Hardening
+    podSecurityStandards:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+    systemHardening:
+      sysctls:
+        enabled: true
+        values:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
+          - name: net.ipv4.tcp_tw_reuse
+            value: "1"
+      runtimeClass:
+        enabled: true
+        name: gvisor
+      securityProviders:
+        appArmor:
+          enabled: true
+          defaultProfile: runtime/default
+          profiles:
+            wazuh:
+              enforced: true
+              rules: |
+                #include <tunables/global>
+                profile wazuh flags=(attach_disconnected) {
+                  #include <abstractions/base>
+                  #include <abstractions/nameservice>
+
+                  /var/ossec/** rwk,
+                  /var/log/wazuh/** rwk,
+                  /etc/wazuh/** r,
+
+                  network tcp,
+                  network udp,
+                }
+        selinux:
+          enabled: true
+          type: wazuh_manager_t
+          level: s0
+
+    # Advanced Threat Protection
+    threatProtection:
+      enabled: true
+      malwareScanning:
+        enabled: true
+        realtime: true
+        schedule: "0 */4 * * *"
+      vulnerabilityScanning:
+        enabled: true
+        schedule: "0 */6 * * *"
+      behavioralAnalysis:
+        enabled: true
+        baselineAfter: 168h
+        anomalyThreshold: 3.0
+      machinelearning:
+        enabled: true
+        models:
+          - name: network_behavior
+            enabled: true
+            type: isolation_forest
+            configPath: /etc/wazuh/ml/network_behavior.yml
+          - name: authentication_patterns
+            enabled: true
+            type: lstm
+            configPath: /etc/wazuh/ml/auth_patterns.yml
+          - name: system_metrics
+            enabled: true
+            type: prophet
+            configPath: /etc/wazuh/ml/system_metrics.yml
+          - name: file_operations
+            enabled: true
+            type: autoencoder
+            configPath: /etc/wazuh/ml/file_ops.yml
+        integration:
+          indexer:
+            enabled: true
+            index: wazuh-ml-results
+          alerts:
+            enabled: true
+            min_score: 0.8
+          actions:
+            enabled: true
+            threshold: 0.95
+            commands:
+              - block_ip
+              - isolate_host
+              - notify_soc
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+      intrusionDetection:
+        enabled: true
+        rules:
+          - source: "https://rules.wazuh.com/latest.xml"
+          - source: "https://rules.emergingthreats.net/latest.xml"
+      fileIntegrity:
+        enabled: true
+        realtime: true
+        directories:
+          - path: /etc
+            recursion_level: 2
+          - path: /usr/bin
+            recursion_level: 1
+          - path: /usr/sbin
+            recursion_level: 1
+
+    # Compliance & Auditing
+    compliance:
+      enabled: true
+      standards:
+        - standard: pci-dss
+          version: "4.0"
+          enabled: true
+        - standard: hipaa
+          enabled: true
+        - standard: gdpr
+          enabled: true
+        - standard: nist-800-53
+          enabled: true
+      auditd:
+        enabled: true
+        rules:
+          - "-a exit,always -F arch=b64 -S execve -k exec"
+          - "-w /etc/passwd -p wa -k identity"
+          - "-w /etc/group -p wa -k identity"
+          - "-w /etc/shadow -p wa -k identity"
+          - "-w /var/run/utmp -p wa -k session"
+          - "-w /var/log/wtmp -p wa -k session"
+          - "-w /var/log/btmp -p wa -k session"
+
+    # Observability Configuration
+    observability:
+      opentelemetry:
+        enabled: true
+        endpoint: "otel-collector.monitoring:4317"
+        protocol: grpc
+        attributes:
+          service.name: wazuh-manager
+          service.namespace: security
+          service.instance.id: ${POD_NAME}
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          interval: 30s
+          scrapeTimeout: 10s
+          metricRelabelings:
+            - sourceLabels: [__name__]
+              regex: 'wazuh_.*'
+              action: keep
+          labels:
+            release: kube-prometheus-stack
+      tracing:
+        enabled: true
+        sampler:
+          type: probabilistic
+          param: 1.0
+        baggage:
+          - key: environment
+            value: production
+      profiling:
+        enabled: true
+        pyroscope:
+          enabled: true
+          endpoint: http://pyroscope.monitoring:4040

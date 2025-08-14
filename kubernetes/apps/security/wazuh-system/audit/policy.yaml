@@ -1,0 +1,78 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+metadata:
+  name: wazuh-audit-policy
+  namespace: security
+rules:
+  # Log all authentication attempts
+  - level: RequestResponse
+    users: ["*"]
+    verbs: ["create"]
+    resources:
+      - group: ""
+        resources: ["users", "groups"]
+
+  # Log all changes to secrets and configmaps
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+    verbs: ["create", "update", "patch", "delete"]
+
+  # Log all changes to RBAC
+  - level: RequestResponse
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["create", "update", "patch", "delete"]
+
+  # Log all changes to network policies
+  - level: RequestResponse
+    resources:
+      - group: "networking.k8s.io"
+        resources: ["networkpolicies"]
+    verbs: ["create", "update", "patch", "delete"]
+
+  # Log all changes to certificates
+  - level: RequestResponse
+    resources:
+      - group: "cert-manager.io"
+        resources: ["certificates", "issuers"]
+    verbs: ["create", "update", "patch", "delete"]
+
+  # Log all pod exec and attach operations
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["pods/exec", "pods/attach"]
+    verbs: ["create"]
+
+  # Log all changes to compliance and security configurations
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["configmaps"]
+    verbs: ["create", "update", "patch", "delete"]
+    resourceNames:
+      - "wazuh-compliance-config"
+      - "wazuh-security-config"
+
+  # Log all changes to backup and disaster recovery configurations
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["configmaps", "cronjobs"]
+    verbs: ["create", "update", "patch", "delete"]
+    resourceNames:
+      - "wazuh-disaster-recovery"
+      - "wazuh-backup"
+
+  # Log all privileged operations
+  - level: RequestResponse
+    users: ["system:serviceaccount:security:wazuh-admin"]
+    verbs: ["*"]
+
+  # Default catch-all rule
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"

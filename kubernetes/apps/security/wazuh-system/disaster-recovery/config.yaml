@@ -1,0 +1,136 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-disaster-recovery
+  namespace: security
+data:
+  recovery-plan.yaml: |
+    backup:
+      schedule: "0 1 * * *"
+      retention:
+        days: 30
+        copies: 7
+      components:
+        - name: wazuh-manager
+          type: statefulset
+          namespace: security
+          volumes:
+            - /var/ossec/etc
+            - /var/ossec/logs
+            - /var/ossec/stats
+          encryption:
+            enabled: true
+            provider: age
+            secretName: backup-encryption-key
+        - name: wazuh-indexer
+          type: statefulset
+          namespace: security
+          volumes:
+            - /usr/share/wazuh-indexer/data
+          encryption:
+            enabled: true
+            provider: age
+            secretName: backup-encryption-key
+        - name: wazuh-dashboard
+          type: deployment
+          namespace: security
+          volumes:
+            - /usr/share/wazuh-dashboard/data
+          encryption:
+            enabled: true
+            provider: age
+            secretName: backup-encryption-key
+      storage:
+        type: s3
+        bucket: wazuh-backups
+        region: us-east-1
+        credentials:
+          secretName: backup-credentials
+    restore:
+      verification:
+        enabled: true
+        schedule: "0 3 * * *"
+      procedures:
+        - name: full-cluster-restore
+          components:
+            - wazuh-manager
+            - wazuh-indexer
+            - wazuh-dashboard
+          order:
+            - stop-services
+            - restore-volumes
+            - restore-configs
+            - start-services
+            - verify-cluster-health
+        - name: indexer-only-restore
+          components:
+            - wazuh-indexer
+          order:
+            - stop-indexer
+            - restore-indexer-data
+            - start-indexer
+            - verify-indexer-health
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: wazuh-backup
+  namespace: security
+spec:
+  schedule: "0 1 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: wazuh-backup
+          containers:
+            - name: backup
+              image: wazuh/wazuh-backup:4.9.0
+              args:
+                - --config=/etc/wazuh/recovery-plan.yaml
+                - --mode=backup
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/wazuh/recovery-plan.yaml
+                  subPath: recovery-plan.yaml
+                  readOnly: true
+                - name: backup-encryption
+                  mountPath: /etc/backup/keys
+                  readOnly: true
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-credentials
+                      key: aws-access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: backup-credentials
+                      key: aws-secret-key
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 1Gi
+                requests:
+                  cpu: 200m
+                  memory: 256Mi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: config
+              configMap:
+                name: wazuh-disaster-recovery
+            - name: backup-encryption
+              secret:
+                secretName: backup-encryption-key
+          restartPolicy: OnFailure

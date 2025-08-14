@@ -1,0 +1,97 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wazuh-ml-alerts
+  namespace: security
+spec:
+  groups:
+    - name: wazuh.ml
+      rules:
+        # Model Performance
+        - alert: WazuhMLModelAccuracyDegraded
+          expr: wazuh_ml_model_accuracy < 0.8
+          for: 1h
+          labels:
+            severity: warning
+            category: ml
+            team: data-science
+          annotations:
+            summary: ML model accuracy has degraded
+            description: "Model {{ $labels.model_name }} accuracy is below 80%"
+            runbook_url: https://runbooks.example.com/wazuh/ml-model-degradation
+
+        - alert: WazuhMLHighPredictionLatency
+          expr: histogram_quantile(0.95, sum(rate(wazuh_ml_prediction_latency_seconds_bucket[5m])) by (le, model_name)) > 0.1
+          for: 15m
+          labels:
+            severity: warning
+            category: ml
+            team: data-science
+          annotations:
+            summary: High ML prediction latency
+            description: "Model {{ $labels.model_name }} prediction latency is above 100ms"
+            runbook_url: https://runbooks.example.com/wazuh/ml-prediction-latency
+
+        # Anomaly Detection
+        - alert: WazuhMLHighAnomalyRate
+          expr: sum(rate(wazuh_ml_anomaly_score{score > 0.9}[5m])) by (model_name) > 10
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: High rate of anomalies detected
+            description: "Model {{ $labels.model_name }} detected multiple high-confidence anomalies"
+            runbook_url: https://runbooks.example.com/wazuh/ml-anomaly-detection
+
+        # Training Issues
+        - alert: WazuhMLTrainingFailure
+          expr: wazuh_ml_training_status != 1
+          for: 1h
+          labels:
+            severity: critical
+            category: ml
+            team: data-science
+          annotations:
+            summary: ML model training failure
+            description: "Model {{ $labels.model_name }} training has failed"
+            runbook_url: https://runbooks.example.com/wazuh/ml-training-failure
+
+        - alert: WazuhMLLongTrainingDuration
+          expr: wazuh_ml_training_duration_seconds > 3600
+          for: 1h
+          labels:
+            severity: warning
+            category: ml
+            team: data-science
+          annotations:
+            summary: ML training taking too long
+            description: "Model {{ $labels.model_name }} training duration exceeds 1 hour"
+            runbook_url: https://runbooks.example.com/wazuh/ml-training-duration
+
+        # Resource Usage
+        - alert: WazuhMLHighMemoryUsage
+          expr: container_memory_usage_bytes{container=~"wazuh-ml.*"} > 2e9
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: High memory usage in ML components
+            description: "ML component {{ $labels.container }} using more than 2GB memory"
+            runbook_url: https://runbooks.example.com/wazuh/ml-resource-usage
+
+        # Data Pipeline
+        - alert: WazuhMLDataPipelineDelay
+          expr: time() - wazuh_ml_last_data_pipeline_success_timestamp > 3600
+          for: 1h
+          labels:
+            severity: warning
+            category: ml
+            team: data-science
+          annotations:
+            summary: ML data pipeline delay
+            description: "Data pipeline for {{ $labels.model_name }} is delayed"
+            runbook_url: https://runbooks.example.com/wazuh/ml-data-pipeline

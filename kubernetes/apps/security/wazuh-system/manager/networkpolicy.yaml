@@ -1,0 +1,456 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/v3/apis__networking.k8s.io__v1_openapi.json
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wazuh-manager-master-default-deny
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-manager
+    app.kubernetes.io/component: master
+    policy.security.openshift.io/default-network: restricted
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-manager
+      node-type: master
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Main policy with explicit allows
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wazuh-manager-master
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-manager
+    app.kubernetes.io/component: master
+    app.kubernetes.io/part-of: wazuh
+    policy.security.openshift.io/default-network: restricted
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/version: "4.7"
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    kubernetes.io/description: "Production-grade network policy for Wazuh manager master with rate limiting"
+    policy.openshift.io/network-isolation: "true"
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    meta.helm.sh/release-name: wazuh
+    meta.helm.sh/release-namespace: security
+    # Rate limiting annotations
+    ingress.kubernetes.io/limit-rpm: "600"
+    ingress.kubernetes.io/limit-connections: "100"
+    ingress.kubernetes.io/limit-burst-multiplier: "5"
+    ingress.kubernetes.io/limit-whitelist: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-manager
+      node-type: master
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow worker nodes to connect to master with rate limiting
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-manager
+              node-type: worker
+              app.kubernetes.io/part-of: wazuh
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 1516
+          protocol: TCP
+          endPort: 1516  # Explicit port range
+    # Allow agents to register with rate limiting and mTLS
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-agent
+              app.kubernetes.io/part-of: wazuh
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 1515
+          protocol: TCP
+          endPort: 1515  # Explicit port range
+    # Allow API access from dashboard with mTLS and rate limiting
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-dashboard
+              app.kubernetes.io/part-of: wazuh
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 55000
+          protocol: TCP
+          endPort: 55000  # Explicit port range
+    # Allow metrics scraping with service account authentication
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/component: monitoring
+              app.kubernetes.io/part-of: monitoring
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 9100
+          protocol: TCP
+          endPort: 9100  # Explicit port range
+  egress:
+    # Allow connection to indexer with mTLS and rate limiting
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-indexer
+              app.kubernetes.io/part-of: wazuh
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 9200
+          protocol: TCP
+          endPort: 9200  # Explicit port range
+    # Allow DNS resolution with specific service account
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 53
+          protocol: UDP
+          endPort: 53  # Explicit port range
+        - port: 53
+          protocol: TCP
+          endPort: 53  # Explicit port range
+    # Allow sending logs to Loki with authentication and rate limiting
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+              app.kubernetes.io/component: logging
+              app.kubernetes.io/part-of: monitoring
+              security.openshift.io/scc.podSecurityLabelSync: "true"
+      ports:
+        - port: 3100
+          protocol: TCP
+          endPort: 3100  # Explicit port range
+    # Allow HTTPS for external updates with strict filtering and rate limiting
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16  # Link-local addresses
+              - 172.16.0.0/12   # Private network
+              - 192.168.0.0/16  # Private network
+              - 10.0.0.0/8      # Private network
+              - 127.0.0.0/8     # Localhost
+              - 0.0.0.0/8       # Invalid addresses
+              - 100.64.0.0/10   # Carrier-grade NAT
+              - 192.0.0.0/24    # IANA special purpose
+              - 192.0.2.0/24    # TEST-NET-1
+              - 198.18.0.0/15   # Network benchmark testing
+              - 198.51.100.0/24 # TEST-NET-2
+              - 203.0.113.0/24  # TEST-NET-3
+              - 224.0.0.0/4     # Multicast
+              - 240.0.0.0/4     # Reserved
+              - fc00::/7        # Unique local addresses
+              - fe80::/10       # Link-local addresses
+      ports:
+        - port: 443
+          protocol: TCP
+          endPort: 443  # Explicit port range
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wazuh-manager-worker
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-manager
+    app.kubernetes.io/component: worker
+    policy.security.openshift.io/default-network: restricted
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    kubernetes.io/description: "Production-grade network policy for Wazuh manager worker"
+    policy.openshift.io/network-isolation: "true"
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-manager
+      node-type: worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow agent connections with explicit namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-agent
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 1514
+          protocol: TCP
+    # Allow metrics scraping with specific service account
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9100
+          protocol: TCP
+  egress:
+    # Allow connection to master with explicit namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-manager
+              node-type: master
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 1516
+          protocol: TCP
+    # Allow connection to indexer with explicit namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-indexer
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 9200
+          protocol: TCP
+    # Allow DNS resolution with specific ports
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow sending logs to Loki with specific port
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: loki
+      ports:
+        - port: 3100
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wazuh-indexer
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-indexer
+    policy.security.openshift.io/default-network: restricted
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    kubernetes.io/description: "Production-grade network policy for Wazuh indexer"
+    policy.openshift.io/network-isolation: "true"
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-indexer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow connections from Wazuh managers with explicit namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-manager
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 9200
+          protocol: TCP
+    # Allow connections from Wazuh dashboard with explicit namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-dashboard
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 9200
+          protocol: TCP
+    # Allow metrics scraping with specific service account
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9100
+          protocol: TCP
+  egress:
+    # Allow DNS resolution with specific ports
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wazuh-dashboard
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-dashboard
+    policy.security.openshift.io/default-network: restricted
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    kubernetes.io/description: "Production-grade network policy for Wazuh dashboard"
+    policy.openshift.io/network-isolation: "true"
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: wazuh-dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow UI access through ingress with explicit namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - port: 5601
+          protocol: TCP
+    # Allow metrics scraping with specific service account
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 9100
+          protocol: TCP
+  egress:
+    # Allow connection to Wazuh manager API with explicit namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-manager
+              node-type: master
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 55000
+          protocol: TCP
+    # Allow connection to indexer with explicit namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: wazuh-indexer
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: security
+      ports:
+        - port: 9200
+          protocol: TCP
+    # Allow DNS resolution with specific ports
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow HTTPS for external updates and API calls
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+      ports:
+        - port: 443
+          protocol: TCP

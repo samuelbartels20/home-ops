@@ -1,0 +1,234 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wazuh-dashboard-alerts
+  namespace: security
+  labels:
+    prometheus: k8s
+    role: alert-rules
+    app.kubernetes.io/name: wazuh-dashboard
+    app.kubernetes.io/part-of: wazuh
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/version: "4.9.0"
+    monitoring: prometheus
+    environment: production
+spec:
+  groups:
+    - name: wazuh-dashboard.certificates
+      rules:
+        # Certificate Expiration Monitoring
+        - alert: WazuhCertificateExpiringCritical
+          expr: (ssl_cert_expiry_timestamp_seconds{job="wazuh-dashboard"} - time()) / 86400 < 7
+          for: 1h
+          labels:
+            severity: critical
+            category: security
+            team: security
+            component: certificates
+          annotations:
+            summary: "Certificate critically close to expiration"
+            description: "Certificate {{ $labels.subject }} will expire in less than 7 days"
+            runbook_url: "https://runbooks.example.com/wazuh/certificate-expiry"
+
+        - alert: WazuhCertificateExpiringWarning
+          expr: (ssl_cert_expiry_timestamp_seconds{job="wazuh-dashboard"} - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+            category: security
+            team: security
+            component: certificates
+          annotations:
+            summary: "Certificate expiring soon"
+            description: "Certificate {{ $labels.subject }} will expire in less than 30 days"
+            runbook_url: "https://runbooks.example.com/wazuh/certificate-expiry"
+
+        - alert: WazuhCertificateValidationError
+          expr: ssl_cert_verify_error{job="wazuh-dashboard"} > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+            component: certificates
+          annotations:
+            summary: "Certificate validation error"
+            description: "Certificate validation failed for {{ $labels.subject }}"
+            runbook_url: "https://runbooks.example.com/wazuh/certificate-validation"
+
+    - name: wazuh-dashboard.sli
+      rules:
+        # Service Level Indicators (SLIs)
+        - record: wazuh_dashboard:availability:ratio
+          expr: avg_over_time(up{job="wazuh-dashboard"}[30d]) * 100
+
+        - record: wazuh_dashboard:latency:p95
+          expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="wazuh-dashboard"}[5m])) by (le))
+
+        - record: wazuh_dashboard:error:ratio
+          expr: sum(rate(http_requests_total{job="wazuh-dashboard",code=~"5.."}[5m])) / sum(rate(http_requests_total{job="wazuh-dashboard"}[5m])) * 100
+
+        - record: wazuh_dashboard:saturation:cpu
+          expr: sum(rate(container_cpu_usage_seconds_total{container="wazuh-dashboard"}[5m])) / sum(container_spec_cpu_quota{container="wazuh-dashboard"}) * 100
+
+        - record: wazuh_dashboard:saturation:memory
+          expr: sum(container_memory_working_set_bytes{container="wazuh-dashboard"}) / sum(container_spec_memory_limit_bytes{container="wazuh-dashboard"}) * 100
+
+    - name: wazuh-dashboard.alerts
+      rules:
+        # Circuit Breaker Alerts
+        - alert: WazuhDashboardCircuitBreakerTripped
+          expr: rate(circuit_breaker_failures_total{service="wazuh-dashboard"}[5m]) > 10
+          for: 2m
+          labels:
+            severity: critical
+            category: reliability
+            team: sre
+          annotations:
+            summary: "Circuit breaker tripped for Wazuh Dashboard"
+            description: "High failure rate triggered circuit breaker"
+            runbook_url: "https://runbooks.example.com/wazuh/circuit-breaker"
+
+        # Rate Limiting Alerts
+        - alert: WazuhDashboardRateLimitExceeded
+          expr: rate(rate_limit_exceeded_total{service="wazuh-dashboard"}[5m]) > 100
+          for: 5m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: "Rate limiting thresholds exceeded"
+            description: "API rate limits being hit frequently, possible abuse"
+            runbook_url: "https://runbooks.example.com/wazuh/rate-limits"
+
+        # Availability Alerts
+        - alert: WazuhDashboardDown
+          expr: up{job="wazuh-dashboard"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+            team: security
+          annotations:
+            summary: "Wazuh Dashboard is down"
+            description: "Wazuh Dashboard has been down for more than 5 minutes"
+            runbook_url: "https://runbooks.example.com/wazuh/dashboard-down"
+
+        # SLO Breach Alerts
+        - alert: WazuhDashboardSLOAvailabilityBreach
+          expr: wazuh_dashboard:availability:ratio < 99.9
+          for: 1h
+          labels:
+            severity: critical
+            category: slo
+            team: sre
+            slo: availability
+          annotations:
+            summary: "Wazuh Dashboard availability SLO breach"
+            description: "Dashboard availability is below 99.9% target over 30 days"
+            runbook_url: "https://runbooks.example.com/wazuh/slo-breach"
+
+        - alert: WazuhDashboardSLOLatencyBreach
+          expr: wazuh_dashboard:latency:p95 > 2
+          for: 15m
+          labels:
+            severity: warning
+            category: slo
+            team: sre
+            slo: latency
+          annotations:
+            summary: "Wazuh Dashboard latency SLO breach"
+            description: "95th percentile latency is above 2 seconds"
+            runbook_url: "https://runbooks.example.com/wazuh/latency-slo"
+
+        # Resource Saturation Alerts
+        - alert: WazuhDashboardHighCPUSaturation
+          expr: wazuh_dashboard:saturation:cpu > 80
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: "High CPU saturation in Wazuh Dashboard"
+            description: "CPU utilization above 80% of limit for 15 minutes"
+            runbook_url: "https://runbooks.example.com/wazuh/high-cpu"
+
+        - alert: WazuhDashboardHighMemorySaturation
+          expr: wazuh_dashboard:saturation:memory > 80
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: "High memory saturation in Wazuh Dashboard"
+            description: "Memory utilization above 80% of limit"
+            runbook_url: "https://runbooks.example.com/wazuh/high-memory"
+
+        # Performance Degradation
+        - alert: WazuhDashboardHighLatency
+          expr: wazuh_dashboard:latency:p95 > 1
+          for: 10m
+          labels:
+            severity: warning
+            category: performance
+            team: sre
+          annotations:
+            summary: "High latency in Wazuh Dashboard"
+            description: "95th percentile latency above 1 second"
+            runbook_url: "https://runbooks.example.com/wazuh/high-latency"
+
+        # Error Budget Alerts
+        - alert: WazuhDashboardHighErrorRate
+          expr: wazuh_dashboard:error:ratio > 5
+          for: 5m
+          labels:
+            severity: warning
+            category: reliability
+            team: sre
+          annotations:
+            summary: "High error rate in Wazuh Dashboard"
+            description: "Error rate above 5% threshold"
+            runbook_url: "https://runbooks.example.com/wazuh/high-error-rate"
+
+        # Security Alerts
+        - alert: WazuhDashboardCertificateExpiringSoon
+          expr: ssl_cert_expiry_days{job="wazuh-dashboard"} < 30
+          for: 1h
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: "SSL Certificate expiring soon"
+            description: "SSL Certificate will expire in less than 30 days"
+            runbook_url: "https://runbooks.example.com/wazuh/ssl-expiry"
+
+        # Connection Health
+        - alert: WazuhDashboardIndexerConnectionIssues
+          expr: opensearch_cluster_health_status{job="wazuh-dashboard"} > 1
+          for: 5m
+          labels:
+            severity: critical
+            category: connectivity
+            team: security
+          annotations:
+            summary: "Issues connecting to OpenSearch"
+            description: "Wazuh Dashboard is having issues connecting to OpenSearch cluster"
+            runbook_url: "https://runbooks.example.com/wazuh/indexer-connection"
+
+        # Resource Exhaustion Prevention
+        - alert: WazuhDashboardHighSessionCount
+          expr: wazuh_dashboard_active_sessions > 1000
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: security
+          annotations:
+            summary: "High number of active sessions"
+            description: "More than 1000 active sessions for 15 minutes"
+            runbook_url: "https://runbooks.example.com/wazuh/high-sessions"

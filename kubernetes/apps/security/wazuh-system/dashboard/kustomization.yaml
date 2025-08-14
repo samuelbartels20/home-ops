@@ -1,0 +1,23 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: security
+resources:
+  - ./helmrelease.yaml
+  - ./secret.sops.yaml
+  - ./networkpolicy.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/name: wazuh-dashboard
+      app.kubernetes.io/part-of: wazuh
+      app.kubernetes.io/version: "4.9.0"
+      app.kubernetes.io/managed-by: flux
+commonLabels:
+  app.kubernetes.io/name: wazuh-dashboard
+  app.kubernetes.io/part-of: wazuh
+configMapGenerator:
+  - name: wazuh-dashboard-config
+    files:
+      - config/opensearch_dashboards.yml
+generatorOptions:
+  disableNameSuffixHash: true

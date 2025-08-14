@@ -1,0 +1,330 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: wazuh-dashboard
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh-dashboard
+    app.kubernetes.io/part-of: wazuh
+    app.kubernetes.io/version: "4.9.0"
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: wazuh-dashboard
+      version: 4.9.0
+      sourceRef:
+        kind: HelmRepository
+        name: wazuh
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+    crds: CreateReplace
+  rollback:
+    timeout: 10m
+    cleanupOnFail: true
+    recreate: true
+  uninstall:
+    keepHistory: false
+  values:
+    # High Availability Configuration
+    replicaCount: 3
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    # Advanced Deployment Strategy
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+
+    # Resource Management
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+    # Pod Placement and Scheduling
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values: ["wazuh-dashboard"]
+            topologyKey: kubernetes.io/hostname
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
+
+    # Security Context
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      seLinuxOptions:
+        type: wazuh_dashboard_t
+        level: "s0"
+      appArmorProfile: "runtime/default"
+
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+      fsGroup: 1000
+      supplementalGroups: [1000]
+      sysctls:
+        - name: kernel.unprivileged_userns_clone
+          value: "0"
+
+    # Network Configuration
+    service:
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 5601
+          protocol: TCP
+      loadBalancer:
+        enabled: false
+        sourceRanges: []
+
+    # Ingress Configuration
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+        nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+        nginx.ingress.kubernetes.io/configuration-snippet: |
+          more_set_headers "X-Frame-Options: SAMEORIGIN";
+          more_set_headers "X-Content-Type-Options: nosniff";
+          more_set_headers "X-XSS-Protection: 1; mode=block";
+          more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;";
+      hosts:
+        - host: wazuh.${SECRET_DOMAIN}
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: wazuh-dashboard-tls
+          hosts:
+            - wazuh.${SECRET_DOMAIN}
+
+    # Monitoring & Observability
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+        labels: {}
+      prometheusRule:
+        enabled: true
+        additionalLabels: {}
+        rules:
+          - alert: WazuhDashboardDown
+            expr: up{job="wazuh-dashboard"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Wazuh Dashboard is down"
+          - alert: WazuhDashboardHighMemory
+            expr: container_memory_usage_bytes{container="wazuh-dashboard"} > 3.5e9
+            for: 15m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage in Wazuh Dashboard"
+
+    # Logging Configuration
+    logging:
+      json: true
+      level: info
+      output:
+        loki:
+          enabled: true
+          url: http://loki.monitoring:3100
+          labels:
+            app: wazuh
+            component: dashboard
+      audit:
+        enabled: true
+        level: info
+        path: /var/log/wazuh/audit.log
+        format: json
+
+    # Advanced Security Features
+    security:
+      tls:
+        enabled: true
+        auto: true
+        certificatesDuration: 2160h
+        api:
+          enabled: true
+          generateCerts: true
+      audit:
+        enabled: true
+        logPath: /usr/share/wazuh-dashboard/logs/audit
+        logFormat: json
+        rules:
+          - level: Metadata
+            users: ["*"]
+            resources: ["dashboards", "visualizations"]
+          - level: RequestResponse
+            users: ["*"]
+            resources: ["*"]
+      authentication:
+        enabled: true
+        provider: oidc
+        oidc:
+          issuer: https://auth.${SECRET_DOMAIN}
+          clientId: "${OIDC_CLIENT_ID}"
+          clientSecret: "${OIDC_CLIENT_SECRET}"
+          redirectUri: https://wazuh.${SECRET_DOMAIN}/oauth/callback
+          scope: "openid profile email"
+          groupsClaim: "groups"
+          rolesAttribute: "roles"
+      session:
+        enabled: true
+        timeout: 3600
+        inactivity: 900
+        sameSite: Strict
+        secure: true
+        httpOnly: true
+      headers:
+        enabled: true
+        xFrameOptions: "SAMEORIGIN"
+        xContentTypeOptions: "nosniff"
+        xXSSProtection: "1; mode=block"
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+      rateLimit:
+        enabled: true
+        windowMs: 900000
+        max: 1000
+        message: "Too many requests, please try again later"
+
+    # UI Configuration
+    dashboard:
+      theme:
+        darkMode: true
+        customization:
+          primaryColor: "#007AFF"
+          logo: "https://example.com/logo.png"
+      defaultRoute: /app/wazuh
+      telemetry:
+        enabled: false
+      reporting:
+        enabled: true
+        engine: chromium
+        queue:
+          timeout: 120
+          maxAttempts: 3
+      search:
+        autocomplete:
+          enabled: true
+          maxSuggestions: 10
+      notifications:
+        lifetime: 10000
+        maxCount: 10
+
+    # Circuit Breaker Configuration
+    circuitBreaker:
+      enabled: true
+      maxRequests: 100
+      interval: 1m
+      timeout: 30s
+      consecutiveFailures: 5
+
+    # Health Checks
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+      successThreshold: 1
+
+    # Additional Security Hardening
+    podSecurityStandards:
+      enforce: restricted
+      audit: restricted
+      warn: restricted
+
+    systemHardening:
+      sysctls:
+        enabled: true
+        values:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
+      securityProviders:
+        appArmor:
+          enabled: true
+          defaultProfile: runtime/default
+        selinux:
+          enabled: true
+          type: wazuh_dashboard_t
+          level: s0
+
+    # Observability Configuration
+    observability:
+      opentelemetry:
+        enabled: true
+        endpoint: "otel-collector.monitoring:4317"
+        protocol: grpc
+        attributes:
+          service.name: wazuh-dashboard
+          service.namespace: security
+          service.instance.id: ${POD_NAME}
+      tracing:
+        enabled: true
+        sampler:
+          type: probabilistic
+          param: 1.0
+      profiling:
+        enabled: true
+        pyroscope:
+          enabled: true
+          endpoint: http://pyroscope.monitoring:4040

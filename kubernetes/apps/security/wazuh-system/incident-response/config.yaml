@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-incident-response
+  namespace: security
+data:
+  incident-response.yaml: |
+    automation:
+      enabled: true
+      playbooks:
+        - name: ransomware-response
+          triggers:
+            - rule_id: "100200"
+              level: 12
+          actions:
+            - type: isolate_host
+              params:
+                timeout: 3600
+            - type: block_ip
+              params:
+                direction: both
+                duration: 24h
+            - type: snapshot_creation
+              params:
+                retain: 7d
+            - type: alert_notification
+              params:
+                channels: ["slack", "pagerduty"]
+                priority: critical
+
+        - name: brute-force-response
+          triggers:
+            - rule_id: "100205"
+              level: 10
+          actions:
+            - type: block_ip
+              params:
+                direction: inbound
+                duration: 1h
+            - type: reset_credentials
+              params:
+                force_reset: true
+            - type: alert_notification
+              params:
+                channels: ["slack"]
+                priority: high
+
+        - name: data-exfiltration-response
+          triggers:
+            - rule_id: "100210"
+              level: 14
+          actions:
+            - type: block_ip
+              params:
+                direction: outbound
+                duration: 12h
+            - type: quarantine_files
+              params:
+                location: /quarantine
+            - type: forensics_capture
+              params:
+                memory: true
+                network: true
+            - type: alert_notification
+              params:
+                channels: ["slack", "pagerduty"]
+                priority: critical
+
+    integrations:
+      slack:
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        default_channel: "#security-alerts"
+        mention_groups:
+          critical: ["@security-team"]
+          high: ["@soc-team"]
+
+      pagerduty:
+        service_key: "${PAGERDUTY_SERVICE_KEY}"
+        escalation_policy: "P123ABC"
+        incident_urgency:
+          critical: high
+          high: low
+
+    forensics:
+      enabled: true
+      storage:
+        class: longhorn
+        size: 100Gi
+      retention:
+        duration: 30d
+      tools:
+        volatility:
+          enabled: true
+          profile: Linux4_8_0-generic
+        tcpdump:
+          enabled: true
+          interface: any
+          snapshot_length: 65535
+
+    reporting:
+      enabled: true
+      format: pdf
+      schedule: "0 */4 * * *"
+      distribution:
+        email:
+          enabled: true
+          recipients: ["security@example.com"]
+        s3:
+          enabled: true
+          bucket: "incident-reports"
+          prefix: "wazuh/"

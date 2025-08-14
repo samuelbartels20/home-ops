@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wazuh-ml-config
+  namespace: security
+data:
+  ml-config.yaml: |
+    anomaly_detection:
+      enabled: true
+      models:
+        - name: network_behavior
+          type: isolation_forest
+          features:
+            - source_ip
+            - destination_ip
+            - bytes_sent
+            - bytes_received
+            - protocol
+          training:
+            schedule: "0 2 * * *"
+            sample_size: 1000000
+            contamination: 0.01
+          prediction:
+            threshold: 0.95
+            batch_size: 1000
+
+        - name: authentication_patterns
+          type: lstm
+          features:
+            - timestamp
+            - user
+            - source_ip
+            - auth_type
+            - success
+          training:
+            schedule: "0 3 * * *"
+            lookback: 24h
+            sequence_length: 10
+            epochs: 50
+
+        - name: system_metrics
+          type: prophet
+          features:
+            - cpu_usage
+            - memory_usage
+            - disk_io
+            - network_traffic
+          training:
+            schedule: "0 4 * * *"
+            history: 30d
+            seasonality:
+              yearly: false
+              weekly: true
+              daily: true
+
+        - name: file_operations
+          type: autoencoder
+          features:
+            - operation_type
+            - file_path
+            - user
+            - process
+            - time_of_day
+          training:
+            schedule: "0 5 * * *"
+            encoding_dim: 32
+            epochs: 100
+
+    preprocessing:
+      scaling:
+        method: standard
+        per_feature: true
+      encoding:
+        categorical:
+          method: one_hot
+        temporal:
+          method: cyclical
+
+    storage:
+      model_registry:
+        path: /var/lib/wazuh/ml/models
+        retention:
+          versions: 5
+          days: 30
+      training_data:
+        path: /var/lib/wazuh/ml/data
+        retention_days: 90
+
+    monitoring:
+      metrics:
+        - name: model_accuracy
+          type: gauge
+        - name: prediction_latency
+          type: histogram
+        - name: anomaly_score
+          type: gauge
+        - name: training_duration
+          type: gauge
+      alerts:
+        - name: ModelDegradation
+          expr: model_accuracy < 0.8
+          for: 1h
+        - name: HighAnomalyRate
+          expr: rate(anomaly_score > 0.9)[5m] > 10
+          for: 5m

@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cert-manager.io/certificate_v1.json
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigning-issuer
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh
+    app.kubernetes.io/component: certificates
+    app.kubernetes.io/part-of: wazuh
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wazuh-pki-ca
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh
+    app.kubernetes.io/component: certificates
+    app.kubernetes.io/part-of: wazuh
+    security.openshift.io/scc.podSecurityLabelSync: "true"
+    pod-security.kubernetes.io/enforce: restricted
+  annotations:
+    cert-manager.io/issue-temporary-certificate: "true"
+    cert-manager.io/revisions-history-limit: "3"
+spec:
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: selfsigning-issuer
+  secretName: wazuh-pki-ca
+  duration: 87600h  # 10 years
+  renewBefore: 8760h  # 1 year
+  commonName: "Wazuh Root CA"
+  subject:
+    organizations:
+      - "Wazuh Security"
+    organizationalUnits:
+      - "PKI"
+    countries:
+      - "US"
+    localities:
+      - "Production"
+    provinces:
+      - "CA"
+  isCA: true
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    encoding: PKCS8
+    rotationPolicy: Always
+  usages:
+    - "cert sign"
+    - "crl sign"
+    - "server auth"
+    - "client auth"
+  keystores:
+    pkcs12:
+      create: true
+      passwordSecretRef:
+        name: wazuh-keystore-password
+        key: password
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: wazuh-issuer
+  namespace: security
+  labels:
+    app.kubernetes.io/name: wazuh
+    app.kubernetes.io/component: certificates
+    app.kubernetes.io/part-of: wazuh
+spec:
+  ca:
+    secretName: wazuh-pki-ca

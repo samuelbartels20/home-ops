@@ -1,0 +1,209 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wazuh-alerts
+  namespace: security
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+    - name: wazuh.rules
+      rules:
+        # SLO Recording Rules
+        - record: wazuh:slo:availability:ratio
+          expr: avg_over_time(up{job="wazuh-manager"}[30d]) * 100
+
+        - record: wazuh:slo:event_processing:ratio
+          expr: (1 - (sum(rate(wazuh_manager_dropped_events[30d])) / sum(rate(wazuh_manager_total_events[30d])))) * 100
+
+        - record: wazuh:slo:alert_latency:ratio
+          expr: histogram_quantile(0.95, sum(rate(wazuh_manager_alert_time_seconds_bucket[30d])) by (le)) * 1000
+
+        # High Priority Security Events
+        - alert: WazuhHighPrioritySecurityEvent
+          expr: sum(increase(wazuh_alerts_triggered{level=~"12|15"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: High priority security events detected
+            description: |
+              {{ $value }} high priority security events detected in the last 5 minutes
+              {{range query "wazuh_alerts_triggered{level=~'12|15'}"}}
+              - Rule ID: {{.Labels.rule_id}}
+              - Description: {{.Labels.description}}
+              - Level: {{.Labels.level}}
+              {{end}}
+            runbook_url: https://runbooks.example.com/wazuh/high-priority-events
+
+        # System Health
+        - alert: WazuhManagerDown
+          expr: up{job="wazuh-manager"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+            team: sre
+          annotations:
+            summary: Wazuh manager is down
+            description: Wazuh manager has been down for more than 5 minutes
+            runbook_url: https://runbooks.example.com/wazuh/manager-down
+
+        # Resource Saturation
+        - alert: WazuhHighCPUUsage
+          expr: rate(container_cpu_usage_seconds_total{container="wazuh-manager"}[5m]) > 0.8
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: High CPU usage in Wazuh manager
+            description: Wazuh manager is using more than 80% CPU for 15 minutes
+            runbook_url: https://runbooks.example.com/wazuh/high-cpu
+
+        # Event Processing
+        - alert: WazuhEventProcessingDelay
+          expr: rate(wazuh_manager_event_processing_time_seconds_sum[5m]) / rate(wazuh_manager_event_processing_time_seconds_count[5m]) > 0.1
+          for: 15m
+          labels:
+            severity: warning
+            category: performance
+            team: sre
+          annotations:
+            summary: Event processing delays in Wazuh
+            description: Average event processing time is above 100ms
+            runbook_url: https://runbooks.example.com/wazuh/processing-delay
+
+        # Agent Health
+        - alert: WazuhAgentConnectionLoss
+          expr: sum(increase(wazuh_agent_connection_lost_total[5m])) > 10
+          for: 15m
+          labels:
+            severity: warning
+            category: availability
+            team: security
+          annotations:
+            summary: Multiple Wazuh agents lost connection
+            description: More than 10 agents lost connection in the last 5 minutes
+            runbook_url: https://runbooks.example.com/wazuh/agent-connection
+
+        # Database Health
+        - alert: WazuhDatabaseErrors
+          expr: rate(wazuh_database_query_errors_total[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: database
+            team: sre
+          annotations:
+            summary: Wazuh database errors detected
+            description: Database query errors detected in Wazuh
+            runbook_url: https://runbooks.example.com/wazuh/database-errors
+
+        # Compliance Monitoring
+        - alert: WazuhComplianceViolation
+          expr: sum(increase(wazuh_compliance_violations_total{standard=~"pci_dss|hipaa"}[1h])) > 5
+          for: 1h
+          labels:
+            severity: critical
+            category: compliance
+            team: security
+          annotations:
+            summary: Multiple compliance violations detected
+            description: More than 5 compliance violations detected in the last hour
+            runbook_url: https://runbooks.example.com/wazuh/compliance-violation
+
+        # Threat Detection
+        - alert: WazuhBruteForceAttack
+          expr: sum(increase(wazuh_auth_failed_attempts_total{rule_group="authentication_failed"}[5m])) > 50
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: Potential brute force attack detected
+            description: High number of authentication failures detected
+            runbook_url: https://runbooks.example.com/wazuh/brute-force
+
+        # File Integrity Monitoring
+        - alert: WazuhCriticalFileChange
+          expr: sum(increase(wazuh_fim_events_total{type="modified",path=~"/etc/.*|/usr/bin/.*"}[5m])) > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: Critical system files modified
+            description: Changes detected in critical system files
+            runbook_url: https://runbooks.example.com/wazuh/fim-critical
+
+        # Malware Detection
+        - alert: WazuhMalwareDetected
+          expr: sum(increase(wazuh_malware_detected_total[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: Malware detected by Wazuh
+            description: Malware detected in the environment
+            runbook_url: https://runbooks.example.com/wazuh/malware-detected
+
+        # Backup Status
+        - alert: WazuhBackupFailure
+          expr: wazuh_backup_status != 1
+          for: 24h
+          labels:
+            severity: warning
+            category: backup
+            team: sre
+          annotations:
+            summary: Wazuh backup failure
+            description: Wazuh backup has not completed successfully in 24 hours
+            runbook_url: https://runbooks.example.com/wazuh/backup-failure
+
+        # MFA Monitoring
+        - alert: WazuhMFAFailure
+          expr: sum(increase(wazuh_mfa_failures_total[5m])) > 10
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: High number of MFA failures detected
+            description: Multiple MFA authentication failures detected in the last 5 minutes
+            runbook_url: https://runbooks.example.com/wazuh/mfa-failures
+
+        - alert: WazuhMFADisabled
+          expr: wazuh_mfa_enabled == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: MFA has been disabled
+            description: Multi-factor authentication is currently disabled
+            runbook_url: https://runbooks.example.com/wazuh/mfa-disabled
+
+        # IP Allowlist Monitoring
+        - alert: WazuhIPAllowlistBypass
+          expr: sum(increase(wazuh_ip_allowlist_violations_total[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: IP allowlist bypass attempts detected
+            description: Unauthorized IP addresses attempting to access Wazuh
+            runbook_url: https://runbooks.example.com/wazuh/ip-allowlist-bypass
