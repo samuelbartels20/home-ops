@@ -1,0 +1,131 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: trivy-operator
+  namespace: security
+spec:
+  interval: 10m0s
+  chart:
+    spec:
+      chart: trivy-operator
+      version: "0.28.1"
+      sourceRef:
+        kind: HelmRepository
+        name: aqua
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    trivy:
+      ignoreUnfixed: true
+      severity: CRITICAL,HIGH
+      timeout: 10m0s
+      dbRepository: ghcr.io/aquasecurity/trivy-db
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+    operator:
+      replicas: 2
+      scanJobsConcurrentLimit: 10
+      vulnerabilityScannerEnabled: true
+      configAuditScannerEnabled: true
+      rbacAssessmentEnabled: true
+      excludeNamespaces:
+        - kube-system
+        - flux-system
+      targetNamespaces: []
+      webhook:
+        enabled: true
+        timeoutSeconds: 30
+      metrics:
+        enabled: true
+
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        release: prometheus
+
+    prometheusRule:
+      enabled: true
+      rules:
+        - alert: TrivyHighVulnerabilities
+          expr: sum(trivy_vulnerabilities{severity="HIGH"}) > 10
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: High number of HIGH severity vulnerabilities
+            description: More than 10 HIGH severity vulnerabilities detected
+
+        - alert: TrivyCriticalVulnerabilities
+          expr: sum(trivy_vulnerabilities{severity="CRITICAL"}) > 0
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: CRITICAL severity vulnerabilities detected
+            description: CRITICAL severity vulnerabilities found in the cluster
+
+        - alert: TrivyScanFailed
+          expr: sum(trivy_scan_failed) > 0
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Trivy vulnerability scan failed
+            description: Vulnerability scan failed for some containers
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    nodeSelector:
+      kubernetes.io/os: linux
+
+    tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - trivy-operator
+              topologyKey: kubernetes.io/hostname
