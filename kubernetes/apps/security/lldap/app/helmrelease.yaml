@@ -1,0 +1,124 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app lldap
+  namespace: security
+spec:
+  interval: 1h
+  chartRef:
+    kind: OCIRepository
+    name: app-template
+    namespace: flux-system
+  releaseName: lldap
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    controllers:
+      lldap:
+        replicas: 2
+        strategy: RollingUpdate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          init-db:
+            image:
+              repository: ghcr.io/onedr0p/postgres-init
+              tag: 16
+            envFrom: &envFrom
+              - secretRef:
+                  name: lldap-secret
+        containers:
+          app:
+            image:
+              repository: ghcr.io/lldap/lldap
+              tag: v0.6.1@sha256:4931eeeb841b1bbf5774161b5fd9dab88f41ffeb4b08ca656f0b7595cd7cb52a
+            env:
+              TZ: America/New_York
+              LLDAP_HTTP_PORT: &port 80
+              LLDAP_HTTP_URL: https://lldap.samcloud.online
+              LLDAP_LDAP_PORT: &ldapPort 389
+              LLDAP_LDAP_BASE_DN: dc=home,dc=arpa
+              LLDAP_SMTP_OPTIONS__ENABLE_PASSOWRD_RESET: false
+            envFrom: *envFrom
+            probes:
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /health
+                    port: *port
+                  initialDelaySeconds: 0
+                  periodSeconds: 10
+                  timeoutSeconds: 1
+                  failureThreshold: 3
+              readiness: *probes
+              startup:
+                enabled: false
+            securityContext:
+              allowPrivilegeEscalation: false
+              # readOnlyRootFilesystem: false
+              # capabilities: { drop: ["ALL"] }
+            resources:
+              requests:
+                cpu: 10m
+              limits:
+                memory: 128Mi
+    defaultPodOptions:
+      # securityContext:
+      #   runAsNonRoot: true
+      #   runAsUser: 65534
+      #   runAsGroup: 65534
+      #   seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: *app
+    service:
+      app:
+        controller: *app
+        ports:
+          http:
+            port: *port
+          ldap:
+            enabled: true
+            port: *ldapPort
+            protocol: TCP
+    ingress:
+      main:
+        enabled: true
+        className: external
+        annotations:
+          external-dns.alpha.kubernetes.io/target: external.samcloud.online
+        hosts:
+          - host: &host lldap.samcloud.online
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts: [*host]
+    serviceMonitor:
+      app:
+        serviceName: *app
+        endpoints:
+          - port: http
+            scheme: http
+            path: /metrics
+            interval: 1m
+            scrapeTimeout: 10s
+    persistence:
+      data:
+        type: emptyDir
