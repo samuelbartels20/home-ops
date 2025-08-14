@@ -1,0 +1,202 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/bjw-s/helm-charts/main/charts/other/app-template/schemas/helmrelease-helm-v2.schema.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: downloads-gateway
+  namespace: security
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: 4.1.0
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    controllers:
+      pod-gateway:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        initContainers:
+          routes:
+            image:
+              repository: ghcr.io/angelnu/pod-gateway
+              tag: v1.13.0
+            command:
+              - /bin/gateway_init.sh
+            securityContext:
+              privileged: true
+        containers:
+          pod-gateway:
+            image:
+              repository: ghcr.io/angelnu/pod-gateway
+              tag: v1.13.0
+            command:
+              - /bin/gateway_sidecar.sh
+            securityContext:
+              capabilities:
+                add:
+                  - NET_ADMIN
+            ports:
+              - name: vxlan
+                containerPort: 4789
+                protocol: UDP
+          netshoot:
+            image:
+              repository: ghcr.io/nicolaka/netshoot
+              tag: v0.13
+            command:
+              - /bin/sh
+              - -c
+              - sleep infinity
+            securityContext:
+              capabilities:
+                add:
+                  - NET_ADMIN
+          openvpn:
+            image:
+              repository: dperson/openvpn-client
+              tag: latest
+            env:
+              TZ: ${TIMEZONE:=Etc/UTC}
+              IPTABLES_BACKEND: legacy
+              KILLSWITCH: "false"
+            envFrom:
+              - secretRef:
+                  name: downloads-gateway-vpnconfig
+            resources:
+              requests:
+                cpu: 15m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+            securityContext:
+              privileged: true
+              capabilities:
+                add:
+                  - NET_ADMIN
+                  - SYS_MODULE
+        pod:
+          dnsPolicy: None
+          dnsConfig:
+            nameservers:
+              - 10.43.0.10
+            searches: ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"]
+            options:
+              - name: ndots
+                value: "5"
+      pod-gateway-webhook:
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          webhook:
+            image:
+              repository: ghcr.io/angelnu/gateway-admision-controller
+              tag: v3.12.0
+            args:
+              - --webhook-listen-address=:8080
+              - --gateway=downloads-gateway-pod-gateway.vpn.svc.cluster.local
+              - --DNS=172.16.0.1
+              - --configmapName=downloads-gateway-pod-gateway
+              - --setGatewayLabel=setGateway
+              - --setGatewayAnnotation=setGateway
+              - --setGatewayDefault
+              # Static
+              - --tls-cert-file-path=/tls/tls.crt
+              - --tls-key-file-path=/tls/tls.key
+              - --DNSPolicy=None
+              # Init container
+              - --initImage=ghcr.io/angelnu/pod-gateway:v1.12.0
+              - --initImagePullPol=IfNotPresent
+              - --initCmd=/bin/client_init.sh
+              - --initMountPoint=/config
+              # Sidecar container
+              - --sidecarImage=ghcr.io/angelnu/pod-gateway:v1.12.0
+              - --sidecarImagePullPol=IfNotPresent
+              - --sidecarCmd=/bin/client_sidecar.sh
+              - --sidecarMountPoint=/config
+            ports:
+              - name: http
+                containerPort: 8080
+                protocol: TCP
+            probes:
+              readiness: &probe
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /wh/health
+                    port: 8080
+                    scheme: HTTPS
+                  initialDelaySeconds: 1
+                  timeoutSeconds: 10
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 5
+              liveness: *probe
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /wh/health
+                    port: 8080
+                    scheme: HTTPS
+                  timeoutSeconds: 1
+                  periodSeconds: 1
+                  successThreshold: 1
+                  failureThreshold: 30
+    service:
+      pod-gateway:
+        controller: pod-gateway
+        type: ClusterIP
+        clusterIP: None
+        ports:
+          vxlan:
+            protocol: UDP
+            port: 4789
+            targetPort: vxlan
+      pod-gateway-webhook:
+        controller: pod-gateway-webhook
+        ports:
+          http:
+            protocol: TCP
+            port: 8080
+            targetPort: http
+    persistence:
+      config:
+        type: configMap
+        name: downloads-gateway-pod-gateway
+        advancedMounts:
+          pod-gateway:
+            routes:
+              - path: /config
+            pod-gateway:
+              - path: /config
+      vpnconfig:
+        type: secret
+        name: downloads-gateway-vpnconfig
+        advancedMounts:
+          pod-gateway:
+            openvpn:
+              - path: /vpn/vpn.conf
+                subPath: vpnConfigfile
+      certificates:
+        type: secret
+        name: downloads-gateway-pod-gateway-webhook-tls
+        advancedMounts:
+          pod-gateway-webhook:
+            webhook:
+              - path: /tls
