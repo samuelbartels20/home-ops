@@ -1,0 +1,132 @@
+apiVersion: falco.security.falco.org/v1beta1
+kind: FalcoRule
+metadata:
+  name: enhanced-security-rules
+  namespace: security
+spec:
+  customRules:
+    - rule: Unauthorized Process in Container
+      desc: Detect unauthorized process execution in containers
+      condition: >
+        spawned_process and container
+        and not (container.image.repository in (allowed_images))
+        and not proc.name in (allowed_processes)
+      output: >
+        Unauthorized process in container (user=%user.name
+        command=%proc.cmdline container=%container.id)
+      priority: WARNING
+      tags: [process, container]
+
+    - rule: Sensitive File Access
+      desc: Detect access to sensitive files
+      condition: >
+        open_read and container
+        and fd.filename pmatch (sensitive_files)
+        and not proc.name in (allowed_processes)
+      output: >
+        Sensitive file accessed in container (user=%user.name
+        file=%fd.filename container=%container.id)
+      priority: WARNING
+      tags: [filesystem]
+
+    - rule: Suspicious Network Activity
+      desc: Detect suspicious network connections
+      condition: >
+        (inbound_connection or outbound_connection) and container
+        and not (container.image.repository in (allowed_images))
+        and not (fd.ip in (allowed_networks))
+      output: >
+        Suspicious network activity detected (user=%user.name
+        connection=%fd.name container=%container.id)
+      priority: WARNING
+      tags: [network]
+
+    - rule: Container Escape Attempt
+      desc: Detect potential container escape attempts
+      condition: >
+        spawned_process and container
+        and (proc.name in (escape_processes)
+        or proc.args contains "device"
+        or proc.args contains "capability")
+      output: >
+        Potential container escape attempt (user=%user.name
+        process=%proc.name container=%container.id)
+      priority: CRITICAL
+      tags: [container, escape]
+
+    - rule: Privilege Escalation
+      desc: Detect privilege escalation attempts
+      condition: >
+        spawned_process and container
+        and proc.name in (privilege_escalation_binaries)
+      output: >
+        Privilege escalation attempt detected (user=%user.name
+        process=%proc.name container=%container.id)
+      priority: CRITICAL
+      tags: [process, privilege-escalation]
+
+    - rule: Crypto Mining Detection
+      desc: Detect cryptocurrency mining activity
+      condition: >
+        spawned_process and container
+        and proc.name pmatch (crypto_mining_processes)
+      output: >
+        Cryptocurrency mining activity detected (user=%user.name
+        process=%proc.name container=%container.id)
+      priority: CRITICAL
+      tags: [mining]
+
+  # Lists and macros
+  lists:
+    - name: allowed_images
+      items:
+        - "k8s.gcr.io/kube-apiserver"
+        - "k8s.gcr.io/kube-controller-manager"
+        - "k8s.gcr.io/kube-scheduler"
+        - "quay.io/prometheus/*"
+        - "docker.io/grafana/*"
+
+    - name: allowed_processes
+      items:
+        - "nginx"
+        - "node"
+        - "python"
+        - "java"
+        - "ruby"
+
+    - name: sensitive_files
+      items:
+        - "/etc/shadow"
+        - "/etc/passwd"
+        - "*.pem"
+        - "*.key"
+        - "*.crt"
+        - "*.env"
+
+    - name: allowed_networks
+      items:
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
+
+    - name: escape_processes
+      items:
+        - "mount"
+        - "umount"
+        - "fdisk"
+        - "mkfs"
+
+    - name: privilege_escalation_binaries
+      items:
+        - "sudo"
+        - "su"
+        - "pkexec"
+        - "doas"
+
+    - name: crypto_mining_processes
+      items:
+        - "xmrig"
+        - "ethminer"
+        - "cgminer"
+        - "bfgminer"
+        - "minerd"

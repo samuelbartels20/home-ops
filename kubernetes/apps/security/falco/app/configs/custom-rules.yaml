@@ -1,0 +1,115 @@
+# Falco Custom Security Rules
+# This file contains custom security rules for container and Kubernetes monitoring
+
+- rule: Unauthorized Process in Container
+  desc: Detect unauthorized process execution in containers
+  condition: >
+    spawned_process and container
+    and not (
+      proc.name in (authorized_processes)
+      or proc.cmdline in (authorized_cmdlines)
+    )
+  output: >
+    Unauthorized process in container (user=%user.name user_id=%user.uid
+    command=%proc.cmdline container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [process, container]
+
+- rule: Container Shell Access
+  desc: Detect shell access to containers
+  condition: >
+    spawned_process and container
+    and proc.name in (shell_binaries)
+    and not proc.pname in (shell_binaries)
+  output: >
+    Shell accessed in container (user=%user.name user_id=%user.uid
+    shell=%proc.name parent=%proc.pname container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [shell, container]
+
+- rule: Sensitive Mount in Container
+  desc: Detect sensitive host path mounts in containers
+  condition: >
+    spawned_process and container
+    and proc.name = "mount"
+    and proc.args intersects (sensitive_mount_paths)
+  output: >
+    Sensitive path mounted in container (user=%user.name command=%proc.cmdline
+    container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [filesystem, container]
+
+- rule: Suspicious Network Activity
+  desc: Detect suspicious network connections
+  condition: >
+    (inbound_outbound) and container
+    and not fd.sport in (allowed_ports)
+    and not fd.cport in (allowed_ports)
+  output: >
+    Suspicious network connection (user=%user.name command=%proc.cmdline
+    connection=%fd.cip:%fd.cport container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [network, container]
+
+- rule: Privilege Escalation
+  desc: Detect privilege escalation attempts
+  condition: >
+    spawned_process and container
+    and proc.name in (privilege_escalation_binaries)
+  output: >
+    Privilege escalation attempt (user=%user.name user_id=%user.uid
+    command=%proc.cmdline container_id=%container.id container_name=%container.name)
+  priority: CRITICAL
+  tags: [process, container, privilege-escalation]
+
+- rule: Suspicious File Access
+  desc: Detect access to sensitive files
+  condition: >
+    open_read and container
+    and fd.filename in (sensitive_files)
+  output: >
+    Sensitive file accessed (user=%user.name file=%fd.filename
+    container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [filesystem, container]
+
+- rule: Package Management Activity
+  desc: Detect package management operations in containers
+  condition: >
+    spawned_process and container
+    and proc.name in (package_mgmt_binaries)
+  output: >
+    Package management activity (user=%user.name command=%proc.cmdline
+    container_id=%container.id container_name=%container.name)
+  priority: WARNING
+  tags: [process, container]
+
+# Lists and macros
+- list: authorized_processes
+  items: [nginx, node, python, java, ruby, php, postgres, mysql, redis, mongodb]
+
+- list: authorized_cmdlines
+  items: ["kube-proxy --proxy-mode=iptables", "coredns -conf /etc/coredns/Corefile"]
+
+- list: shell_binaries
+  items: [bash, sh, ksh, zsh, csh, tcsh]
+
+- list: sensitive_mount_paths
+  items: ["/proc", "/sys", "/dev", "/var/run/docker.sock", "/etc/kubernetes"]
+
+- list: allowed_ports
+  items: [80, 443, 8080, 8443, 6379, 3306, 5432]
+
+- list: privilege_escalation_binaries
+  items: [sudo, su, sudoedit, pkexec]
+
+- list: sensitive_files
+  items: ["/etc/shadow", "/etc/passwd", "/etc/kubernetes/admin.conf", "/.kube/config"]
+
+- list: package_mgmt_binaries
+  items: [apt, apt-get, dpkg, rpm, yum, dnf, pip, npm, gem]
+
+# Macros for common conditions
+- macro: inbound_outbound
+  condition: >
+    (evt.type in (accept,connect) and evt.dir=<)

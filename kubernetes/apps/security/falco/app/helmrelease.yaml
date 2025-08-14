@@ -1,0 +1,714 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2beta2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: falco
+  namespace: security
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: security
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: falco
+      version: 3.8.5
+      sourceRef:
+        kind: HelmRepository
+        name: falcosecurity
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    timeout: 10m
+    remediation:
+      retries: 3
+    createNamespace: true
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+    crds: CreateReplace
+  rollback:
+    recreate: true
+    force: true
+    cleanupOnFail: true
+  values:
+    image:
+      repository: falcosecurity/falco
+      tag: 0.36.0
+
+    driver:
+      kind: ebpf
+
+    falco:
+      rules:
+        custom:
+          rules-audit.yaml: |-
+            - rule: Unauthorized Pod Exec
+              desc: Detect unauthorized pod exec attempts
+              condition: >
+                spawned_process and
+                container and
+                container.privileged=false and
+                proc.name=sh
+              output: Pod exec detected (user=%user.name pod=%k8s.pod.name container=%container.name command=%proc.cmdline)
+              priority: WARNING
+              tags: [process, mitre_execution]
+
+            - rule: Sensitive Mount
+              desc: Detect mounting of sensitive host paths
+              condition: >
+                evt.type=mount and
+                container and
+                (mount.dest startswith /proc or
+                 mount.dest startswith /sys or
+                 mount.dest startswith /root or
+                 mount.dest startswith /var/run/docker.sock)
+              output: Sensitive mount detected (user=%user.name pod=%k8s.pod.name container=%container.name path=%mount.dest)
+              priority: WARNING
+              tags: [filesystem, mitre_persistence]
+
+    tty:
+      enabled: false
+
+    webui:
+      enabled: true
+      ssl:
+        enabled: true
+
+    serviceMonitor:
+      enabled: true
+
+    metrics:
+      enabled: true
+
+    # High Availability Settings
+    controller:
+      replicas: 3  # Increased for better HA
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1
+      resources:
+        requests:
+          cpu: 200m  # Increased based on production metrics
+          memory: 512Mi
+        limits:
+          cpu: 2000m
+          memory: 2Gi
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values: ["falco"]
+            topologyKey: kubernetes.io/hostname
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/worker
+                  operator: Exists
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    priorityClassName: system-cluster-critical
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule  # Stricter scheduling
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: falco
+
+    # Enhanced Security Settings
+    podSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      supplementalGroups: [1000]
+      seccompProfile:
+        type: RuntimeDefault
+      sysctls:  # Added security-related sysctls
+        - name: kernel.core_pattern
+          value: "|/bin/false"
+        - name: kernel.perf_event_paranoid
+          value: "3"
+
+    securityContext:
+      privileged: false
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      seLinuxOptions:  # Added SELinux options
+        type: container_t
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Advanced Monitoring & Observability
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 15s  # More frequent scraping
+        scrapeTimeout: 10s
+        labels:
+
+        metricRelabelings:  # Added metric relabeling
+          - sourceLabels: [__name__]
+            regex: 'falco_events_total'
+            action: keep
+
+    # Enhanced Outputs and Integrations
+    outputs:
+      # Prometheus Metrics with detailed settings
+      metrics:
+        enabled: true
+        advanced:
+          histogramBuckets: [0.001, 0.01, 0.1, 0.5, 1, 2, 5]
+          enabledCollectors:
+            - events
+            - drops
+            - rule_matches
+            - rule_latency
+      # Enhanced Loki Integration
+      loki:
+        enabled: true
+        host: loki.observability.svc.cluster.local
+        port: 3100
+        minimumPriority: notice
+        batchWait: 1s
+        batchSize: 1048576
+        labels:
+          cluster: production
+          environment: prod
+      # Enhanced Webhook Output
+      webhook:
+        enabled: true
+        url: "http://falco-sidekick:2801/"
+        minimumPriority: notice
+        connectionTimeout: 5s
+        maxRetries: 3
+        retryWaitDuration: "5s"
+
+    # Enhanced Falco Sidekick Configuration
+    sidekick:
+      enabled: true
+      replicaCount: 3  # Increased for HA
+      config:
+        debug: false
+        listenport: 2801
+        customfields:
+          cluster_name: "production"
+          environment: "prod"
+          region: "${REGION}"
+          compliance_framework: "soc2,iso27001,hipaa"
+        outputs:
+          slack:
+            webhookurl: "${SLACK_WEBHOOK_URL}"
+            minimumpriority: "notice"
+            messageformat: "json"
+            outputformat: "all"
+          elasticsearch:
+            hostport: "http://elasticsearch-master:9200"
+            index: "falco"
+            type: "event"
+            minimumpriority: "notice"
+            mutualtls: true
+            checkcert: true
+          prometheus:
+            extralabels:
+              cluster: "production"
+              environment: "prod"
+              region: "${REGION}"
+
+    # Enhanced Rules and Policies
+    customRules:
+      rules-audit.yaml: |-
+        - rule: Unauthorized Process
+          desc: Detect unauthorized process execution
+          condition: spawned_process and not proc.name in (authorized_processes)
+          output: Unauthorized process started (user=%user.name command=%proc.cmdline)
+          priority: WARNING
+
+      authorized_processes:
+        - name: authorized_processes
+          list:
+            - nginx
+            - node
+            - python
+            - java
+            - postgres
+
+        - list: authorized_cmdlines
+          items: [
+            "kube-proxy --proxy-mode=iptables",
+            "coredns -conf /etc/coredns/Corefile",
+            "prometheus --config.file=/etc/prometheus/config_out/prometheus.env",
+            "grafana-server --config=/etc/grafana/grafana.ini"
+          ]
+
+        - list: trusted_repositories
+          items: [
+            "k8s.gcr.io/",
+            "gcr.io/kubernetes",
+            "quay.io/prometheus",
+            "docker.io/grafana"
+          ]
+
+        - list: sensitive_mount_paths
+          items: [
+            "/proc",
+            "/sys",
+            "/dev",
+            "/var/run/docker.sock",
+            "/etc/kubernetes",
+            "/var/lib/kubelet",
+            "/.kube/config"
+          ]
+
+    # Enhanced Audit Configuration
+    audit:
+      enabled: true
+      rules:
+        - level: Metadata
+          users: ["system:serviceaccount:*"]
+          resources:
+            - group: ""
+              resources: ["pods", "services", "configmaps"]
+        - level: RequestResponse
+          users: ["system:serviceaccount:*"]
+          resources:
+            - group: ""
+              resources: ["secrets", "serviceaccounts"]
+            - group: "rbac.authorization.k8s.io"
+              resources: ["roles", "rolebindings"]
+
+    # Enhanced Resource Management
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+    # Advanced Pod Lifecycle Management
+    lifecycle:
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "sleep 30"]  # Graceful shutdown
+    terminationGracePeriodSeconds: 60
+
+    # Enhanced Pod Disruption Budget
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+
+    # Network Policies
+    networkPolicy:
+      enabled: true
+      ingressRules:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: monitoring
+          ports:
+            - port: 9376
+              protocol: TCP
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: observability
+          ports:
+            - port: 2801
+              protocol: TCP
+
+    # Chaos Engineering Configuration
+    chaosEngineering:
+      enabled: true
+      scenarios:
+        - name: pod-failure
+          schedule: "0 */6 * * *"  # Every 6 hours
+          maxDuration: 10m
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: falco
+          faults:
+            - type: pod-failure
+              count: 1
+              interval: 30s
+        - name: network-latency
+          schedule: "30 */12 * * *"  # Every 12 hours
+          maxDuration: 5m
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: falco
+          faults:
+            - type: network-latency
+              latency: 100ms
+              jitter: 50ms
+              correlation: 50
+        - name: cpu-pressure
+          schedule: "15 */8 * * *"  # Every 8 hours
+          maxDuration: 5m
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: falco
+          faults:
+            - type: cpu-pressure
+              workers: 2
+              load: 80
+
+    # Enhanced Resilience Settings
+    resilience:
+      circuitBreaker:
+        enabled: true
+        consecutiveFailures: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+      retryPolicy:
+        enabled: true
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: "5xx,gateway-error,reset,connect-failure"
+      loadBalancing:
+        enabled: true
+        type: LEAST_REQUEST
+        warmupDuration: 30s
+      outlierDetection:
+        enabled: true
+        consecutiveErrors: 5
+        interval: 10s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 10
+        enforcingConsecutiveErrors: 100
+
+    # Advanced Performance Tuning
+    performance:
+      bufferTuning:
+        enabled: true
+        pageCache: 512Mi
+        writeBufferSize: 256Mi
+        maxWriteBufferNumber: 4
+        minWriteBufferNumberToMerge: 2
+      threadPool:
+        enabled: true
+        coreSize: 8
+        maxSize: 16
+        queueCapacity: 1000
+        keepAliveSeconds: 60
+      caching:
+        enabled: true
+        type: caffeine
+        maximumSize: 10000
+        expireAfterWrite: 1h
+      compression:
+        enabled: true
+        type: lz4
+        level: 3
+
+    # Enhanced Security Hardening
+    security:
+      seccompProfile:
+        type: RuntimeDefault
+        localhostProfile: falco-seccomp.json
+      selinuxOptions:
+        type: falco_t
+        level: "s0"
+        role: "system_r"
+        user: "system_u"
+      sysctls:
+        - name: kernel.unprivileged_bpf_disabled
+          value: "1"
+        - name: net.core.bpf_jit_harden
+          value: "2"
+        - name: kernel.kptr_restrict
+          value: "2"
+        - name: kernel.dmesg_restrict
+          value: "1"
+        - name: kernel.perf_event_paranoid
+          value: "3"
+      capabilities:
+        drop:
+          - ALL
+        add:
+          - SYS_PTRACE
+          - NET_ADMIN
+          - SYS_ADMIN
+      rootless:
+        enabled: true
+        uidMappings:
+          - containerID: 0
+            hostID: 100000
+            size: 65536
+        gidMappings:
+          - containerID: 0
+            hostID: 100000
+            size: 65536
+
+    # Advanced Observability
+    observability:
+      opentelemetry:
+        enabled: true
+        samplingRatio: 0.1
+        exporters:
+          otlp:
+            endpoint: "otel-collector.observability:4317"
+            compression: gzip
+            timeout: 5s
+            retryOnFailure:
+              enabled: true
+              initialInterval: 5s
+              maxInterval: 30s
+              maxElapsedTime: 300s
+      distributedTracing:
+        enabled: true
+        provider: tempo
+        endpoint: "tempo.observability:4317"
+        sampleRate: 0.1
+        tags:
+          service: falco
+          environment: production
+      metrics:
+        prometheus:
+          enabled: true
+          path: /metrics
+          port: 9376
+          serviceMonitor:
+            enabled: true
+            interval: 15s
+            scrapeTimeout: 10s
+            metricRelabelings:
+              - sourceLabels: [__name__]
+                regex: 'falco_.*'
+                action: keep
+          rules:
+            - record: "falco:events:rate5m"
+              expr: "rate(falco_events_total[5m])"
+            - record: "falco:drops:rate5m"
+              expr: "rate(falco_drops_total[5m])"
+            - record: "falco:alerts:priority:ratio"
+              expr: "sum(rate(falco_alerts_total[5m])) by (priority) / sum(rate(falco_alerts_total[5m]))"
+
+    # Production-grade Compliance
+    compliance:
+      enabled: true
+      standards:
+        - standard: "SOC2"
+          controls:
+            - CC6.1
+            - CC6.2
+            - CC6.6
+            - CC6.7
+            - CC7.2
+        - standard: "ISO27001"
+          controls:
+            - A.12.4
+            - A.12.6
+            - A.13.1
+        - standard: "HIPAA"
+          controls:
+            - "164.308(a)(1)(ii)(D)"
+            - "164.312(b)"
+        - standard: "PCI-DSS"
+          controls:
+            - "10.1"
+            - "10.2"
+            - "10.3"
+      auditLog:
+        enabled: true
+        maxAge: 90d
+        maxBackup: 30
+        maxSize: 100Mi
+        compress: true
+        format: json
+
+    # Critical Production Features
+    enterpriseGrade:
+      # Graceful Degradation (Netflix Pattern)
+      degradationPolicy:
+        enabled: true
+        modes:
+          - name: "minimal-processing"
+            trigger: "cpu > 85% for 5m"
+            settings:
+              sampling_rate: 0.5
+              drop_non_critical: true
+          - name: "emergency-only"
+            trigger: "cpu > 95% for 2m"
+            settings:
+              sampling_rate: 0.1
+              priority_threshold: "critical"
+
+      # Advanced Rate Limiting (Google SRE Pattern)
+      adaptiveThrottling:
+        enabled: true
+        algorithm: "AIMD"  # Additive Increase, Multiplicative Decrease
+        target_latency_ms: 100
+        sample_interval_sec: 5
+        adjustment:
+          increase_rate: 1.1
+          decrease_rate: 0.9
+
+      # Automated Canary Analysis (Google Pattern)
+      canaryDeployment:
+        enabled: true
+        metrics:
+          - name: "error_rate"
+            threshold: 0.1%
+            interval: 1m
+          - name: "latency_p95"
+            threshold: 100ms
+            interval: 1m
+          - name: "cpu_usage"
+            threshold: 80%
+            interval: 5m
+
+      # Advanced Failure Recovery (Amazon Pattern)
+      failureRecovery:
+        enabled: true
+        strategies:
+          - type: "self-healing"
+            actions:
+              - "restart-process"
+              - "reload-rules"
+              - "flush-buffers"
+          - type: "fallback"
+            actions:
+              - "use-backup-rules"
+              - "reduce-sampling"
+          - type: "circuit-breaking"
+            conditions:
+              error_rate: ">10%"
+              latency_p99: ">500ms"
+
+      # Zero-Trust Security (Google BeyondProd)
+      zeroTrust:
+        enabled: true
+        features:
+          - name: "workload-identity"
+            enabled: true
+          - name: "encryption-in-transit"
+            enabled: true
+            minTLSVersion: "1.3"
+          - name: "runtime-integrity"
+            enabled: true
+            verifySignatures: true
+          - name: "binary-authorization"
+            enabled: true
+            requireAttestation: true
+
+      # Advanced Threat Detection (Meta Pattern)
+      threatDetection:
+        enabled: true
+        features:
+          - name: "behavioral-analysis"
+            enabled: true
+            baselinePeriod: "7d"
+          - name: "ml-anomaly-detection"
+            enabled: true
+            model: "isolation-forest"
+          - name: "correlation-engine"
+            enabled: true
+            windowSize: "1h"
+
+      # Performance Optimization (Netflix Pattern)
+      performanceOptimization:
+        enabled: true
+        features:
+          - name: "adaptive-batching"
+            enabled: true
+            maxBatchSize: 1000
+            maxLatency: "50ms"
+          - name: "predictive-caching"
+            enabled: true
+            cacheSize: "1Gi"
+            predictionWindow: "1h"
+          - name: "hot-path-optimization"
+            enabled: true
+            profilePeriod: "12h"
+
+      # Disaster Recovery (Amazon Pattern)
+      disasterRecovery:
+        enabled: true
+        rto: "5m"  # Recovery Time Objective
+        rpo: "0s"  # Recovery Point Objective
+        strategies:
+          - name: "state-replication"
+            type: "synchronous"
+            interval: "1s"
+          - name: "backup-restore"
+            type: "incremental"
+            interval: "1h"
+          - name: "failover"
+            type: "automated"
+            checkInterval: "10s"
+
+      # Advanced Resource Management (Google Pattern)
+      resourceManagement:
+        enabled: true
+        features:
+          - name: "vertical-pod-autoscaling"
+            enabled: true
+            updateMode: "Auto"
+            controlledResources: ["cpu", "memory"]
+          - name: "horizontal-pod-autoscaling"
+            enabled: true
+            metrics:
+              - type: "Resource"
+                resource:
+                  name: "cpu"
+                  targetAverageUtilization: 75
+              - type: "Pods"
+                pods:
+                  metric:
+                    name: "falco_events_per_second"
+                  target:
+                    type: "AverageValue"
+                    averageValue: 1000
+          - name: "resource-overcommit-protection"
+            enabled: true
+            maxOvercommitRatio: 1.2
+
+      # Production Readiness Checks (Netflix Pattern)
+      readinessChecks:
+        enabled: true
+        probes:
+          startup:
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+            successThreshold: 1
+            probeHandler:
+              exec:
+                command:
+                  - "/bin/grpc_health_probe"
+                  - "-addr=:9376"
+          liveness:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            probeHandler:
+              httpGet:
+                path: /healthz
+                port: 9376
+          readiness:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+            probeHandler:
+              httpGet:
+                path: /ready
+                port: 9376

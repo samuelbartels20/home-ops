@@ -1,0 +1,234 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: falco-alerts
+  namespace: security
+  labels:
+    prometheus: k8s
+    role: alert-rules
+    severity: critical
+    team: security
+spec:
+  groups:
+    - name: falco.rules
+      rules:
+        # SLO Recording Rules
+        - record: falco:slo:availability:ratio
+          expr: avg_over_time(up{job="falco"}[30d]) * 100
+
+        - record: falco:slo:event_processing:ratio
+          expr: (1 - (sum(rate(falco_dropped_events[30d])) / sum(rate(falco_events[30d])))) * 100
+
+        - record: falco:slo:alert_latency:ratio
+          expr: histogram_quantile(0.95, sum(rate(falco_event_processing_latency_seconds_bucket[30d])) by (le)) * 1000
+
+        # High Priority Security Events
+        - alert: FalcoHighPrioritySecurityEvent
+          expr: sum(rate(falco_events{priority=~"Emergency|Alert|Critical"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+            slo: security_events
+          annotations:
+            summary: High priority Falco security events detected
+            description: |
+              {{ $value }} high priority security events detected in the last 5 minutes
+              {{range query "falco_events{priority=~'Emergency|Alert|Critical'}"}}
+              - Rule: {{.Labels.rule}}
+              - Container: {{.Labels.container}}
+              - Namespace: {{.Labels.k8s_ns}}
+              - Priority: {{.Labels.priority}}
+              {{end}}
+            runbook_url: https://runbooks.example.com/falco/high-priority-events
+            dashboard_url: https://grafana.example.com/d/falco-security
+            playbook_url: https://playbooks.example.com/security/incident-response
+
+        # Container Escape Attempts
+        - alert: FalcoContainerEscapeAttempt
+          expr: sum(rate(falco_events{rule=~"Container.*Escape.*"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+            slo: container_security
+          annotations:
+            summary: Container escape attempts detected
+            description: |
+              Container escape attempts detected:
+              {{range query "falco_events{rule=~'Container.*Escape.*'}"}}
+              - Container: {{.Labels.container}}
+              - Namespace: {{.Labels.k8s_ns}}
+              - Command: {{.Labels.command}}
+              {{end}}
+            runbook_url: https://runbooks.example.com/falco/container-escape
+            dashboard_url: https://grafana.example.com/d/falco-container-security
+            playbook_url: https://playbooks.example.com/security/container-escape
+
+        # SLO Breaches
+        - alert: FalcoSLOAvailabilityBreach
+          expr: falco:slo:availability:ratio < 99.9
+          for: 1h
+          labels:
+            severity: critical
+            category: slo
+            team: sre
+          annotations:
+            summary: Falco availability SLO breach
+            description: Falco availability has dropped below 99.9% target
+            runbook_url: https://runbooks.example.com/falco/slo-breach
+
+        - alert: FalcoSLOEventProcessingBreach
+          expr: falco:slo:event_processing:ratio < 99.99
+          for: 1h
+          labels:
+            severity: critical
+            category: slo
+            team: sre
+          annotations:
+            summary: Falco event processing SLO breach
+            description: Falco is dropping more than 0.01% of events
+            runbook_url: https://runbooks.example.com/falco/event-processing
+
+        - alert: FalcoSLOLatencyBreach
+          expr: falco:slo:alert_latency:ratio > 100
+          for: 5m
+          labels:
+            severity: critical
+            category: slo
+            team: sre
+          annotations:
+            summary: Falco alert latency SLO breach
+            description: 95th percentile alert latency is above 100ms target
+            runbook_url: https://runbooks.example.com/falco/alert-latency
+
+        # Resource Saturation
+        - alert: FalcoHighCPUUsage
+          expr: rate(container_cpu_usage_seconds_total{container="falco"}[5m]) > 0.8 * container_spec_cpu_quota{container="falco"}
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: High CPU usage in Falco pods
+            description: Falco pods are using more than 80% of CPU quota
+            runbook_url: https://runbooks.example.com/falco/high-cpu
+
+        - alert: FalcoHighMemoryUsage
+          expr: container_memory_working_set_bytes{container="falco"} > 0.8 * container_spec_memory_limit_bytes{container="falco"}
+          for: 15m
+          labels:
+            severity: warning
+            category: resource
+            team: sre
+          annotations:
+            summary: High memory usage in Falco pods
+            description: Falco pods are using more than 80% of memory limit
+            runbook_url: https://runbooks.example.com/falco/high-memory
+
+        # System Health
+        - alert: FalcoKernelHeadersMissing
+          expr: falco_kernel_headers_available == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: system
+            team: sre
+          annotations:
+            summary: Kernel headers missing for Falco
+            description: Kernel headers are not available for the current kernel version
+            runbook_url: https://runbooks.example.com/falco/kernel-headers
+
+        - alert: FalcoDriverLoadFailure
+          expr: falco_driver_loaded == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: system
+            team: sre
+          annotations:
+            summary: Falco driver failed to load
+            description: The Falco driver is not properly loaded
+            runbook_url: https://runbooks.example.com/falco/driver-failure
+
+        # Privilege Escalation
+        - alert: FalcoPrivilegeEscalation
+          expr: sum(rate(falco_events{rule=~"Privilege.*Escalation.*"}[5m])) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: Privilege escalation attempts detected
+            description: Privilege escalation attempts detected in the cluster
+            runbook_url: https://runbooks.example.com/falco/privilege-escalation
+
+        # Suspicious Network Activity
+        - alert: FalcoSuspiciousNetworkActivity
+          expr: sum(rate(falco_events{rule=~"Suspicious.*Network.*"}[5m])) > 5
+          for: 5m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: Suspicious network activity detected
+            description: High rate of suspicious network activity detected
+            runbook_url: https://runbooks.example.com/falco/suspicious-network
+
+        # Falco Service Health
+        - alert: FalcoServiceDown
+          expr: up{job="falco"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            category: security
+            team: security
+          annotations:
+            summary: Falco service is down
+            description: Falco monitoring service is not running
+            runbook_url: https://runbooks.example.com/falco/service-down
+
+        # Rule Evaluation Errors
+        - alert: FalcoRuleEvaluationErrors
+          expr: rate(falco_rule_evaluation_errors[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: Falco rule evaluation errors detected
+            description: Errors occurring during rule evaluation
+            runbook_url: https://runbooks.example.com/falco/rule-errors
+
+        # High Event Rate
+        - alert: FalcoHighEventRate
+          expr: sum(rate(falco_events[5m])) > 100
+          for: 15m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: High rate of Falco events
+            description: Unusually high rate of security events detected
+            runbook_url: https://runbooks.example.com/falco/high-event-rate
+
+        # Dropped Events
+        - alert: FalcoDroppedEvents
+          expr: rate(falco_dropped_events[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            category: security
+            team: security
+          annotations:
+            summary: Falco is dropping events
+            description: Events are being dropped due to system load or configuration issues
+            runbook_url: https://runbooks.example.com/falco/dropped-events

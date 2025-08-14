@@ -1,0 +1,16 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: security
+commonLabels:
+  app.kubernetes.io/name: falco
+  app.kubernetes.io/instance: falco
+  app.kubernetes.io/part-of: security-monitoring
+  app.kubernetes.io/managed-by: flux
+  app.kubernetes.io/created-by: flux
+
+resources:
+  - helmrelease.yaml
+  - networkpolicy.yaml
+  - prometheus-rules.yaml
