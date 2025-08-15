@@ -4,7 +4,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app actions-runner-controller
-  namespace: &namespace actions-runner-system
+  namespace: &namespace ci-cd
 spec:
   commonMetadata:
     labels:
@@ -30,7 +30,7 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &app actions-runner-controller-runners
-  namespace: &namespace actions-runner-system
+  namespace: &namespace ci-cd
 spec:
   commonMetadata:
     labels:
@@ -41,7 +41,7 @@ spec:
     - name: openebs
       namespace: openebs-system
   interval: 1h
-  path: ./kubernetes/kyak/apps/actions-runner-system/actions-runner-controller/runners
+  path: ./kubernetes/apps/ci-cd/actions-runner-controller/runners
   prune: true
   retryInterval: 2m
   sourceRef:

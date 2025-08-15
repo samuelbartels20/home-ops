@@ -18,12 +18,15 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &name home-ops-runner
+  namespace: ci-cd
 spec:
   interval: 1h
   chartRef:
     kind: OCIRepository
     name: gha-runner-scale-set
   install:
+    createNamespace: true
+    crds: CreateReplace
     remediation:
       retries: -1
   upgrade:
@@ -31,7 +34,7 @@ spec:
     remediation:
       retries: 3
   values:
-    githubConfigUrl: https://github.com/coolguy1771/home-ops
+    githubConfigUrl: https://github.com/samuelbartels20/home-ops
     githubConfigSecret: home-ops-runner-secret
     minRunners: 1
     maxRunners: 3
