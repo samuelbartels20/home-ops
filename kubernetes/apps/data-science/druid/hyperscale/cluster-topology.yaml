@@ -120,7 +120,6 @@ data:
           druid_server_tier: "cold"
           druid_server_priority: "50"
 
-    # Ingestion tier (handling 15PB/day)
     middlemanagers:
       replicas: 50
       resources:

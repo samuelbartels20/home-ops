@@ -1,0 +1,180 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: druid-security-audit
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+data:
+  # Falco rules for Druid security monitoring
+  falco-rules.yaml: |
+    - rule: Druid Unauthorized Access Attempt
+      desc: Detect unauthorized access attempts to Druid components
+      condition: >
+        spawned_process and proc.name=druid and
+        (proc.args contains "coordinator" or proc.args contains "broker" or
+         proc.args contains "historical" or proc.args contains "overlord") and
+        not user.name in (druid_system, druid_admin)
+      output: >
+        Unauthorized Druid access attempt (user=%user.name command=%proc.cmdline)
+      priority: WARNING
+      tags: [druid, security]
+
+    - rule: Druid Configuration File Access
+      desc: Detect access to Druid configuration files
+      condition: >
+        open_write and proc.name=druid and
+        (fd.name contains "/opt/druid/conf" or fd.name contains "druid.properties")
+      output: >
+        Druid configuration file accessed (user=%user.name file=%fd.name)
+      priority: INFO
+      tags: [druid, config]
+
+    - rule: Druid Data Directory Access
+      desc: Detect access to Druid data directories
+      condition: >
+        open_write and proc.name=druid and
+        (fd.name contains "/opt/druid/var/druid/segments" or
+         fd.name contains "/opt/druid/var/druid/segments-deep")
+      output: >
+        Druid data directory accessed (user=%user.name file=%fd.name)
+      priority: INFO
+      tags: [druid, data]
+
+    - rule: Druid Network Connection
+      desc: Detect network connections from Druid components
+      condition: >
+        evt.type=connect and proc.name=druid and
+        (fd.name contains "postgresql" or fd.name contains "zookeeper" or
+         fd.name contains "redis" or fd.name contains "s3")
+      output: >
+        Druid network connection (user=%user.name connection=%fd.name)
+      priority: INFO
+      tags: [druid, network]
+
+    - rule: Druid Container Escape Attempt
+      desc: Detect potential container escape attempts from Druid containers
+      condition: >
+        spawned_process and proc.name=druid and
+        (proc.args contains "docker" or proc.args contains "kubectl" or
+         proc.args contains "helm" or proc.args contains "kubelet")
+      output: >
+        Potential container escape attempt from Druid (user=%user.name command=%proc.cmdline)
+      priority: CRITICAL
+      tags: [druid, security, container-escape]
+
+    - rule: Druid Privilege Escalation
+      desc: Detect privilege escalation attempts in Druid containers
+      condition: >
+        spawned_process and proc.name=druid and
+        proc.aname[1]="druid" and proc.aname[2]!="druid"
+      output: >
+        Privilege escalation attempt in Druid container (user=%user.name command=%proc.cmdline)
+      priority: CRITICAL
+      tags: [druid, security, privilege-escalation]
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: druid-wazuh-rules
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+data:
+  # Wazuh rules for Druid security monitoring
+  wazuh-rules.xml: |
+    <group name="druid,">
+      <rule id="100001" level="0">
+        <if_sid>0</if_sid>
+        <match>druid</match>
+        <description>Druid events</description>
+      </rule>
+
+      <rule id="100002" level="5">
+        <if_sid>100001</if_sid>
+        <field name="message">ERROR</field>
+        <description>Druid error detected</description>
+      </rule>
+
+      <rule id="100003" level="7">
+        <if_sid>100001</if_sid>
+        <field name="message">CRITICAL</field>
+        <description>Druid critical error detected</description>
+      </rule>
+
+      <rule id="100004" level="10">
+        <if_sid>100001</if_sid>
+        <field name="message">authentication failed</field>
+        <description>Druid authentication failure</description>
+      </rule>
+
+      <rule id="100005" level="10">
+        <if_sid>100001</if_sid>
+        <field name="message">authorization failed</field>
+        <description>Druid authorization failure</description>
+      </rule>
+
+      <rule id="100006" level="8">
+        <if_sid>100001</if_sid>
+        <field name="message">segment load failed</field>
+        <description>Druid segment load failure</description>
+      </rule>
+
+      <rule id="100007" level="8">
+        <if_sid>100001</if_sid>
+        <field name="message">task failed</field>
+        <description>Druid task failure</description>
+      </rule>
+
+      <rule id="100008" level="6">
+        <if_sid>100001</if_sid>
+        <field name="message">high memory usage</field>
+        <description>Druid high memory usage</description>
+      </rule>
+
+      <rule id="100009" level="6">
+        <if_sid>100001</if_sid>
+        <field name="message">high cpu usage</field>
+        <description>Druid high CPU usage</description>
+      </rule>
+
+      <rule id="100010" level="9">
+        <if_sid>100001</if_sid>
+        <field name="message">security violation</field>
+        <description>Druid security violation detected</description>
+      </rule>
+    </group>
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: druid-trivy-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+data:
+  # Trivy configuration for Druid image scanning
+  trivy-config.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: trivy-druid-config
+      namespace: trivy-system
+    data:
+      trivy.yaml: |
+        image:
+          ref: apache/druid:31.0.0
+        report:
+          format: json
+          output: /tmp/trivy-report.json
+        security:
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+        cache:
+          backend: redis
+          redis:
+            addr: redis://dragonfly.storage.svc.cluster.local:6379
+            db: 3 

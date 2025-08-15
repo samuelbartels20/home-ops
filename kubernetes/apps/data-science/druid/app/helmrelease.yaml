@@ -15,6 +15,7 @@ spec:
         name: bjw-s
         namespace: flux-system
   install:
+    crds: CreateReplace
     createNamespace: true
     remediation:
       retries: 3
@@ -24,7 +25,6 @@ spec:
       retries: 3
   values:
     controllers:
-      # Coordinator - manages data availability and coordinates queries
       coordinator:
         type: deployment
         replicas: 2
@@ -53,7 +53,6 @@ spec:
                 cpu: 1
                 memory: 3Gi
 
-      # Overlord - manages data ingestion
       overlord:
         type: deployment
         replicas: 1
@@ -82,7 +81,6 @@ spec:
                 cpu: 1
                 memory: 3Gi
 
-      # Broker - handles queries from external clients
       broker:
         type: deployment
         replicas: 2
@@ -111,7 +109,6 @@ spec:
                 cpu: 2
                 memory: 4Gi
 
-      # Historical - stores and serves historical data
       historical:
         type: statefulset
         replicas: 2
@@ -148,7 +145,6 @@ spec:
                 cpu: 2
                 memory: 8Gi
 
-      # MiddleManager - handles data ingestion tasks
       middlemanager:
         type: deployment
         replicas: 2
@@ -177,7 +173,6 @@ spec:
                 cpu: 2
                 memory: 4Gi
 
-      # Router - optional HTTP proxy for Druid API
       router:
         type: deployment
         replicas: 1
@@ -266,7 +261,7 @@ spec:
       # Deep storage for segments (using TrueNAS NFS)
       deepstorage:
         type: nfs
-        server: 192.168.8.161  # Your TrueNAS IP
+        server: 192.168.8.102  
         path: /mnt/pool0/druid-deepstorage
         globalMounts:
           - path: /opt/druid/var/druid/segments-deep

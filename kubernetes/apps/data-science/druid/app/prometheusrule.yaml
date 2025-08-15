@@ -1,0 +1,313 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: druid-alerts
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: druid.rules
+      rules:
+        # Availability Alerts
+        - alert: DruidCoordinatorDown
+          expr: up{job="druid-coordinator"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: coordinator
+          annotations:
+            summary: "Druid Coordinator is down"
+            description: "Druid Coordinator has been down for more than 1 minute. This affects data availability coordination."
+
+        - alert: DruidBrokerDown
+          expr: up{job="druid-broker"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: broker
+          annotations:
+            summary: "Druid Broker is down"
+            description: "Druid Broker has been down for more than 1 minute. This affects query processing."
+
+        - alert: DruidHistoricalDown
+          expr: up{job="druid-historical"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: historical
+          annotations:
+            summary: "Druid Historical is down"
+            description: "Druid Historical has been down for more than 1 minute. This affects historical data access."
+
+        - alert: DruidOverlordDown
+          expr: up{job="druid-overlord"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: overlord
+          annotations:
+            summary: "Druid Overlord is down"
+            description: "Druid Overlord has been down for more than 1 minute. This affects data ingestion coordination."
+
+        - alert: DruidMiddleManagerDown
+          expr: up{job="druid-middlemanager"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: middlemanager
+          annotations:
+            summary: "Druid MiddleManager is down"
+            description: "Druid MiddleManager has been down for more than 1 minute. This affects data ingestion tasks."
+
+        - alert: DruidRouterDown
+          expr: up{job="druid-router"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: router
+          annotations:
+            summary: "Druid Router is down"
+            description: "Druid Router has been down for more than 1 minute. This affects API access."
+
+        - alert: DruidZooKeeperDown
+          expr: up{job="druid-zookeeper"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: zookeeper
+          annotations:
+            summary: "Druid ZooKeeper is down"
+            description: "Druid ZooKeeper has been down for more than 1 minute. This affects cluster coordination."
+
+        # Performance Alerts
+        - alert: DruidHighQueryLatency
+          expr: histogram_quantile(0.95, rate(druid_query_time_bucket[5m])) > 30
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid query latency"
+            description: "95th percentile query latency is above 30 seconds for more than 5 minutes."
+
+        - alert: DruidHighIngestionLatency
+          expr: histogram_quantile(0.95, rate(druid_ingestion_time_bucket[5m])) > 300
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid ingestion latency"
+            description: "95th percentile ingestion latency is above 5 minutes for more than 5 minutes."
+
+        - alert: DruidHighMemoryUsage
+          expr: (container_memory_usage_bytes{container="druid"} / container_spec_memory_limit_bytes{container="druid"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid memory usage"
+            description: "Druid container memory usage is above 85% for more than 5 minutes."
+
+        - alert: DruidHighCPUUsage
+          expr: (rate(container_cpu_usage_seconds_total{container="druid"}[5m]) / container_spec_cpu_quota{container="druid"}) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid CPU usage"
+            description: "Druid container CPU usage is above 80% for more than 5 minutes."
+
+        # Data Integrity Alerts
+        - alert: DruidSegmentLoadFailures
+          expr: rate(druid_segment_load_failed_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Druid segment load failures detected"
+            description: "Druid is experiencing segment load failures. This may indicate data corruption or storage issues."
+
+        - alert: DruidSegmentDropFailures
+          expr: rate(druid_segment_drop_failed_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Druid segment drop failures detected"
+            description: "Druid is experiencing segment drop failures. This may indicate storage issues."
+
+        - alert: DruidTaskFailures
+          expr: rate(druid_task_failed_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid task failure rate"
+            description: "Druid task failure rate is above 0.1 failures per second for more than 5 minutes."
+
+        # Storage Alerts
+        - alert: DruidLowDiskSpace
+          expr: (node_filesystem_avail_bytes{mountpoint="/opt/druid/var/druid/segments"} / node_filesystem_size_bytes{mountpoint="/opt/druid/var/druid/segments"}) < 0.1
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Low Druid disk space"
+            description: "Druid segment storage has less than 10% available space."
+
+        - alert: DruidDeepStorageUnavailable
+          expr: up{job="druid-historical"} == 1 and rate(druid_segment_load_failed_total[5m]) > 0.5
+          for: 2m
+          labels:
+            severity: critical
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Druid deep storage unavailable"
+            description: "Druid is unable to access deep storage, causing segment load failures."
+
+        # Query Performance Alerts
+        - alert: DruidSlowQueries
+          expr: rate(druid_query_slow_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High number of slow Druid queries"
+            description: "Druid is experiencing more than 0.1 slow queries per second for more than 5 minutes."
+
+        - alert: DruidQueryQueueFull
+          expr: druid_query_queue_size > 100
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Druid query queue is full"
+            description: "Druid query queue has more than 100 pending queries."
+
+        # Ingestion Alerts
+        - alert: DruidIngestionQueueFull
+          expr: druid_ingestion_queue_size > 50
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "Druid ingestion queue is full"
+            description: "Druid ingestion queue has more than 50 pending tasks."
+
+        - alert: DruidIngestionLag
+          expr: druid_ingestion_lag_seconds > 300
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid ingestion lag"
+            description: "Druid ingestion is lagging by more than 5 minutes."
+
+        # JVM Alerts
+        - alert: DruidJVMHighMemoryUsage
+          expr: (jvm_memory_used_bytes{job=~"druid-.*"} / jvm_memory_max_bytes{job=~"druid-.*"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid JVM memory usage"
+            description: "Druid JVM memory usage is above 85% for more than 5 minutes."
+
+        - alert: DruidJVMHighGCTime
+          expr: rate(jvm_gc_collection_seconds_sum{job=~"druid-.*"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid JVM garbage collection time"
+            description: "Druid JVM is spending more than 10% of time in garbage collection."
+
+        # Connection Alerts
+        - alert: DruidHighConnectionCount
+          expr: druid_http_connections > 1000
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid connection count"
+            description: "Druid has more than 1000 active HTTP connections."
+
+        # ZooKeeper Alerts
+        - alert: DruidZooKeeperHighLatency
+          expr: histogram_quantile(0.95, rate(zk_request_latency_ms_bucket{job="druid-zookeeper"}[5m])) > 100
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: zookeeper
+          annotations:
+            summary: "High ZooKeeper latency"
+            description: "ZooKeeper 95th percentile request latency is above 100ms for more than 5 minutes."
+
+        - alert: DruidZooKeeperHighConnectionCount
+          expr: zk_num_alive_connections > 100
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+            app.kubernetes.io/component: zookeeper
+          annotations:
+            summary: "High ZooKeeper connection count"
+            description: "ZooKeeper has more than 100 active connections."
+
+        # Cache Alerts
+        - alert: DruidCacheMissRate
+          expr: rate(druid_cache_miss_total[5m]) / (rate(druid_cache_hit_total[5m]) + rate(druid_cache_miss_total[5m])) > 0.2
+          for: 5m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid cache miss rate"
+            description: "Druid cache miss rate is above 20% for more than 5 minutes."
+
+        # Security Alerts
+        - alert: DruidAuthenticationFailures
+          expr: rate(druid_auth_failed_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid authentication failures"
+            description: "Druid is experiencing more than 0.1 authentication failures per second."
+
+        - alert: DruidAuthorizationFailures
+          expr: rate(druid_authz_failed_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+            app.kubernetes.io/name: druid
+          annotations:
+            summary: "High Druid authorization failures"
+            description: "Druid is experiencing more than 0.1 authorization failures per second."

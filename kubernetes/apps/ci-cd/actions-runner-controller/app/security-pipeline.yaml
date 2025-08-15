@@ -1,0 +1,123 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: security-scanner-runner
+  namespace: ci-cd
+spec:
+  replicas: 2
+  template:
+    spec:
+      repository: your-org/home-ops
+      labels: ["security-scanner"]
+      containers:
+        - name: runner
+          image: summerwind/actions-runner:latest
+          env:
+            - name: RUNNER_FEATURE_FLAG_GITHUB_ACTIONS_PRE_JOB_CLEANUP_HOOK
+              value: "true"
+          resources:
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: security-scanner-autoscaler
+  namespace: ci-cd
+spec:
+  scaleTargetRef:
+    name: security-scanner-runner
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: PercentageRunnersBusy
+      scaleUpThreshold: '0.75'
+      scaleDownThreshold: '0.25'
+      scaleUpFactor: '2'
+      scaleDownFactor: '0.5'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-scan-workflow
+  namespace: ci-cd
+data:
+  workflow.yaml: |
+    name: Security Scanning Pipeline
+    on:
+      push:
+        branches: [ main ]
+      pull_request:
+        branches: [ main ]
+      schedule:
+        - cron: '0 0 * * *'  # Daily at midnight
+
+    jobs:
+      security-scan:
+        runs-on: [self-hosted, security-scanner]
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Run Trivy vulnerability scanner
+            uses: aquasecurity/trivy-action@master
+            with:
+              scan-type: 'fs,config'
+              ignore-unfixed: true
+              format: 'sarif'
+              output: 'trivy-results.sarif'
+              severity: 'CRITICAL,HIGH'
+
+          - name: Run Kubescape
+            uses: kubescape/github-action@main
+            with:
+              format: sarif
+              outputFile: kubescape-results.sarif
+              frameworks: |
+                nsa
+                mitre
+                armobest
+              severityThreshold: high
+
+          - name: Run KICS scan
+            uses: checkmarx/kics-github-action@v1.7
+            with:
+              path: '.'
+              output_path: kics-results
+              platform_type: k8s
+              output_formats: 'sarif,json'
+              ignore_on_exit: results
+
+          - name: Run Checkov
+            uses: bridgecrewio/checkov-action@master
+            with:
+              directory: .
+              framework: kubernetes
+              output_format: sarif
+              output_file_path: checkov-results.sarif
+
+          - name: Upload scan results
+            uses: github/codeql-action/upload-sarif@v2
+            with:
+              sarif_file: trivy-results.sarif
+              category: trivy
+
+          - name: Notify on failures
+            if: failure()
+            uses: rtCamp/action-slack-notify@v2
+            env:
+              SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+              SLACK_COLOR: danger
+              SLACK_MESSAGE: 'Security scan failed! Check the logs for details.'
+              SLACK_TITLE: Security Pipeline Alert

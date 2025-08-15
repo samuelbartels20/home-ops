@@ -10,3 +10,9 @@ resources:
   - ./rbac.yaml
   - ./ingress.yaml
   - ./helmrelease.yaml
+  - ./configmap.yaml
+  - ./pdb.yaml
+  - ./hpa.yaml
+  - ./psp.yaml
+  - ./grafana-dashboard.yaml
+  - ./security-audit.yaml

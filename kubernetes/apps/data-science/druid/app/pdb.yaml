@@ -1,0 +1,105 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-coordinator-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: coordinator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: coordinator
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-broker-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: broker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: broker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-historical-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: historical
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: historical
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-overlord-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: overlord
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: overlord
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-middlemanager-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: middlemanager
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: middlemanager
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-router-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: router
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: router
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: druid-zookeeper-pdb
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: zookeeper
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: zookeeper 

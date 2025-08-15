@@ -14,7 +14,7 @@ spec:
     - name: rook-ceph-cluster
       namespace: storage
   interval: 30m
-  path: ./kubernetes/apps/services/data-science/druid/app
+  path: ./kubernetes/apps/data-science/druid/app
   prune: true
   sourceRef:
     kind: GitRepository

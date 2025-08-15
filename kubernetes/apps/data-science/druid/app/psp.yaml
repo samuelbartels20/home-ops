@@ -1,0 +1,94 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: druid-psp
+  labels:
+    app.kubernetes.io/name: druid
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+    - 'nfs'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: true
+  allowPrivilegedContainer: false
+  allowedHostPaths: []
+  allowedFlexVolumes: []
+  allowedCSIDrivers: []
+  allowedUnsafeSysctls: []
+  forbiddenSysctls: []
+  defaultAddCapabilities: []
+  defaultAllowPrivilegeEscalation: false
+  runtimeClass:
+    allowedRuntimeClassNames: []
+    defaultRuntimeClassName: ""
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: druid-psp
+  labels:
+    app.kubernetes.io/name: druid
+rules:
+  - apiGroups: ['policy']
+    resources: ['podsecuritypolicies']
+    verbs: ['use']
+    resourceNames: ['druid-psp']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: druid-psp
+  labels:
+    app.kubernetes.io/name: druid
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: druid-psp
+subjects:
+  - kind: ServiceAccount
+    name: druid-coordinator
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-broker
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-historical
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-overlord
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-middlemanager
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-router
+    namespace: data-science
+  - kind: ServiceAccount
+    name: druid-zookeeper
+    namespace: data-science 
