@@ -1,0 +1,94 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubecost
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+    prometheus.io/monitor: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 30s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: |
+            kubecost_allocation_.*|
+            kubecost_cluster_cost_.*|
+            kubecost_namespace_cost_.*|
+            kubecost_node_cost_.*|
+            kubecost_persistent_volume_.*|
+            kubecost_prometheus_.*|
+            kubecost_daily_store_.*|
+            container_memory_working_set_bytes|
+            container_cpu_usage_seconds_total|
+            up
+          action: keep
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubecost-cost-model
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-model
+    app.kubernetes.io/part-of: finops-platform
+    prometheus.io/monitor: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+      app.kubernetes.io/component: cost-model
+  endpoints:
+    - port: http-model
+      path: /metrics
+      interval: 60s
+      scrapeTimeout: 30s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubecost-network-costs
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: network-costs
+    app.kubernetes.io/part-of: finops-platform
+    prometheus.io/monitor: "true"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost-network-costs
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 120s
+      scrapeTimeout: 30s
+      honorLabels: true

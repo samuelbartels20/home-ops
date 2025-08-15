@@ -1,0 +1,218 @@
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubecost-frontend-hpa
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: finops-platform
+    environment: production
+    security-level: enterprise
+  annotations:
+    compliance.finops.io/auto-scaling: "approved"
+    performance.finops.io/scaling-policy: "reactive"
+    cost.finops.io/scaling-bounds: "cost-optimized"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubecost-cost-analyzer-frontend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Pods
+      pods:
+        metric:
+          name: http_request_duration_seconds_p99
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+              app.kubernetes.io/component: frontend
+        target:
+          type: AverageValue
+          averageValue: "500m"  
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+              app.kubernetes.io/component: frontend
+        target:
+          type: AverageValue
+          averageValue: "100"  
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+      selectPolicy: Min
+
+---
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubecost-cost-model-hpa
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-model
+    app.kubernetes.io/part-of: finops-platform
+    environment: production
+    security-level: enterprise
+  annotations:
+    compliance.finops.io/auto-scaling: "approved"
+    performance.finops.io/scaling-policy: "conservative"
+    cost.finops.io/scaling-bounds: "performance-optimized"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubecost-cost-analyzer-cost-model
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 85
+    - type: Pods
+      pods:
+        metric:
+          name: kubecost_etl_queue_depth
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+              app.kubernetes.io/component: cost-model
+        target:
+          type: AverageValue
+          averageValue: "50"  
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 120
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 5
+          periodSeconds: 120
+        - type: Pods
+          value: 1
+          periodSeconds: 600
+      selectPolicy: Min
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: kubecost-frontend-vpa
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: finops-platform
+    environment: production
+    security-level: enterprise
+  annotations:
+    compliance.finops.io/auto-scaling: "approved"
+    performance.finops.io/resource-optimization: "enabled"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubecost-cost-analyzer-frontend
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 3
+  resourcePolicy:
+    containerPolicies:
+      - containerName: kubecost-frontend
+        maxAllowed:
+          cpu: 2000m
+          memory: 4Gi
+        minAllowed:
+          cpu: 100m
+          memory: 256Mi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: kubecost-cost-model-vpa
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-model
+    app.kubernetes.io/part-of: finops-platform
+    environment: production
+    security-level: enterprise
+  annotations:
+    compliance.finops.io/auto-scaling: "approved"
+    performance.finops.io/resource-optimization: "enabled"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubecost-cost-analyzer-cost-model
+  updatePolicy:
+    updateMode: "Initial"  
+  resourcePolicy:
+    containerPolicies:
+      - containerName: cost-model
+        maxAllowed:
+          cpu: 8000m
+          memory: 16Gi
+        minAllowed:
+          cpu: 500m
+          memory: 2Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits

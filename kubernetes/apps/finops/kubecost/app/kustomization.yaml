@@ -1,0 +1,63 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: finops
+
+resources:
+  - ./externalsecret.yaml
+  - ./helmrelease.yaml
+  - ./configmap.yaml
+  - ./service.yaml
+  - ./rbac.yaml
+  - ./networkpolicy.yaml
+  - ./zero-trust-networkpolicy.yaml
+  - ./gatekeeper-policies.yaml
+  - ./pod-security-policy.yaml
+
+  - ./poddisruptionbudget.yaml
+  - ./hpa.yaml
+
+  - ./prometheusrule.yaml
+  - ./servicemonitor.yaml
+  - ./monitoring.yaml
+
+  - ./ingress.yaml
+
+  - ./resourcequota.yaml
+
+  - ./backup-cronjob.yaml
+  - ./backup-serviceaccount.yaml
+  - ./backup-role.yaml
+  - ./backup-rolebinding.yaml
+  - ./backup-configmap.yaml
+  - ./production-standards.yaml
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: kubecost
+      app.kubernetes.io/part-of: finops-platform
+      environment: production
+      security-level: standard
+
+commonAnnotations:
+  compliance.finops.io/sox: "required"
+  compliance.finops.io/gdpr: "required"
+  compliance.finops.io/nist: "required"
+  compliance.finops.io/iso27001: "required"
+  compliance.finops.io/pci-dss: "applicable"
+
+  security.finops.io/policy: "zero-trust"
+  security.finops.io/scan-required: "true"
+  security.finops.io/version: "v2.0"
+
+  ops.finops.io/owner: "finops-team"
+  ops.finops.io/contact: "finops@samcloud.online"
+  ops.finops.io/environment: "production"
+  ops.finops.io/criticality: "high"
+
+commonLabels:
+  app.kubernetes.io/name: kubecost
+  app.kubernetes.io/component: cost-analyzer
+  app.kubernetes.io/part-of: finops

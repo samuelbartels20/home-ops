@@ -1,0 +1,249 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-network-policy
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: finops
+    security-level: strict
+  annotations:
+    network-policy.kubernetes.io/type: "zero-trust"
+    security.finops.io/policy-version: "v2.0"
+    compliance.finops.io/frameworks: "sox,pci-dss,gdpr,nist,iso27001"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 9090
+
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9003
+
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9003
+
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 9003  
+
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 9090
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9443  
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: external-secrets-system
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-secrets
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-cloud-api-access
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cloud-api-access
+    app.kubernetes.io/part-of: finops-platform
+    security-level: controlled
+  annotations:
+    network-policy.kubernetes.io/type: "cloud-api-restricted"
+    security.finops.io/purpose: "cost-data-collection"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+      app.kubernetes.io/component: cost-analyzer
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 52.94.0.0/16  
+            except:
+              - 169.254.169.254/32  
+        - ipBlock:
+            cidr: 54.239.0.0/16  
+      ports:
+        - protocol: TCP
+          port: 443
+
+    - to:
+        - ipBlock:
+            cidr: 40.74.0.0/15  
+        - ipBlock:
+            cidr: 13.107.42.14/32  
+      ports:
+        - protocol: TCP
+          port: 443
+
+    - to:
+        - ipBlock:
+            cidr: 34.64.0.0/14  
+        - ipBlock:
+            cidr: 35.186.0.0/16  
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-backup-network
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: backup-network
+    app.kubernetes.io/part-of: finops-platform
+    security-level: backup-restricted
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+      app.kubernetes.io/component: backup
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    - to:
+        - ipBlock:
+            cidr: 192.168.0.0/16  
+      ports:
+        - protocol: TCP
+          port: 2049  
+        - protocol: UDP
+          port: 2049  
+        - protocol: TCP
+          port: 111  
+        - protocol: UDP
+          port: 111  
+
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-default-deny
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: default-deny
+    app.kubernetes.io/part-of: finops-platform
+    security-level: baseline
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+  policyTypes:
+    - Ingress
+    - Egress

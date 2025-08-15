@@ -1,0 +1,209 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: kubecost-psp
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: security
+    app.kubernetes.io/part-of: finops
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+    security.finops.io/policy-version: "v2.0"
+    compliance.finops.io/frameworks: "sox,pci-dss,gdpr,nist,iso27001"
+spec:
+
+  privileged: false
+  allowPrivilegeEscalation: false
+
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+
+
+  volumes:
+    - configMap
+    - emptyDir
+    - projected
+    - secret
+    - downwardAPI
+    - persistentVolumeClaim
+
+
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  hostPorts:
+    - min: 0
+      max: 0
+
+
+  runAsUser:
+    rule: MustRunAsNonRoot
+    ranges:
+      - min: 1000
+        max: 65535
+
+  runAsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+
+
+  readOnlyRootFilesystem: true
+
+
+  seLinux:
+    rule: RunAsAny
+
+  allowedHostPaths: []
+  allowedFlexVolumes: []
+  allowedUnsafeSysctls: []
+  forbiddenSysctls:
+    - '*'
+
+
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubecost-psp-use
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: finops-platform
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - kubecost-psp
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubecost-psp-use
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: finops-platform
+roleRef:
+  kind: ClusterRole
+  name: kubecost-psp-use
+  apiGroup: rbac.authorization.k8s.io
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - kubecost-psp
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finops
+  labels:
+
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+
+    name: finops
+    network-policy: enabled
+
+
+    monitoring: enabled
+    backup: enabled
+
+
+    environment: production
+    classification: financial
+    data-sensitivity: high
+
+
+    compliance.finops.io/sox: "required"
+    compliance.finops.io/pci-dss: "applicable"
+    compliance.finops.io/gdpr: "required"
+    compliance.finops.io/hipaa: "applicable"
+    compliance.finops.io/nist: "required"
+    compliance.finops.io/iso27001: "required"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kubecost-critical
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: scheduling
+    app.kubernetes.io/part-of: finops-platform
+value: 1000000
+globalDefault: false
+description: "Critical priority class for Kubecost FinOps platform"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: kubecost-limits
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: resource-management
+    app.kubernetes.io/part-of: finops-platform
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 1Gi
+        ephemeral-storage: 5Gi
+      defaultRequest:
+        cpu: 100m
+        memory: 256Mi
+        ephemeral-storage: 1Gi
+      max:
+        cpu: "8"
+        memory: 16Gi
+        ephemeral-storage: 20Gi
+      min:
+        cpu: 50m
+        memory: 128Mi
+        ephemeral-storage: 500Mi
+
+    - type: Pod
+      max:
+        cpu: "16"
+        memory: 32Gi
+        ephemeral-storage: 40Gi
+      min:
+        cpu: 100m
+        memory: 256Mi
+        ephemeral-storage: 1Gi
+
+    - type: PersistentVolumeClaim
+      max:
+        storage: 1Ti
+      min:
+        storage: 10Gi

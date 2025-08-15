@@ -1,0 +1,326 @@
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: kubecostenterprisesecurity
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    description: "Enforces enterprise security standards for Kubecost pods"
+    compliance.finops.io/policy: "enterprise-security"
+spec:
+  crd:
+    spec:
+      names:
+        kind: KubecostEnterpriseSecurity
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            requiredSecurityContexts:
+              type: array
+              items:
+                type: string
+            forbiddenCapabilities:
+              type: array
+              items:
+                type: string
+            requiredLabels:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package kubecostenterprisesecurity
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.runAsNonRoot
+          msg := "Container must run as non-root user"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.readOnlyRootFilesystem
+          msg := "Container must have read-only root filesystem"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          container.securityContext.allowPrivilegeEscalation
+          msg := "Container must not allow privilege escalation"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.capabilities.drop
+          msg := "Container must drop all capabilities"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          "ALL" != container.securityContext.capabilities.drop[_]
+          msg := "Container must drop ALL capabilities"
+        }
+
+        violation[{"msg": msg}] {
+          not input.review.object.spec.securityContext.seccompProfile.type
+          msg := "Pod must specify seccomp profile"
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.spec.securityContext.seccompProfile.type != "RuntimeDefault"
+          msg := "Pod must use RuntimeDefault seccomp profile"
+        }
+
+        violation[{"msg": msg}] {
+          required_labels := input.parameters.requiredLabels
+          provided_labels := input.review.object.metadata.labels
+          missing := required_labels[_]
+          not provided_labels[missing]
+          msg := sprintf("Required label %s is missing", [missing])
+        }
+
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: kubecostresourcemanagement
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    description: "Enforces resource limits and requests for Kubecost workloads"
+    compliance.finops.io/policy: "resource-governance"
+spec:
+  crd:
+    spec:
+      names:
+        kind: KubecostResourceManagement
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            maxCpu:
+              type: string
+            maxMemory:
+              type: string
+            minCpu:
+              type: string
+            minMemory:
+              type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package kubecostresourcemanagement
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.resources.requests.cpu
+          msg := "Container must specify CPU requests"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.resources.requests.memory
+          msg := "Container must specify memory requests"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.resources.limits.cpu
+          msg := "Container must specify CPU limits"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.resources.limits.memory
+          msg := "Container must specify memory limits"
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          cpu_limit := container.resources.limits.cpu
+          max_cpu := input.parameters.maxCpu
+          cpu_limit_value := resource_value(cpu_limit)
+          max_cpu_value := resource_value(max_cpu)
+          cpu_limit_value > max_cpu_value
+          msg := sprintf("CPU limit %s exceeds maximum allowed %s", [cpu_limit, max_cpu])
+        }
+
+        resource_value(resource) = value {
+          value := resource
+        }
+
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: KubecostEnterpriseSecurity
+metadata:
+  name: kubecost-enterprise-security
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    compliance.finops.io/enforcement: "strict"
+    security.finops.io/policy-version: "v2.0"
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces: ["finops"]
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kubecost
+  parameters:
+    requiredLabels:
+      - "app.kubernetes.io/name"
+      - "app.kubernetes.io/component"
+      - "app.kubernetes.io/part-of"
+      - "environment"
+      - "security-level"
+    forbiddenCapabilities:
+      - "SYS_ADMIN"
+      - "NET_ADMIN"
+      - "SYS_TIME"
+    requiredSecurityContexts:
+      - "runAsNonRoot"
+      - "readOnlyRootFilesystem"
+
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: KubecostResourceManagement
+metadata:
+  name: kubecost-resource-limits
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    compliance.finops.io/enforcement: "strict"
+    cost.finops.io/policy-version: "v1.0"
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+    namespaces: ["finops"]
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kubecost
+  parameters:
+    maxCpu: "8000m"
+    maxMemory: "16Gi"
+    minCpu: "10m"
+    minMemory: "64Mi"
+
+---
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: kubecostimagesecurity
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    description: "Enforces image security standards for Kubecost"
+    security.finops.io/policy: "image-security"
+spec:
+  crd:
+    spec:
+      names:
+        kind: KubecostImageSecurity
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedRegistries:
+              type: array
+              items:
+                type: string
+            requireDigest:
+              type: boolean
+            forbiddenTags:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package kubecostimagesecurity
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          image := container.image
+          not startswith(image, input.parameters.allowedRegistries[_])
+          msg := sprintf("Image %s is not from an allowed registry", [image])
+        }
+
+        violation[{"msg": msg}] {
+          input.parameters.requireDigest
+          container := input.review.object.spec.containers[_]
+          image := container.image
+          not contains(image, "@sha256:")
+          msg := sprintf("Image %s must use digest pinning (sha256)", [image])
+        }
+
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          image := container.image
+          forbidden_tag := input.parameters.forbiddenTags[_]
+          endswith(image, forbidden_tag)
+          msg := sprintf("Image %s uses forbidden tag %s", [image, forbidden_tag])
+        }
+
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: KubecostImageSecurity
+metadata:
+  name: kubecost-image-security
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    security.finops.io/enforcement: "strict"
+    compliance.finops.io/policy-version: "v1.0"
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+    namespaces: ["finops"]
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kubecost
+  parameters:
+    allowedRegistries:
+      - "gcr.io/kubecost1/"
+      - "quay.io/kubecost/"
+      - "registry.k8s.io/"
+      - "ghcr.io/"
+      - "docker.io/library/"  
+    requireDigest: true
+    forbiddenTags:
+      - ":latest"
+      - ":master"
+      - ":main"
+      - ":dev"

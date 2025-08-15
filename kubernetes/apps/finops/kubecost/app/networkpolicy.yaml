@@ -1,0 +1,123 @@
+---
+# Ingress NetworkPolicy for Kubecost
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-ingress
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow ingress from observability namespace (Prometheus scraping)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow ingress from same namespace (inter-pod communication)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: finops
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9003  # Cost model API
+  egress:
+    # Allow egress to Kubernetes API server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    # Allow egress to Prometheus in observability namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    # Allow egress to DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow egress to cloud provider APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow egress to OIDC provider
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Egress NetworkPolicy for external APIs
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kubecost-external-egress
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kubecost
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to cloud provider billing APIs
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32  
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443

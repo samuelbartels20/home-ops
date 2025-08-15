@@ -1,0 +1,12 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: kubecost-high-priority
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+value: 1000
+globalDefault: false
+description: "High priority class for Kubecost FinOps workloads"

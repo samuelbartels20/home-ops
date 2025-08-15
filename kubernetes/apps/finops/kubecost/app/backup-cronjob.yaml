@@ -1,0 +1,154 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubecost-backup
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: finops-platform
+  annotations:
+    ops.finops.io/owner: "finops-team"
+    ops.finops.io/contact: "finops@samcloud.online"
+    ops.finops.io/runbook: "https://runbooks.samcloud.online/kubecost-backup"
+spec:
+  schedule: "0 2 * * *"  
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubecost
+        app.kubernetes.io/component: backup
+        app.kubernetes.io/part-of: finops-platform
+    spec:
+      activeDeadlineSeconds: 3600  
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: kubecost
+            app.kubernetes.io/component: backup
+            app.kubernetes.io/part-of: finops-platform
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: kubecost-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            fsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+
+          nodeSelector:
+            kubernetes.io/os: linux
+            node-type: "compute"
+
+          tolerations:
+            - key: "node.kubernetes.io/not-ready"
+              operator: "Exists"
+              effect: "NoExecute"
+              tolerationSeconds: 300
+
+          volumes:
+            - name: kubecost-data
+              persistentVolumeClaim:
+                claimName: kubecost-cost-analyzer
+
+            - name: truenas-backup
+              nfs:
+                server: "${TRUENAS_NFS_SERVER}"
+                path: "${TRUENAS_NFS_PATH}/kubecost-backups"
+                readOnly: false
+
+            - name: backup-config
+              secret:
+                secretName: kubecost-secrets
+                items:
+                  - key: backup-config.yaml
+                    path: backup-config.yaml
+                defaultMode: 0400
+
+            - name: backup-scripts
+              configMap:
+                name: kubecost-backup-scripts
+                defaultMode: 0755
+
+          containers:
+            - name: backup
+              image: alpine:3.19
+              imagePullPolicy: IfNotPresent
+
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1001
+                runAsGroup: 1001
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+
+              env:
+                - name: BACKUP_DATE
+                  value: "$(date +%Y%m%d_%H%M%S)"
+                - name: RETENTION_DAYS
+                  value: "90"
+                - name: KUBECOST_DATA_DIR
+                  value: "/kubecost-data"
+                - name: BACKUP_DIR
+                  value: "/backup"
+                - name: TEMP_DIR
+                  value: "/tmp"
+
+              command:
+                - /scripts/backup.sh
+
+              volumeMounts:
+                - name: kubecost-data
+                  mountPath: /kubecost-data
+                  readOnly: true
+
+                - name: truenas-backup
+                  mountPath: /backup
+
+                - name: backup-config
+                  mountPath: /config
+                  readOnly: true
+
+                - name: backup-scripts
+                  mountPath: /scripts
+                  readOnly: true
+
+                - name: temp
+                  mountPath: /tmp
+
+              # Health checks
+              livenessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - "pgrep -f backup.sh || exit 0"
+                initialDelaySeconds: 30
+                periodSeconds: 30
+                timeoutSeconds: 10
+                failureThreshold: 3
+
+            - name: temp
+              emptyDir:
+                sizeLimit: 10Gi

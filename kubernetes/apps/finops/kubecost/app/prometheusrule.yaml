@@ -1,0 +1,191 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubecost-alerts
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+    prometheus.io/rule: "true"
+spec:
+  groups:
+    - name: kubecost.availability
+      interval: 30s
+      rules:
+        - alert: KubecostDown
+          expr: up{job="kubecost"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: kubecost
+            category: availability
+          annotations:
+            summary: "Kubecost is down"
+            description: "Kubecost has been down for more than 5 minutes. FinOps cost tracking is unavailable."
+            runbook_url: "https://runbooks.samcloud.online/kubecost-down"
+
+        - alert: KubecostHighMemoryUsage
+          expr: (container_memory_working_set_bytes{pod=~"kubecost-cost-analyzer-.*"} / container_spec_memory_limit_bytes{pod=~"kubecost-cost-analyzer-.*"}) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+            service: kubecost
+            category: performance
+          annotations:
+            summary: "Kubecost high memory usage"
+            description: "Kubecost pod {{ $labels.pod }} memory usage is above 85% for more than 10 minutes."
+
+        - alert: KubecostHighCPUUsage
+          expr: (rate(container_cpu_usage_seconds_total{pod=~"kubecost-cost-analyzer-.*"}[5m]) / container_spec_cpu_quota{pod=~"kubecost-cost-analyzer-.*"} * container_spec_cpu_period{pod=~"kubecost-cost-analyzer-.*"}) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+            service: kubecost
+            category: performance
+          annotations:
+            summary: "Kubecost high CPU usage"
+            description: "Kubecost pod {{ $labels.pod }} CPU usage is above 85% for more than 10 minutes."
+
+    - name: kubecost.data
+      interval: 5m
+      rules:
+        - alert: KubecostDataIngestionSlow
+          expr: increase(kubecost_allocation_memory_efficiency{kubecost="kubecost"}[1h]) < 10
+          for: 30m
+          labels:
+            severity: warning
+            service: kubecost
+            category: data
+          annotations:
+            summary: "Kubecost data ingestion is slow"
+            description: "Kubecost allocation data ingestion has been slow for 30 minutes. This may impact cost accuracy."
+
+        - alert: KubecostETLFailure
+          expr: kubecost_daily_store_failure_total > 0
+          for: 0m
+          labels:
+            severity: critical
+            service: kubecost
+            category: data
+          annotations:
+            summary: "Kubecost ETL process failure"
+            description: "Kubecost ETL process has failed. Cost data may be incomplete."
+
+        - alert: KubecostPrometheusConnectionFailure
+          expr: kubecost_prometheus_query_failure_total > 5
+          for: 5m
+          labels:
+            severity: warning
+            service: kubecost
+            category: integration
+          annotations:
+            summary: "Kubecost cannot connect to Prometheus"
+            description: "Kubecost has failed to query Prometheus {{ $value }} times in 5 minutes."
+
+    - name: kubecost.costs
+      interval: 1h
+      rules:
+        - alert: HighClusterCostIncrease
+          expr: |
+            (
+              (kubecost_cluster_cost_total{period="1d"} - kubecost_cluster_cost_total{period="1d"} offset 7d)
+              / kubecost_cluster_cost_total{period="1d"} offset 7d
+            ) * 100 > 20
+          for: 0m
+          labels:
+            severity: warning
+            service: kubecost
+            category: cost-anomaly
+          annotations:
+            summary: "High cluster cost increase detected"
+            description: "Cluster {{ $labels.cluster }} costs have increased by {{ $value }}% compared to last week."
+
+        - alert: NamespaceCostAnomaly
+          expr: |
+            (
+              (kubecost_namespace_cost_total{period="1d"} - kubecost_namespace_cost_total{period="1d"} offset 1d)
+              / kubecost_namespace_cost_total{period="1d"} offset 1d
+            ) * 100 > 50
+          for: 0m
+          labels:
+            severity: warning
+            service: kubecost
+            category: cost-anomaly
+          annotations:
+            summary: "Namespace cost anomaly detected"
+            description: "Namespace {{ $labels.namespace }} costs have increased by {{ $value }}% compared to yesterday."
+
+        - alert: UnallocatedCostsHigh
+          expr: |
+            (
+              kubecost_unallocated_cost_total{period="1d"}
+              / kubecost_cluster_cost_total{period="1d"}
+            ) * 100 > 15
+          for: 0m
+          labels:
+            severity: info
+            service: kubecost
+            category: cost-optimization
+          annotations:
+            summary: "High unallocated costs detected"
+            description: "{{ $value }}% of cluster costs are unallocated. Consider improving resource allocation tracking."
+
+    - name: kubecost.efficiency
+      interval: 1h
+      rules:
+        - alert: LowResourceEfficiency
+          expr: kubecost_allocation_memory_efficiency{kubecost="kubecost"} < 0.5
+          for: 2h
+          labels:
+            severity: info
+            service: kubecost
+            category: efficiency
+          annotations:
+            summary: "Low resource efficiency detected"
+            description: "Workload {{ $labels.container }} in namespace {{ $labels.namespace }} has memory efficiency of {{ $value }}%."
+
+        - alert: OverprovisionedWorkloads
+          expr: kubecost_allocation_cpu_efficiency{kubecost="kubecost"} < 0.3
+          for: 4h
+          labels:
+            severity: info
+            service: kubecost
+            category: efficiency
+          annotations:
+            summary: "Overprovisioned workload detected"
+            description: "Workload {{ $labels.container }} in namespace {{ $labels.namespace }} has CPU efficiency of {{ $value }}%."
+
+    - name: kubecost.storage
+      interval: 30m
+      rules:
+        - alert: KubecostStorageUsageHigh
+          expr: |
+            (
+              kubecost_persistent_volume_bytes{persistentvolume=~".*kubecost.*"}
+              / kubecost_persistent_volume_capacity_bytes{persistentvolume=~".*kubecost.*"}
+            ) * 100 > 80
+          for: 30m
+          labels:
+            severity: warning
+            service: kubecost
+            category: storage
+          annotations:
+            summary: "Kubecost storage usage high"
+            description: "Kubecost persistent volume {{ $labels.persistentvolume }} is {{ $value }}% full."
+
+        - alert: KubecostStorageFull
+          expr: |
+            (
+              kubecost_persistent_volume_bytes{persistentvolume=~".*kubecost.*"}
+              / kubecost_persistent_volume_capacity_bytes{persistentvolume=~".*kubecost.*"}
+            ) * 100 > 95
+          for: 5m
+          labels:
+            severity: critical
+            service: kubecost
+            category: storage
+          annotations:
+            summary: "Kubecost storage nearly full"
+            description: "Kubecost persistent volume {{ $labels.persistentvolume }} is {{ $value }}% full. Immediate action required."

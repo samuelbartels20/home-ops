@@ -1,0 +1,250 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubecost-backup-scripts
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: finops-platform
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -euo pipefail
+
+    # Color codes for output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m' 
+
+    # Logging functions
+    log_info() {
+        echo -e "${GREEN}[INFO]${NC} $(date): $1"
+    }
+
+    log_warn() {
+        echo -e "${YELLOW}[WARN]${NC} $(date): $1"
+    }
+
+    log_error() {
+        echo -e "${RED}[ERROR]${NC} $(date): $1"
+    }
+
+    # Main backup function
+    main() {
+        log_info "Starting Kubecost backup process"
+
+        # Set backup timestamp
+        BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        BACKUP_PATH="${BACKUP_DIR}/${BACKUP_TIMESTAMP}"
+
+        log_info "Creating backup directory: ${BACKUP_PATH}"
+        mkdir -p "${BACKUP_PATH}"
+
+        # Backup Kubecost data
+        log_info "Backing up Kubecost data from ${KUBECOST_DATA_DIR}"
+        if [ -d "${KUBECOST_DATA_DIR}" ] && [ "$(ls -A ${KUBECOST_DATA_DIR})" ]; then
+            # Create compressed archive
+            tar -czf "${BACKUP_PATH}/kubecost-data.tar.gz" -C "${KUBECOST_DATA_DIR}" .
+            log_info "Data backup completed: $(du -h ${BACKUP_PATH}/kubecost-data.tar.gz | cut -f1)"
+        else
+            log_warn "No data found in ${KUBECOST_DATA_DIR}"
+        fi
+
+        # Backup configuration
+        log_info "Backing up configuration files"
+        if [ -d "/config" ]; then
+            cp -r /config "${BACKUP_PATH}/config"
+            log_info "Configuration backup completed"
+        fi
+
+        # Create manifest with backup metadata
+        cat > "${BACKUP_PATH}/manifest.json" << EOF
+    {
+      "timestamp": "${BACKUP_TIMESTAMP}",
+      "kubernetes_cluster": "${KUBERNETES_SERVICE_HOST:-unknown}",
+      "namespace": "${POD_NAMESPACE:-finops}",
+      "kubecost_version": "2.8.0",
+      "backup_size": "$(du -sb ${BACKUP_PATH} | cut -f1)",
+      "files": [
+        $(find ${BACKUP_PATH} -type f -printf '"%f",\n' | sed '$ s/,$//')
+      ]
+    }
+    EOF
+
+        # Verify backup integrity
+        log_info "Verifying backup integrity"
+        if [ -f "${BACKUP_PATH}/kubecost-data.tar.gz" ]; then
+            if tar -tzf "${BACKUP_PATH}/kubecost-data.tar.gz" > /dev/null 2>&1; then
+                log_info "Backup integrity check passed"
+            else
+                log_error "Backup integrity check failed"
+                exit 1
+            fi
+        fi
+
+        # Cleanup old backups
+        log_info "Cleaning up backups older than ${RETENTION_DAYS} days"
+        find "${BACKUP_DIR}" -maxdepth 1 -type d -name "20*" -mtime +${RETENTION_DAYS} -exec rm -rf {} \; 2>/dev/null || true
+
+        # Create 'latest' symlink
+        ln -sfn "${BACKUP_TIMESTAMP}" "${BACKUP_DIR}/latest"
+
+        log_info "Backup completed successfully"
+        log_info "Backup location: ${BACKUP_PATH}"
+        log_info "Total backup size: $(du -h ${BACKUP_PATH} | tail -1 | cut -f1)"
+
+        # Send completion event to Kubernetes
+        kubectl_available=$(command -v kubectl 2>/dev/null || echo "")
+        if [ -n "$kubectl_available" ]; then
+            kubectl create event \
+                --type=Normal \
+                --reason=BackupCompleted \
+                --message="Kubecost backup completed successfully at ${BACKUP_TIMESTAMP}" \
+                --reporting-component=kubecost-backup \
+                --reporting-instance=${HOSTNAME} \
+                kubecost-backup-${BACKUP_TIMESTAMP} 2>/dev/null || true
+        fi
+    }
+
+    # Error handling
+    trap 'log_error "Backup failed with exit code $?"' EXIT
+
+    # Install required packages
+    apk add --no-cache tar gzip kubectl
+
+    # Run main backup process
+    main "$@"
+
+    # If we get here, backup was successful
+    trap - EXIT
+
+  restore.sh: |
+    #!/bin/sh
+    set -euo pipefail
+
+    # Color codes for output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m' # No Color
+
+    # Logging functions
+    log_info() {
+        echo -e "${GREEN}[INFO]${NC} $(date): $1"
+    }
+
+    log_warn() {
+        echo -e "${YELLOW}[WARN]${NC} $(date): $1"
+    }
+
+    log_error() {
+        echo -e "${RED}[ERROR]${NC} $(date): $1"
+    }
+
+    # Usage function
+    usage() {
+        echo "Usage: $0 [BACKUP_TIMESTAMP|latest]"
+        echo "Example: $0 20240101_120000"
+        echo "Example: $0 latest"
+        exit 1
+    }
+
+    # Main restore function
+    main() {
+        RESTORE_TARGET=${1:-latest}
+
+        log_info "Starting Kubecost restore process"
+        log_info "Restore target: ${RESTORE_TARGET}"
+
+        # Resolve backup path
+        if [ "${RESTORE_TARGET}" = "latest" ]; then
+            BACKUP_PATH="${BACKUP_DIR}/latest"
+            if [ ! -L "${BACKUP_PATH}" ]; then
+                log_error "Latest backup symlink not found"
+                exit 1
+            fi
+            # Resolve symlink
+            BACKUP_PATH="${BACKUP_DIR}/$(readlink ${BACKUP_PATH})"
+        else
+            BACKUP_PATH="${BACKUP_DIR}/${RESTORE_TARGET}"
+        fi
+
+        if [ ! -d "${BACKUP_PATH}" ]; then
+            log_error "Backup not found: ${BACKUP_PATH}"
+            exit 1
+        fi
+
+        log_info "Restoring from: ${BACKUP_PATH}"
+
+        # Verify backup integrity before restore
+        if [ -f "${BACKUP_PATH}/kubecost-data.tar.gz" ]; then
+            log_info "Verifying backup integrity"
+            if ! tar -tzf "${BACKUP_PATH}/kubecost-data.tar.gz" > /dev/null 2>&1; then
+                log_error "Backup integrity check failed"
+                exit 1
+            fi
+        fi
+
+        # Stop any running Kubecost pods (if kubectl available)
+        kubectl_available=$(command -v kubectl 2>/dev/null || echo "")
+        if [ -n "$kubectl_available" ]; then
+            log_info "Scaling down Kubecost deployment"
+            kubectl scale deployment kubecost-cost-analyzer --replicas=0 -n finops || true
+            sleep 30
+        fi
+
+        # Backup current data before restore
+        if [ -d "${KUBECOST_DATA_DIR}" ] && [ "$(ls -A ${KUBECOST_DATA_DIR})" ]; then
+            CURRENT_BACKUP="${KUBECOST_DATA_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+            log_info "Backing up current data to: ${CURRENT_BACKUP}"
+            mv "${KUBECOST_DATA_DIR}" "${CURRENT_BACKUP}"
+        fi
+
+        # Create data directory
+        mkdir -p "${KUBECOST_DATA_DIR}"
+
+        # Restore data
+        if [ -f "${BACKUP_PATH}/kubecost-data.tar.gz" ]; then
+            log_info "Restoring Kubecost data"
+            tar -xzf "${BACKUP_PATH}/kubecost-data.tar.gz" -C "${KUBECOST_DATA_DIR}"
+            log_info "Data restore completed"
+        fi
+
+        # Restore configuration
+        if [ -d "${BACKUP_PATH}/config" ]; then
+            log_info "Restoring configuration"
+            cp -r "${BACKUP_PATH}/config/"* /config/ 2>/dev/null || true
+            log_info "Configuration restore completed"
+        fi
+
+        # Set proper permissions
+        chown -R 1001:1001 "${KUBECOST_DATA_DIR}" 2>/dev/null || true
+
+        # Scale up Kubecost deployment
+        if [ -n "$kubectl_available" ]; then
+            log_info "Scaling up Kubecost deployment"
+            kubectl scale deployment kubecost-cost-analyzer --replicas=3 -n finops || true
+        fi
+
+        log_info "Restore completed successfully"
+
+        # Display restore summary
+        if [ -f "${BACKUP_PATH}/manifest.json" ]; then
+            log_info "Restore summary:"
+            cat "${BACKUP_PATH}/manifest.json"
+        fi
+    }
+
+    # Check arguments
+    if [ $# -gt 1 ]; then
+        usage
+    fi
+
+    # Install required packages
+    apk add --no-cache tar gzip kubectl
+
+    # Run main restore process
+    main "$@" 

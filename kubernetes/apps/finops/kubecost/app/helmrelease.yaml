@@ -1,0 +1,503 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kubecost
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analyzer
+    app.kubernetes.io/part-of: finops
+  annotations:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+    trivy-scanner/scan: "true"
+    falco-security/monitor: "true"
+
+    compliance.finops.io/sox: "required"
+    compliance.finops.io/pci-dss: "applicable"
+    compliance.finops.io/gdpr: "required"
+    compliance.finops.io/hipaa: "applicable"
+    compliance.finops.io/nist: "required"
+    compliance.finops.io/iso27001: "required"
+
+    hardening.finops.io/version: "v2.0"
+    hardening.finops.io/profile: "enterprise-strict"
+    security.finops.io/policy: "zero-trust"
+
+    ops.finops.io/owner: "finops-team"
+    ops.finops.io/contact: "finops@samcloud.online"
+    ops.finops.io/escalation: "sre-oncall"
+    ops.finops.io/runbook: "https://runbooks.samcloud.online/kubecost"
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: cost-analyzer
+      version: 1.106.0
+      sourceRef:
+        kind: HelmRepository
+        name: kubecost
+        namespace: flux-system
+  maxHistory: 3
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+    timeout: 10m
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+    timeout: 10m
+  uninstall:
+    keepHistory: false
+  valuesFrom:
+    - kind: Secret
+      name: kubecost-secrets
+      valuesKey: productkey.json
+      targetPath: kubecostProductConfigs.productKey
+  values:
+    global:
+      zone: "us-west-2a"
+      region: "us-west-2"
+
+      images:
+        pullPolicy: IfNotPresent
+        pullSecrets:
+          - name: kubecost-registry-secret
+
+      prometheus:
+        enabled: true
+        fqdn: http://prometheus-operated:9090
+
+      grafana:
+        enabled: true
+        domainName: grafana.${CLUSTER_DOMAIN}
+
+      notifications:
+        alertmanager:
+          enabled: true
+          fqdn: http://alertmanager-operated:9093
+
+    kubecostFrontend:
+      image:
+        repository: gcr.io/kubecost1/frontend
+        tag: "prod-2.8.0"
+        pullPolicy: IfNotPresent
+
+      replicaCount: 3
+      revisionHistoryLimit: 3
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+          ephemeral-storage: 1Gi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+          ephemeral-storage: 5Gi
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+
+      probes:
+        liveness:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /healthz
+              port: 9090
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+
+        readiness:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /readyz
+              port: 9090
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+        startup:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /readyz
+              port: 9090
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+            successThreshold: 1
+
+      env:
+        - name: PROMETHEUS_SERVER_ENDPOINT
+          value: "http://prometheus-operated.observability.svc.cluster.local:9090"
+        - name: CLUSTER_ID
+          value: "production-cluster"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: EMIT_POD_ANNOTATIONS_METRIC
+          value: "true"
+        - name: EMIT_NAMESPACE_ANNOTATIONS_METRIC
+          value: "true"
+        - name: EMIT_KSM_V1_METRICS
+          value: "false"
+        - name: KUBECOST_METRICS_PORT
+          value: "9003"
+
+    kubecostModel:
+      image:
+        repository: gcr.io/kubecost1/cost-model
+        tag: "prod-2.8.0"
+        pullPolicy: IfNotPresent
+
+      replicaCount: 3
+
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+          ephemeral-storage: 2Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+          ephemeral-storage: 10Gi
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+
+      probes:
+        liveness:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /healthz
+              port: 9003
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+
+        readiness:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /readyz
+              port: 9003
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+        startup:
+          enabled: true
+          custom: true
+          spec:
+            httpGet:
+              path: /readyz
+              port: 9003
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+            successThreshold: 1
+
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        supplementalGroups: [1001]
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: kubecost
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: kubecost
+                topologyKey: topology.kubernetes.io/zone
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: kubecost
+
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-type: "compute"
+
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9003"
+        prometheus.io/path: "/metrics"
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+      labels:
+        app.kubernetes.io/name: kubecost
+        app.kubernetes.io/component: cost-analytics
+        monitoring: "true"
+        security-scan: "required"
+
+    serviceAccount:
+      create: true
+      name: kubecost
+      automountServiceAccountToken: true  
+      annotations:
+        eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/kubecost-irsa"
+        azure.workload.identity/client-id: "${AZURE_CLIENT_ID}"
+        iam.gke.io/gcp-service-account: "kubecost@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+
+    rbac:
+      create: true
+
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+      maxUnavailable: null
+
+    priorityClassName: kubecost-critical
+
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+      storageClass: mayastor-two-replica
+      accessModes:
+        - ReadWriteOnce
+
+    objectStoreConfigSecret: "kubecost-secrets"
+    etlCloudStorageConfigSecret: "kubecost-secrets"
+
+    etl:
+      enabled: true
+      fileStoreEnabled: true
+      durationHours: 8760  
+      cloudStorageConfig: "object-store.yaml"
+
+    thanos:
+      enabled: true
+      store: true
+      query: true
+      compact: true
+      sidecar:
+        enabled: true
+
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/auth-url: "https://oauth2-proxy.security.svc.cluster.local/oauth2/auth"
+        nginx.ingress.kubernetes.io/auth-signin: "https://oauth2-proxy.samcloud.online/oauth2/start?rd=$escaped_request_uri"
+      hosts:
+        - host: kubecost.samcloud.online
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: kubecost-tls
+          hosts:
+            - kubecost.samcloud.online
+
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        prometheus.io/scrape: "true"
+      interval: 30s
+      scrapeTimeout: 10s
+
+    prometheusRule:
+      enabled: true
+      additionalLabels:
+        prometheus.io/rule: "true"
+      rules:
+        - alert: KubecostDown
+          expr: up{job="kubecost"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Kubecost is down"
+            description: "Kubecost has been down for more than 5 minutes"
+
+        - alert: KubecostHighMemoryUsage
+          expr: container_memory_working_set_bytes{pod=~"kubecost.*"} / container_spec_memory_limit_bytes > 0.9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kubecost high memory usage"
+            description: "Kubecost memory usage is above 90%"
+
+
+    kubecostProductConfigs:
+      labelMappingConfigs:
+        enabled: true
+      clusterName: home-cluster
+      currencyCode: USD
+
+    prometheus:
+      nodeExporter:
+        enabled: true
+      serviceAccounts:
+        nodeExporter:
+          create: false
+      kubeStateMetrics:
+        enabled: true
+
+    grafana:
+      sidecar:
+        dashboards:
+          enabled: true
+          label: grafana_dashboard
+
+    kubecostAggregator:
+      enabled: true
+      replicas: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+    networkCosts:
+      enabled: true
+      image:
+        repository: gcr.io/kubecost1/kubecost-network-costs
+        tag: "v0.17.10"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+    clusterController:
+      enabled: true
+      image:
+        repository: gcr.io/kubecost1/cluster-controller
+        tag: "v0.16.18"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+    kubecostMetrics:
+      emitPodAnnotations: true
+      emitNamespaceAnnotations: true
+      emitKsmV1Metrics: false  
+
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"  
+      retention: "30d"
+
+    reporting:
+      enabled: true
+
+    gpu:
+      enabled: true
+
+    allocation:
+      splitIdle: true
+      shareIdle: "shareByNode"
+
+    budgets:
+      enabled: true
+
+    costAnalyzer:
+      image:
+        repository: kubecost/cost-analyzer
+        tag: prod-1.103.1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+    metrics:
+      serviceMonitor:
+        enabled: true

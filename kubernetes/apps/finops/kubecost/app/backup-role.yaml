@@ -1,0 +1,26 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubecost-backup
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: finops-platform
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+    resourceNames: ["kubecost-backup-scripts"]
+
+  # Access to secrets for backup credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["kubecost-secrets"]
+
+  # Create events for backup status
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"] 

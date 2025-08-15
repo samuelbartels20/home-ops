@@ -1,0 +1,67 @@
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: finops-quota
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+spec:
+  hard:
+    requests.cpu: "5"
+    requests.memory: "8Gi"
+    limits.cpu: "10"
+    limits.memory: "16Gi"
+
+    requests.storage: "500Gi"
+    persistentvolumeclaims: "10"
+
+    pods: "50"
+    services: "20"
+    secrets: "20"
+    configmaps: "20"
+
+    services.nodeports: "0"
+    services.loadbalancers: "2"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: finops-limits
+  namespace: finops
+  labels:
+    app.kubernetes.io/name: kubecost
+    app.kubernetes.io/component: cost-analytics
+    app.kubernetes.io/part-of: finops-platform
+spec:
+  limits:
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: "8Gi"
+      min:
+        cpu: "10m"
+        memory: "64Mi"
+
+    - type: Container
+      max:
+        cpu: "2"
+        memory: "4Gi"
+      min:
+        cpu: "10m"
+        memory: "64Mi"
+      default:
+        cpu: "100m"
+        memory: "256Mi"
+      defaultRequest:
+        cpu: "50m"
+        memory: "128Mi"
+
+    - type: PersistentVolumeClaim
+      max:
+        storage: "200Gi"
+      min:
+        storage: "1Gi"
