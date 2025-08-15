@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: authelia-pdb
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: high-availability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia 

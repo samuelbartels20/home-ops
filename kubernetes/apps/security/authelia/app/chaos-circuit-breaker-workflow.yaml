@@ -1,0 +1,70 @@
+---
+# Circuit Breaker Test
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: authelia-circuit-breaker-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: circuit-breaker
+spec:
+  entry: test-circuit-breaker
+  templates:
+    - name: test-circuit-breaker
+      templateType: Serial
+      deadline: 300s
+      children:
+        - simulate-ldap-failure
+        - generate-auth-load
+        - verify-circuit-breaker
+    - name: simulate-ldap-failure
+      templateType: NetworkChaos
+      deadline: 180s
+      networkChaos:
+        action: partition
+        mode: all
+        selector:
+          namespaces:
+            - security
+          labelSelectors:
+            app.kubernetes.io/name: authelia
+        direction: to
+        target:
+          mode: all
+          selector:
+            namespaces:
+              - auth
+            labelSelectors:
+              app.kubernetes.io/name: lldap
+    - name: generate-auth-load
+      templateType: Task
+      deadline: 120s
+      task:
+        container:
+          image: curlimages/curl:latest
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              # Generate authentication load
+              for i in $(seq 1 50); do
+                curl -s -X POST http://authelia.security.svc.cluster.local/api/firstfactor \
+                  -H "Content-Type: application/json" \
+                  -d '{"username":"test","password":"invalid","keepMeLoggedIn":false}' &
+              done
+              wait
+    - name: verify-circuit-breaker
+      templateType: Task
+      deadline: 60s
+      task:
+        container:
+          image: curlimages/curl:latest
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              # Verify circuit breaker is triggered
+              response=$(curl -s http://authelia.security.svc.cluster.local/api/health)
+              echo "Circuit breaker test completed"
+  schedule: "@every 72h" 

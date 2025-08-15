@@ -1,0 +1,93 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authelia-region-failover-check
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: multi-region-health
+spec:
+  schedule: "* * * * *"  
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: authelia-multi-region
+          restartPolicy: OnFailure
+          containers:
+            - name: failover-manager
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo " Starting multi-region failover check"
+
+                  # Get current health status
+                  HEALTH_DATA=$(kubectl get configmap authelia-region-health -n security -o jsonpath='{.data}' 2>/dev/null || echo '{}')
+
+                  # Check if primary region is healthy
+                  PRIMARY_STATUS=$(echo "$HEALTH_DATA" | jq -r '.["us-east-1_status"] // "unknown"')
+                  OVERALL_HEALTH=$(echo "$HEALTH_DATA" | jq -r '.overall_health_percentage // "0"')
+
+                  echo " Primary region (us-east-1) status: $PRIMARY_STATUS"
+                  echo " Overall health: $OVERALL_HEALTH%"
+
+                  # Trigger failover if primary is unhealthy
+                  if [[ "$PRIMARY_STATUS" == "unhealthy" ]]; then
+                    echo " Primary region unhealthy, checking failover options..."
+
+                    # Check secondary region health
+                    SECONDARY_STATUS=$(echo "$HEALTH_DATA" | jq -r '.["us-west-2_status"] // "unknown"')
+                    TERTIARY_STATUS=$(echo "$HEALTH_DATA" | jq -r '.["eu-west-1_status"] // "unknown"')
+
+                    if [[ "$SECONDARY_STATUS" == "healthy" ]]; then
+                      echo " Initiating failover to secondary region (us-west-2)"
+                      # Update DNS to point to secondary region
+                      kubectl patch service authelia-global -n security --patch '{
+                        "metadata": {
+                          "annotations": {
+                            "external-dns.alpha.kubernetes.io/hostname": "auth-global.samcloud.online",
+                            "external-dns.alpha.kubernetes.io/target": "auth-us-west.samcloud.online"
+                          }
+                        }
+                      }'
+                      echo " Failover to us-west-2 completed"
+                    elif [[ "$TERTIARY_STATUS" == "healthy" ]]; then
+                      echo " Initiating failover to tertiary region (eu-west-1)"
+                      kubectl patch service authelia-global -n security --patch '{
+                        "metadata": {
+                          "annotations": {
+                            "external-dns.alpha.kubernetes.io/hostname": "auth-global.samcloud.online",
+                            "external-dns.alpha.kubernetes.io/target": "auth-eu-west.samcloud.online"
+                          }
+                        }
+                      }'
+                      echo " Failover to eu-west-1 completed"
+                    else
+                      echo " All regions unhealthy! Manual intervention required"
+                    fi
+                  elif [[ "$PRIMARY_STATUS" == "healthy" ]] && [[ "$OVERALL_HEALTH" -gt 66 ]]; then
+                    echo " Primary region healthy, ensuring DNS points back to primary"
+                    # Ensure DNS points back to primary
+                    kubectl patch service authelia-global -n security --patch '{
+                      "metadata": {
+                        "annotations": {
+                          "external-dns.alpha.kubernetes.io/hostname": "auth-global.samcloud.online",
+                          "external-dns.alpha.kubernetes.io/target": "auth.samcloud.online"
+                        }
+                      }
+                    }'
+                  fi
+
+                  echo " Failover check completed"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi 

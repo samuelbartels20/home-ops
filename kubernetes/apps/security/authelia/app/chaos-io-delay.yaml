@@ -1,0 +1,23 @@
+---
+# IOChaos Test Configuration
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: authelia-io-delay-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: chaos-engineering
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - security
+    labelSelectors:
+      app.kubernetes.io/name: authelia
+  delay: "100ms"
+  percent: 50
+  duration: "60s"
+  scheduler:
+    cron: "@every 8h" 

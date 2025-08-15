@@ -1,0 +1,91 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: authelia-storage-monitoring
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: storage
+spec:
+  groups:
+    - name: authelia.storage
+      interval: 30s
+      rules:
+        # Storage Usage Metrics
+        - record: authelia:storage:pvc_used_bytes
+          expr: |
+            sum(kubelet_volume_stats_used_bytes{namespace="security", persistentvolumeclaim=~".*authelia.*"})
+
+        - record: authelia:storage:pvc_total_bytes
+          expr: |
+            sum(kubelet_volume_stats_capacity_bytes{namespace="security", persistentvolumeclaim=~".*authelia.*"})
+
+        - record: authelia:storage:pvc_utilization_percent
+          expr: |
+            (authelia:storage:pvc_used_bytes / authelia:storage:pvc_total_bytes) * 100
+
+        # Snapshot Metrics
+        - record: authelia:storage:snapshot_count
+          expr: |
+            count(kube_volumesnapshot_info{namespace="security", volumesnapshot=~"authelia-.*"})
+
+        - record: authelia:storage:latest_snapshot_age_hours
+          expr: |
+            (time() - max(kube_volumesnapshot_creation_time{namespace="security", volumesnapshot=~"authelia-.*"})) / 3600
+
+        # Storage Alerts
+        - alert: AutheliaStorageUsageHigh
+          expr: |
+            authelia:storage:pvc_utilization_percent > 85
+          for: 5m
+          labels:
+            severity: warning
+            category: storage
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia storage usage is high"
+            description: "Storage utilization is {{ $value | printf \"%.1f\" }}%"
+            runbook_url: "https://runbooks.samcloud.online/authelia/storage-high"
+
+        - alert: AutheliaStorageUsageCritical
+          expr: |
+            authelia:storage:pvc_utilization_percent > 95
+          for: 2m
+          labels:
+            severity: critical
+            category: storage
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia storage usage is critical"
+            description: "Storage utilization is {{ $value | printf \"%.1f\" }}%"
+            runbook_url: "https://runbooks.samcloud.online/authelia/storage-critical"
+
+        - alert: AutheliaSnapshotMissing
+          expr: |
+            authelia:storage:latest_snapshot_age_hours > 8
+          for: 10m
+          labels:
+            severity: warning
+            category: storage
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia snapshot is overdue"
+            description: "Latest snapshot is {{ $value | printf \"%.1f\" }} hours old"
+            runbook_url: "https://runbooks.samcloud.online/authelia/snapshot-missing"
+
+        - alert: AutheliaNoSnapshots
+          expr: |
+            authelia:storage:snapshot_count == 0
+          for: 30m
+          labels:
+            severity: critical
+            category: storage
+            service: authelia
+            team: security
+          annotations:
+            summary: "No Authelia snapshots found"
+            description: "No backup snapshots available for disaster recovery"
+            runbook_url: "https://runbooks.samcloud.online/authelia/no-snapshots" 

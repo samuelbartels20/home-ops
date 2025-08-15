@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authelia-multi-region-health
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia-multi-region-health
+    app.kubernetes.io/component: multi-region-health
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia-multi-region-health
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authelia-multi-region-health
+        app.kubernetes.io/component: multi-region-health
+    spec:
+      serviceAccountName: authelia-multi-region
+      containers:
+        - name: health-checker
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              while true; do
+                echo " Starting multi-region health check cycle"
+
+                # Health check endpoints
+                REGIONS=("us-east-1:auth.samcloud.online" "us-west-2:auth-us-west.samcloud.online" "eu-west-1:auth-eu-west.samcloud.online")
+                HEALTHY_REGIONS=0
+                TOTAL_REGIONS=${#REGIONS[@]}
+
+                for region_endpoint in "${REGIONS[@]}"; do
+                  IFS=':' read -r region endpoint <<< "$region_endpoint"
+
+                  echo " Checking health for $region ($endpoint)"
+
+                  # Health check with timeout
+                  if curl -f -s --max-time 5 "https://$endpoint/api/health" > /dev/null; then
+                    echo " $region is healthy"
+                    HEALTHY_REGIONS=$((HEALTHY_REGIONS + 1))
+
+                    # Update metrics
+                    kubectl patch configmap authelia-region-health -n security --patch "{
+                      \"data\": {
+                        \"${region}_status\": \"healthy\",
+                        \"${region}_last_check\": \"$(date -Iseconds)\"
+                      }
+                    }" || true
+                  else
+                    echo " $region is unhealthy"
+
+                    # Update metrics and trigger alert
+                    kubectl patch configmap authelia-region-health -n security --patch "{
+                      \"data\": {
+                        \"${region}_status\": \"unhealthy\",
+                        \"${region}_last_check\": \"$(date -Iseconds)\",
+                        \"${region}_last_failure\": \"$(date -Iseconds)\"
+                      }
+                    }" || true
+
+                    # Log failure for alerting
+                    echo " ALERT: Region $region health check failed at $(date -Iseconds)"
+                    echo " ALERT: Region $region health check failed at $(date -Iseconds)"
+                  fi
+                done
+
+                # Calculate overall health percentage
+                HEALTH_PERCENTAGE=$((HEALTHY_REGIONS * 100 / TOTAL_REGIONS))
+                echo " Overall health: $HEALTH_PERCENTAGE% ($HEALTHY_REGIONS/$TOTAL_REGIONS regions healthy)"
+
+                # Update overall health status
+                kubectl patch configmap authelia-region-health -n security --patch "{
+                  \"data\": {
+                    \"overall_health_percentage\": \"$HEALTH_PERCENTAGE\",
+                    \"healthy_regions\": \"$HEALTHY_REGIONS\",
+                    \"total_regions\": \"$TOTAL_REGIONS\",
+                    \"last_health_check\": \"$(date -Iseconds)\"
+                  }
+                }" || true
+
+                echo " Waiting 30 seconds before next health check..."
+                sleep 30
+              done
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi 

@@ -1,0 +1,20 @@
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: authelia-pod-failure-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: chaos-engineering
+spec:
+  action: pod-failure
+  mode: one
+  duration: "30s"
+  selector:
+    namespaces:
+      - security
+    labelSelectors:
+      app.kubernetes.io/name: authelia
+  scheduler:
+    cron: "@every 6h" 

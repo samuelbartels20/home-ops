@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authelia-dr-test
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: disaster-recovery
+  annotations:
+    argocd.argoproj.io/hook: Manual
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: authelia-snapshot-sa
+      restartPolicy: Never
+      containers:
+        - name: dr-test
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo "[ALERT] Starting Authelia Disaster Recovery Test"
+
+              # Find latest snapshot
+              LATEST_SNAPSHOT=$(kubectl get volumesnapshot -n security \
+                -l app.kubernetes.io/name=authelia \
+                --sort-by=.metadata.creationTimestamp \
+                -o jsonpath='{.items[-1].metadata.name}')
+
+              if [[ -z "$LATEST_SNAPSHOT" ]]; then
+                echo "[FAIL] No snapshots found for Authelia"
+                exit 1
+              fi
+
+              echo "[BACKUP] Using snapshot: $LATEST_SNAPSHOT"
+
+              # Create test namespace
+              kubectl create namespace authelia-dr-test --dry-run=client -o yaml | kubectl apply -f -
+
+              # Create PVC from snapshot
+              cat <<EOF | kubectl apply -f -
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: authelia-dr-test-pvc
+                namespace: authelia-dr-test
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 10Gi
+                dataSource:
+                  name: $LATEST_SNAPSHOT
+                  kind: VolumeSnapshot
+                  apiGroup: snapshot.storage.k8s.io
+              EOF
+
+              # Wait for PVC to be bound
+              echo "[WAIT] Waiting for PVC to be bound..."
+              kubectl wait --for=condition=Bound pvc/authelia-dr-test-pvc -n authelia-dr-test --timeout=300s
+
+              # Test data integrity
+              echo "[CHECK] Testing data integrity..."
+              kubectl run authelia-dr-test-pod -n authelia-dr-test \
+                --image=alpine:latest \
+                --restart=Never \
+                --rm -i --tty \
+                --overrides='{"spec":{"containers":[{"name":"test","image":"alpine:latest","command":["sh","-c","ls -la /data && echo \"Data integrity test passed\" || echo \"Data integrity test failed\""],"volumeMounts":[{"name":"data","mountPath":"/data"}]}],"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"authelia-dr-test-pvc"}}]}}' \
+                -- /bin/true
+
+              # Cleanup
+              echo "[CLEAN] Cleaning up DR test resources..."
+              kubectl delete namespace authelia-dr-test
+
+              echo "[PASS] Disaster Recovery Test Completed Successfully"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi 

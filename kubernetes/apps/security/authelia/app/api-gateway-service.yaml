@@ -1,0 +1,24 @@
+---
+# API Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: authelia-api-gateway
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia-api-gateway
+    app.kubernetes.io/component: api-management
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: "api.witl.xyz"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+    - port: 443
+      targetPort: 8443
+      name: https
+  selector:
+    app.kubernetes.io/name: authelia-api-gateway 

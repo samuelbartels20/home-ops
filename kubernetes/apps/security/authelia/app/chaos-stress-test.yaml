@@ -1,0 +1,26 @@
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: authelia-stress-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: chaos-engineering
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - security
+    labelSelectors:
+      app.kubernetes.io/name: authelia
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+    memory:
+      workers: 1
+      size: "64Mi"
+  duration: "120s"
+  scheduler:
+    cron: "@every 24h" 

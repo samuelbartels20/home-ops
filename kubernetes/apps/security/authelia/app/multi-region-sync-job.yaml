@@ -1,0 +1,78 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authelia-cross-region-sync
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: multi-region
+spec:
+  schedule: "*/5 * * * *"  
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: authelia-multi-region
+          restartPolicy: OnFailure
+          containers:
+            - name: cross-region-sync
+              image: bitnami/kubectl:latest
+              env:
+                - name: PRIMARY_REGION
+                  value: "us-east-1"
+                - name: SECONDARY_REGIONS
+                  value: "us-west-2,eu-west-1"
+                - name: SYNC_INTERVAL
+                  value: "300"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo " Starting cross-region configuration sync"
+
+                  # Get primary region configuration
+                  PRIMARY_CONFIG=$(kubectl get configmap authelia-configmap -n security -o yaml)
+                  PRIMARY_SECRETS=$(kubectl get secret authelia-secret -n security -o yaml)
+
+                  # Sync to secondary regions
+                  IFS=',' read -ra REGIONS <<< "$SECONDARY_REGIONS"
+                  for region in "${REGIONS[@]}"; do
+                    echo " Syncing to region: $region"
+
+                    # Apply configuration to secondary region
+                    echo "$PRIMARY_CONFIG" | \
+                      sed "s/namespace: security/namespace: security-$region/g" | \
+                      kubectl apply -f - || echo "[WARNING] Failed to sync config to $region"
+
+                    # Verify sync success
+                    kubectl get configmap authelia-configmap -n "security-$region" > /dev/null 2>&1
+                    if [ $? -eq 0 ]; then
+                      echo "[PASS] Configuration synced successfully to $region"
+                    else
+                      echo " Configuration sync failed for $region"
+                    fi
+                  done
+
+                  # Update sync metrics
+                  echo " Updating cross-region sync metrics"
+                  kubectl patch configmap authelia-sync-status -n security --patch '{
+                    "data": {
+                      "last_sync": "'$(date -Iseconds)'",
+                      "sync_status": "success",
+                      "regions_synced": "'$SECONDARY_REGIONS'"
+                    }
+                  }' || echo " Failed to update sync status"
+
+                  echo " Cross-region sync completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi 

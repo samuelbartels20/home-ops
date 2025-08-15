@@ -1,0 +1,245 @@
+---
+# Compliance Controller Deployment for Authelia
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authelia-compliance-controller
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia-compliance-controller
+    app.kubernetes.io/component: compliance
+    security.samcloud.online/tier: standard
+  annotations:
+    compliance.kubernetes.io/soc2: "true"
+    compliance.kubernetes.io/iso27001: "true"
+    compliance.kubernetes.io/nist: "true"
+    compliance.kubernetes.io/gdpr: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia-compliance-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authelia-compliance-controller
+        app.kubernetes.io/component: compliance
+      annotations:
+        compliance.samcloud.online/audit: "true"
+        compliance.samcloud.online/encryption: "required"
+        compliance.samcloud.online/data-classification: "confidential"
+    spec:
+      serviceAccountName: authelia-compliance-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: compliance-controller
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              echo " Starting Authelia Compliance Controller"
+
+              # Compliance monitoring loop
+              while true; do
+                echo " Running compliance checks..."
+
+                # Check SOC2 Type II Controls
+                echo " Checking SOC2 Type II Controls..."
+
+                # CC2.1 - Logical Access Controls
+                AUTH_FAILURES=$(kubectl logs -n security -l app.kubernetes.io/name=authelia --tail=1000 | grep "authentication failed" | wc -l || echo 0)
+                if [ "$AUTH_FAILURES" -gt 10 ]; then
+                  echo " SOC2 CC2.1 VIOLATION: High authentication failure rate: $AUTH_FAILURES"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"soc2_cc2_1_status\": \"violation\",
+                      \"soc2_cc2_1_details\": \"High auth failure rate: $AUTH_FAILURES\",
+                      \"soc2_cc2_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " SOC2 CC2.1 COMPLIANT: Authentication failure rate acceptable: $AUTH_FAILURES"
+                fi
+
+                # CC6.1 - System Operation (Monitoring)
+                AUTHELIA_PODS=$(kubectl get pods -n security -l app.kubernetes.io/name=authelia --field-selector=status.phase=Running | wc -l || echo 0)
+                if [ "$AUTHELIA_PODS" -lt 2 ]; then
+                  echo " SOC2 CC6.1 VIOLATION: Insufficient Authelia pods running: $AUTHELIA_PODS"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"soc2_cc6_1_status\": \"violation\",
+                      \"soc2_cc6_1_details\": \"Insufficient pods: $AUTHELIA_PODS\",
+                      \"soc2_cc6_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " SOC2 CC6.1 COMPLIANT: Authelia pods running: $AUTHELIA_PODS"
+                fi
+
+                # A1.1 - Availability (Backup & Recovery)
+                BACKUP_AGE=$(kubectl get cronjob -n security authelia-backup -o jsonpath='{.status.lastScheduleTime}' 2>/dev/null || echo "")
+                if [ -z "$BACKUP_AGE" ]; then
+                  echo " SOC2 A1.1 VIOLATION: No recent backup found"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"soc2_a1_1_status\": \"violation\",
+                      \"soc2_a1_1_details\": \"No recent backup found\",
+                      \"soc2_a1_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " SOC2 A1.1 COMPLIANT: Backup found: $BACKUP_AGE"
+                fi
+
+                # Check GDPR Compliance
+                echo " Checking GDPR Compliance..."
+
+                # Article 32 - Security of Processing
+                TLS_ENABLED=$(kubectl get service authelia -n security -o jsonpath='{.metadata.annotations.external-dns\.alpha\.kubernetes\.io/hostname}' | grep -c "https" || echo 0)
+                if [ "$TLS_ENABLED" -eq 0 ]; then
+                  echo " GDPR Article 32 VIOLATION: TLS not properly configured"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"gdpr_article32_status\": \"violation\",
+                      \"gdpr_article32_details\": \"TLS not properly configured\",
+                      \"gdpr_article32_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " GDPR Article 32 COMPLIANT: TLS properly configured"
+                fi
+
+                # Check HIPAA Compliance
+                echo " Checking HIPAA Compliance..."
+
+                # 164.312(a)(1) - Access Control
+                RBAC_POLICIES=$(kubectl get rolebinding,clusterrolebinding -n security -l app.kubernetes.io/name=authelia --no-headers | wc -l || echo 0)
+                if [ "$RBAC_POLICIES" -lt 1 ]; then
+                  echo " HIPAA 164.312(a)(1) VIOLATION: Insufficient RBAC policies"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"hipaa_164_312_a_1_status\": \"violation\",
+                      \"hipaa_164_312_a_1_details\": \"Insufficient RBAC policies: $RBAC_POLICIES\",
+                      \"hipaa_164_312_a_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " HIPAA 164.312(a)(1) COMPLIANT: RBAC policies found: $RBAC_POLICIES"
+                fi
+
+                # Check PCI DSS Compliance
+                echo " Checking PCI DSS Compliance..."
+
+                # 4.1 - Strong Cryptography
+                ENCRYPTION_ENABLED=$(kubectl get secret -n security -l app.kubernetes.io/name=authelia -o jsonpath='{.items[*].type}' | grep -c "kubernetes.io/tls" || echo 0)
+                if [ "$ENCRYPTION_ENABLED" -eq 0 ]; then
+                  echo " PCI DSS 4.1 VIOLATION: Encryption not properly configured"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"pci_dss_4_1_status\": \"violation\",
+                      \"pci_dss_4_1_details\": \"Encryption not properly configured\",
+                      \"pci_dss_4_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " PCI DSS 4.1 COMPLIANT: Encryption properly configured"
+                fi
+
+                # Check ISO 27001 Compliance
+                echo " Checking ISO 27001 Compliance..."
+
+                # A.12.4 - Logging and Monitoring
+                LOGGING_ENABLED=$(kubectl get servicemonitor -n security -l app.kubernetes.io/name=authelia --no-headers | wc -l || echo 0)
+                if [ "$LOGGING_ENABLED" -eq 0 ]; then
+                  echo " ISO 27001 A.12.4 VIOLATION: Logging not properly configured"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"iso27001_a_12_4_status\": \"violation\",
+                      \"iso27001_a_12_4_details\": \"Logging not properly configured\",
+                      \"iso27001_a_12_4_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " ISO 27001 A.12.4 COMPLIANT: Logging properly configured"
+                fi
+
+                # Check NIST Compliance
+                echo " Checking NIST CSF Compliance..."
+
+                # PR.AC-1 - Identities and credentials
+                IDENTITY_MANAGEMENT=$(kubectl get secret -n security authelia-secret --no-headers 2>/dev/null | wc -l || echo 0)
+                if [ "$IDENTITY_MANAGEMENT" -eq 0 ]; then
+                  echo " NIST PR.AC-1 VIOLATION: Identity management not properly configured"
+                  kubectl patch configmap authelia-compliance-status -n security --patch "{
+                    \"data\": {
+                      \"nist_pr_ac_1_status\": \"violation\",
+                      \"nist_pr_ac_1_details\": \"Identity management not properly configured\",
+                      \"nist_pr_ac_1_timestamp\": \"$(date -Iseconds)\"
+                    }
+                  }" || true
+                else
+                  echo " NIST PR.AC-1 COMPLIANT: Identity management properly configured"
+                fi
+
+                # Generate overall compliance score
+                VIOLATIONS=$(kubectl get configmap authelia-compliance-status -n security -o jsonpath='{.data}' 2>/dev/null | grep -c "violation" || echo 0)
+                TOTAL_CHECKS=12  
+                COMPLIANCE_SCORE=$(( (TOTAL_CHECKS - VIOLATIONS) * 100 / TOTAL_CHECKS ))
+
+                echo " Overall Compliance Score: $COMPLIANCE_SCORE% ($VIOLATIONS violations out of $TOTAL_CHECKS checks)"
+
+                kubectl patch configmap authelia-compliance-status -n security --patch "{
+                  \"data\": {
+                    \"overall_compliance_score\": \"$COMPLIANCE_SCORE\",
+                    \"total_violations\": \"$VIOLATIONS\",
+                    \"total_checks\": \"$TOTAL_CHECKS\",
+                    \"last_check_timestamp\": \"$(date -Iseconds)\"
+                  }
+                }" || true
+
+                # Alert on low compliance
+                if [ "$COMPLIANCE_SCORE" -lt 90 ]; then
+                  echo " COMPLIANCE ALERT: Compliance score is below 90%: $COMPLIANCE_SCORE%"
+                else
+                  echo " COMPLIANCE OK: Compliance score is acceptable: $COMPLIANCE_SCORE%"
+                fi
+
+                echo " Waiting 5 minutes before next compliance check..."
+                sleep 300
+              done
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {} 

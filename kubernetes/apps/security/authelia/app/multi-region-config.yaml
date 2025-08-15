@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-distributed-config
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: auth
+data:
+  distributed.yaml: |
+    regions:
+      - name: primary
+        components:
+          - service: auth-api
+            replicas: 3
+          - service: auth-worker
+            replicas: 2
+
+      - name: secondary
+        components:
+          - service: auth-api
+            replicas: 2
+          - service: auth-worker
+            replicas: 2
+
+    storage:
+      type: distributed
+      replication: 3
+      backup: enabled
+
+    networking:
+      load_balancing: global
+      failover: automatic
+      latency_threshold: 100ms
+
+    monitoring:
+      metrics:
+        - "Request latency"
+        - "Error rates"
+        - "Authentication attempts"
+      alerts:
+        - "High latency"
+        - "Error spikes"
+        - "Sync delays" 

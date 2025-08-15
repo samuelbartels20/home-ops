@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["apiVersion", "kind"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["kustomize.config.k8s.io/v1beta1"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Kustomization"]
+    },
+    "resources": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "namespace": { "type": "string" },
+    "commonLabels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "commonAnnotations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "patches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["patch", "target"],
+        "properties": {
+          "patch": { "type": "string" },
+          "target": {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string" },
+              "name": { "type": "string" },
+              "namespace": { "type": "string" },
+              "labelSelector": { "type": "string" },
+              "annotationSelector": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "patchesStrategicMerge": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "configMapGenerator": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "namespace": { "type": "string" },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "literals": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "secretGenerator": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "namespace": { "type": "string" },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "literals": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

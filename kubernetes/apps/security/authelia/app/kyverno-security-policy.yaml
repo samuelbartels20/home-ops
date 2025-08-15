@@ -1,0 +1,67 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: authelia-security-policy
+  annotations:
+    policies.kyverno.io/title: Authelia Security Policy
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Enforces security policies for Authelia authentication service
+    compliance.kubernetes.io/frameworks: "soc2,iso27001,nist"
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+    - name: require-non-root-user
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Pod must run as non-root user"
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 568
+    - name: require-read-only-root-filesystem
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Container must have read-only root filesystem"
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
+    - name: disallow-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Privilege escalation is not allowed"
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false 

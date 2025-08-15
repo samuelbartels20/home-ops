@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-storage-config
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: storage
+data:
+  storage-policy.yaml: |
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      key_rotation_days: 90
+    backup:
+      retention_policy:
+        hourly: 24    
+        daily: 7      
+        weekly: 4     
+        monthly: 12   
+      compression: true
+      deduplication: true
+    disaster_recovery:
+      rpo_minutes: 360  
+      rto_minutes: 60   
+      cross_region_replication: false
+      automated_testing: true
+  performance-tuning.yaml: |
+    volume_settings:
+      type: "ssd"
+      iops_limit: 3000
+      throughput_limit: "125Mi"
+      cache_policy: "WriteBack"
+    snapshot_settings:
+      concurrent_snapshots: 3
+      snapshot_timeout: "10m"
+      compression_level: 6 

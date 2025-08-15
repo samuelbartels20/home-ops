@@ -1,0 +1,24 @@
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HttpChaos
+metadata:
+  name: authelia-http-delay-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: chaos-engineering
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - security
+    labelSelectors:
+      app.kubernetes.io/name: authelia
+  target: Request
+  port: 80
+  method: GET
+  path: "/api/health"
+  delay: "200ms"
+  duration: "60s"
+  scheduler:
+    cron: "@every 6h" 

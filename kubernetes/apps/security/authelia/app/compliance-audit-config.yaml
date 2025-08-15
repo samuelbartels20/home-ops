@@ -1,0 +1,98 @@
+---
+# Comprehensive Audit Configuration for Authelia
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-audit-config
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: compliance
+    app.kubernetes.io/part-of: security
+    security.samcloud.online/tier: standard
+data:
+  audit-configuration.yaml: |
+    # Comprehensive Audit Configuration
+    audit:
+      enabled: true
+      retention_days: 2555  
+      encryption_enabled: true
+      compression_enabled: true
+
+      # What to audit
+      events:
+        authentication_events: true
+        authorization_events: true
+        configuration_changes: true
+        access_events: true
+        data_access: true
+        system_events: true
+        error_events: true
+        performance_events: true
+        security_events: true
+        admin_events: true
+        user_events: true
+
+      # Event categories with retention
+      event_categories:
+        security_critical:
+          retention_days: 2555  
+          events: ["authentication_failure", "authorization_failure", "privilege_escalation", "suspicious_activity"]
+        operational:
+          retention_days: 365   
+          events: ["login", "logout", "configuration_change", "system_restart"]
+        performance:
+          retention_days: 90    
+          events: ["slow_query", "high_cpu", "high_memory", "disk_full"]
+        debug:
+          retention_days: 30    
+          events: ["debug_log", "trace_log", "verbose_log"]
+
+      # Audit detail levels
+      detail_levels:
+        authentication: "detailed"
+        authorization: "detailed"
+        configuration: "detailed"
+        data_access: "summarized"
+        system: "minimal"
+        performance: "minimal"
+
+      # Real-time alerting
+      real_time_alerts:
+        enabled: true
+        critical_events:
+          - "unauthorized_access"
+          - "configuration_change"
+          - "data_breach_indicators"
+          - "privilege_escalation"
+          - "suspicious_queries"
+          - "multiple_failed_logins"
+          - "service_account_misuse"
+          - "after_hours_access"
+
+      # Audit log integrity
+      integrity:
+        enabled: true
+        signing: true
+        encryption: true
+        tamper_detection: true
+        backup_verification: true
+        hash_algorithm: "SHA-256"
+
+      # Compliance reporting
+      reporting:
+        enabled: true
+        formats: ["JSON", "CSV", "PDF", "SIEM"]
+        automated_reports:
+          - name: "SOC2_Control_Report"
+            frequency: "monthly"
+            recipients: ["security@samcloud.online", "compliance@samcloud.online"]
+          - name: "GDPR_Data_Processing_Report"
+            frequency: "quarterly"
+            recipients: ["dpo@samcloud.online", "legal@samcloud.online"]
+          - name: "HIPAA_Access_Report"
+            frequency: "weekly"
+            recipients: ["hipaa-security@samcloud.online"]
+          - name: "PCI_DSS_Audit_Report"
+            frequency: "monthly"
+            recipients: ["pci-compliance@samcloud.online"] 

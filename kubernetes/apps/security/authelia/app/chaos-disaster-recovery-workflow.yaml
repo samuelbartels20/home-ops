@@ -1,0 +1,46 @@
+---
+# Disaster Recovery Workflow
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: authelia-disaster-recovery-test
+  namespace: chaos-mesh
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: disaster-recovery
+spec:
+  entry: simulate-database-failure
+  templates:
+    - name: simulate-database-failure
+      templateType: PodChaos
+      deadline: 120s
+      podChaos:
+        action: pod-failure
+        mode: all
+        selector:
+          namespaces:
+            - storage
+          labelSelectors:
+            app.kubernetes.io/name: postgres17
+    - name: verify-authelia-resilience
+      templateType: Task
+      deadline: 60s
+      task:
+        container:
+          image: curlimages/curl:latest
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              # Wait for Authelia to recover
+              sleep 30
+              # Test authentication endpoint
+              response=$(curl -s -o /dev/null -w "%{http_code}" http://authelia.security.svc.cluster.local/api/health)
+              if [ "$response" = "200" ]; then
+                echo " Authelia recovered successfully"
+                exit 0
+              else
+                echo "Authelia failed to recover, status: $response"
+                exit 1
+              fi
+  schedule: "@every 48h" 

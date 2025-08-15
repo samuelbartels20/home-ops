@@ -1,0 +1,20 @@
+extends: default
+
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+
+rules:
+  document-start: disable
+  line-length: disable
+  comments-indentation: disable
+  trailing-spaces: disable
+  empty-lines: disable
+
+schema:
+  mapping:
+    kubernetes/apps/security/authelia/app/prometheus-rules.yaml: .schema/prometheusrule.json
+    kubernetes/apps/security/authelia/app/chaos-engineering.yaml: .schema/chaosmesh.json
+    kubernetes/apps/security/authelia/app/helmrelease.yaml: .schema/helmrelease.json
+    kubernetes/apps/security/authelia/app/externalsecret.yaml: .schema/externalsecret.json
+    kubernetes/apps/security/authelia/app/kustomization.yaml: .schema/kustomization.json

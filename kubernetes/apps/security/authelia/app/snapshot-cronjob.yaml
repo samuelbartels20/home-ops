@@ -1,0 +1,87 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authelia-snapshot-job
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: storage
+spec:
+  schedule: "0 */6 * * *"  
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: authelia-snapshot-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: snapshot-creator
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  # Get current timestamp
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+                  # Find all PVCs for Authelia
+                  PVCS=$(kubectl get pvc -n security -l app.kubernetes.io/name=authelia -o name)
+
+                  for PVC in $PVCS; do
+                    PVC_NAME=$(echo $PVC | cut -d'/' -f2)
+                    SNAPSHOT_NAME="authelia-${PVC_NAME}-${TIMESTAMP}"
+
+                    echo "Creating snapshot: $SNAPSHOT_NAME for PVC: $PVC_NAME"
+
+                    cat <<EOF | kubectl apply -f -
+                  apiVersion: snapshot.storage.k8s.io/v1
+                  kind: VolumeSnapshot
+                  metadata:
+                    name: $SNAPSHOT_NAME
+                    namespace: security
+                    labels:
+                      app.kubernetes.io/name: authelia
+                      app.kubernetes.io/component: storage
+                      authelia.io/pvc-name: $PVC_NAME
+                      authelia.io/snapshot-type: scheduled
+                    annotations:
+                      authelia.io/created-at: "$(date -Iseconds)"
+                      authelia.io/retention-policy: "7d"
+                  spec:
+                    volumeSnapshotClassName: authelia-snapshot-class
+                    source:
+                      persistentVolumeClaimName: $PVC_NAME
+                  EOF
+
+                    echo "[PASS] Snapshot $SNAPSHOT_NAME created successfully"
+                  done
+
+                  # Cleanup old snapshots
+                  echo "[CLEAN] Cleaning up old snapshots..."
+                  CUTOFF_DATE=$(date -d '7 days ago' +%Y%m%d)
+
+                  kubectl get volumesnapshot -n security -l app.kubernetes.io/name=authelia \
+                    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.labels.authelia\.io/snapshot-type}{"\n"}{end}' | \
+                  while read SNAPSHOT_NAME SNAPSHOT_TYPE; do
+                    if [[ "$SNAPSHOT_TYPE" == "scheduled" ]]; then
+                      SNAPSHOT_DATE=$(echo $SNAPSHOT_NAME | grep -oE '[0-9]{8}' | head -1)
+                      if [[ "$SNAPSHOT_DATE" < "$CUTOFF_DATE" ]]; then
+                        echo "[DELETE] Deleting old snapshot: $SNAPSHOT_NAME"
+                        kubectl delete volumesnapshot $SNAPSHOT_NAME -n security
+                      fi
+                    fi
+                  done
+
+                  echo "[PASS] Snapshot maintenance completed"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi 

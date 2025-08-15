@@ -1,0 +1,77 @@
+---
+# FinOps Policies
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: authelia-finops-policy
+  annotations:
+    policies.kyverno.io/title: Authelia FinOps Policy
+    policies.kyverno.io/category: Cost Optimization
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Enforces cost optimization policies for Authelia resources
+spec:
+  validationFailureAction: enforce
+  background: true
+  rules:
+    - name: require-resource-requests
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Resource requests are required for cost tracking"
+        pattern:
+          spec:
+            containers:
+              - name: "*"
+                resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+
+    - name: limit-expensive-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Resource limits exceed cost thresholds"
+        pattern:
+          spec:
+            containers:
+              - name: "*"
+                resources:
+                  limits:
+                    cpu: "<=1"
+                    memory: "<=512Mi"
+
+    - name: require-cost-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Service
+                - Deployment
+                - StatefulSet
+              namespaces:
+                - security
+              names:
+                - authelia-*
+      validate:
+        message: "Cost tracking labels are required"
+        pattern:
+          metadata:
+            labels:
+              app.kubernetes.io/name: "authelia"
+              app.kubernetes.io/component: "?*" 

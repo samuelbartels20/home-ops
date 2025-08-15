@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["monitoring.coreos.com/v1"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["PrometheusRule"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["groups"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "rules"],
+            "properties": {
+              "name": { "type": "string" },
+              "interval": { "type": "string" },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "alert": { "type": "string" },
+                    "expr": { "type": "string" },
+                    "for": { "type": "string" },
+                    "labels": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    },
+                    "annotations": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    },
+                    "record": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

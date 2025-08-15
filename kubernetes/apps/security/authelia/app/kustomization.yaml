@@ -1,0 +1,84 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: security
+
+resources:
+  - helmrelease.yaml
+  - network-policy.yaml
+  - pod-disruption-budget.yaml
+  - security-context-constraints.yaml
+  - kyverno-security-policy.yaml
+  - compliance-config.yaml
+  - monitoring.yaml
+  - production-standards.yaml
+  # API Management components
+  - api-management-config.yaml
+  - api-gateway-deployment.yaml
+  - envoy-config.yaml
+  - api-gateway-service.yaml
+  - api-gateway-rbac.yaml
+  - api-management-dashboard.yaml
+  # Cost optimization components
+  - cost-resource-quotas.yaml
+  - cost-vpa.yaml
+  - cost-hpa.yaml
+  - cost-prometheus-rules.yaml
+  - cost-dashboard.yaml
+  - cost-kyverno-policy.yaml
+  - volume-snapshot-class.yaml
+  - snapshot-secret.yaml
+  - snapshot-cronjob.yaml
+  - snapshot-rbac.yaml
+  - disaster-recovery-job.yaml
+  - backup-validation-cronjob.yaml
+  - storage-config.yaml
+  - storage-monitoring.yaml
+  # Multi-region architecture components
+  - multi-region-config.yaml
+  - multi-region-service.yaml
+  - multi-region-sync-job.yaml
+  - multi-region-health-check.yaml
+  - multi-region-failover.yaml
+  - multi-region-health-status.yaml
+  - multi-region-rbac.yaml
+  - multi-region-monitoring.yaml
+  # Chaos Engineering components
+  - chaos-pod-failure.yaml
+  - chaos-network-delay.yaml
+  - chaos-io-delay.yaml
+  - chaos-dns-failure.yaml
+  - chaos-stress-test.yaml
+  - chaos-http-delay.yaml
+  - chaos-disaster-recovery-workflow.yaml
+  - chaos-circuit-breaker-workflow.yaml
+  - chaos-resilience-dashboard.yaml
+  - chaos-rbac.yaml
+  # Compliance and Governance components
+  - compliance-config.yaml
+  - compliance-audit-config.yaml
+  - compliance-data-privacy.yaml
+  - compliance-governance.yaml
+  - compliance-controller.yaml
+  - compliance-status.yaml
+  - compliance-rbac.yaml
+  - compliance-dashboard.yaml
+  # Service Mesh components
+  - service-mesh.yaml
+  - service-mesh-certificate.yaml
+
+commonLabels:
+  app.kubernetes.io/name: authelia
+  app.kubernetes.io/component: auth
+  app.kubernetes.io/part-of: security
+
+configMapGenerator:
+  - name: authelia-configmap
+    files:
+      - configuration.yaml=./config/configuration.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled

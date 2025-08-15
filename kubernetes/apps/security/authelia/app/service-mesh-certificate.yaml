@@ -1,0 +1,18 @@
+---
+# Certificate for TLS
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: authelia-tls-cert
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  secretName: authelia-tls-cert
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: auth.samcloud.online
+  dnsNames:
+    - auth.samcloud.online 

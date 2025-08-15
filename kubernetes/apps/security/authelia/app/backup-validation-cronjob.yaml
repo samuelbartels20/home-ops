@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authelia-backup-validation
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: storage
+spec:
+  schedule: "0 2 * * 0" 
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: authelia-snapshot-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: backup-validator
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+
+                  echo "[CHECK] Starting Authelia backup validation"
+
+                  # Check if snapshots exist
+                  SNAPSHOT_COUNT=$(kubectl get volumesnapshot -n security \
+                    -l app.kubernetes.io/name=authelia \
+                    --no-headers | wc -l)
+
+                  echo "[METRICS] Found $SNAPSHOT_COUNT snapshots"
+
+                  if [[ $SNAPSHOT_COUNT -eq 0 ]]; then
+                    echo "[FAIL] No snapshots found!"
+                    exit 1
+                  fi
+
+                  # Check snapshot ages
+                  RECENT_SNAPSHOTS=$(kubectl get volumesnapshot -n security \
+                    -l app.kubernetes.io/name=authelia \
+                    --field-selector="metadata.creationTimestamp>$(date -d '24 hours ago' -Iseconds)" \
+                    --no-headers | wc -l)
+
+                  echo "[DATE] Found $RECENT_SNAPSHOTS recent snapshots (last 24h)"
+
+                  if [[ $RECENT_SNAPSHOTS -eq 0 ]]; then
+                    echo "[WARNING] No recent snapshots found!"
+                    # Send alert (would integrate with your alerting system)
+                  fi
+
+                  # Validate snapshot readiness
+                  kubectl get volumesnapshot -n security \
+                    -l app.kubernetes.io/name=authelia \
+                    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.readyToUse}{"\n"}{end}' | \
+                  while read SNAPSHOT_NAME READY_STATUS; do
+                    if [[ "$READY_STATUS" != "true" ]]; then
+                      echo "[FAIL] Snapshot $SNAPSHOT_NAME is not ready!"
+                      exit 1
+                    else
+                      echo "[PASS] Snapshot $SNAPSHOT_NAME is ready"
+                    fi
+                  done
+
+                  echo "[PASS] All backup validations passed"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 100m
+                  memory: 128Mi 

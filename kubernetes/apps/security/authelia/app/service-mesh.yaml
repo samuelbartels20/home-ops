@@ -1,0 +1,498 @@
+---
+apiVersion: install.istio.io/v1alpha1
+kind: Gateway
+metadata:
+  name: authelia-gateway
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - auth.samcloud.online
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - auth.samcloud.online
+      tls:
+        mode: SIMPLE
+        credentialName: authelia-tls-cert
+---
+# PeerAuthentication for mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: authelia-mtls
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    80:
+      mode: STRICT
+    8080:
+      mode: PERMISSIVE  
+---
+# AuthorizationPolicy for fine-grained access control
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: authelia-authz
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia
+  rules:
+    # Allow health checks
+    - to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/api/health"]
+      when:
+        - key: source.namespace
+          values: ["istio-system", "kube-system"]
+
+    # Allow metrics collection
+    - to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/metrics"]
+            ports: ["8080"]
+      when:
+        - key: source.namespace
+          values: ["observability"]
+        - key: source.principal
+          values: ["cluster.local/ns/observability/sa/prometheus"]
+
+    # Allow authentication requests
+    - to:
+        - operation:
+            methods: ["GET", "POST"]
+            paths: ["/api/*"]
+      when:
+        - key: source.namespace
+          values: ["istio-system", "security"]
+
+    # Allow static assets
+    - to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/static/*", "/assets/*", "/favicon.ico"]
+
+    # Allow OAuth2 flows
+    - to:
+        - operation:
+            methods: ["GET", "POST"]
+            paths: ["/oauth2/*", "/oidc/*"]
+
+    # Default deny all other traffic
+    - {}
+---
+# DestinationRule for load balancing and circuit breaker
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: authelia-destination-rule
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  host: authelia.security.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    loadBalancer:
+      simple: LEAST_CONN
+      consistentHash:
+        httpHeaderName: "x-forwarded-for"
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        keepAlive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+        minHealthPercent: 30
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      consecutive5xxErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+      splitExternalLocalOriginErrors: true
+    retry:
+      attempts: 3
+      perTryTimeout: 5s
+      retryOn: gateway-error,connect-failure,refused-stream
+      retryRemoteLocalities: true
+  portLevelSettings:
+    - port:
+        number: 80
+      connectionPool:
+        tcp:
+          maxConnections: 50
+---
+# VirtualService for traffic management
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: authelia-virtual-service
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  hosts:
+    - auth.samcloud.online
+    - authelia.security.svc.cluster.local
+  gateways:
+    - authelia-gateway
+    - mesh
+  http:
+    # Health check route
+    - match:
+        - uri:
+            exact: /api/health
+      route:
+        - destination:
+            host: authelia.security.svc.cluster.local
+            port:
+              number: 80
+      timeout: 5s
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: gateway-error,connect-failure,refused-stream
+
+    # Authentication API routes
+    - match:
+        - uri:
+            prefix: /api/
+      route:
+        - destination:
+            host: authelia.security.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
+      retries:
+        attempts: 2
+        perTryTimeout: 15s
+        retryOn: 5xx,gateway-error,connect-failure,refused-stream
+      headers:
+        request:
+          add:
+            x-forwarded-proto: https
+            x-forwarded-port: "443"
+        response:
+          add:
+            x-frame-options: SAMEORIGIN
+            x-xss-protection: "1; mode=block"
+            x-content-type-options: nosniff
+            strict-transport-security: "max-age=31536000; includeSubDomains"
+
+    # OAuth2/OIDC routes
+    - match:
+        - uri:
+            prefix: /oauth2/
+        - uri:
+            prefix: /oidc/
+      route:
+        - destination:
+            host: authelia.security.svc.cluster.local
+            port:
+              number: 80
+      timeout: 60s
+      retries:
+        attempts: 2
+        perTryTimeout: 30s
+      headers:
+        request:
+          add:
+            x-forwarded-proto: https
+            x-forwarded-port: "443"
+
+    # Static assets
+    - match:
+        - uri:
+            prefix: /static/
+        - uri:
+            prefix: /assets/
+        - uri:
+            exact: /favicon.ico
+      route:
+        - destination:
+            host: authelia.security.svc.cluster.local
+            port:
+              number: 80
+      timeout: 10s
+      headers:
+        response:
+          add:
+            cache-control: "public, max-age=86400"
+
+    # Default route
+    - route:
+        - destination:
+            host: authelia.security.svc.cluster.local
+            port:
+              number: 80
+      timeout: 30s
+      headers:
+        request:
+          add:
+            x-forwarded-proto: https
+            x-forwarded-port: "443"
+        response:
+          add:
+            x-frame-options: SAMEORIGIN
+            x-xss-protection: "1; mode=block"
+            x-content-type-options: nosniff
+            strict-transport-security: "max-age=31536000; includeSubDomains"
+            cache-control: "no-store, no-cache, must-revalidate"
+            pragma: "no-cache"
+---
+# Sidecar configuration for Authelia
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: authelia-sidecar
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: authelia
+  egress:
+    # Allow access to LDAP
+    - hosts:
+        - "./lldap.auth.svc.cluster.local"
+      port:
+        number: 389
+        protocol: TCP
+        name: ldap
+
+    # Allow access to PostgreSQL
+    - hosts:
+        - "./postgres17-rw.storage.svc.cluster.local"
+      port:
+        number: 5432
+        protocol: TCP
+        name: postgres
+
+    # Allow access to Redis/Dragonfly
+    - hosts:
+        - "./dragonfly.storage.svc.cluster.local"
+      port:
+        number: 6379
+        protocol: TCP
+        name: redis
+
+    # Allow access to SMTP
+    - hosts:
+        - "./smtp-relay.auth.svc.cluster.local"
+      port:
+        number: 25
+        protocol: TCP
+        name: smtp
+
+    # Allow DNS
+    - hosts:
+        - "*/kube-dns.kube-system.svc.cluster.local"
+      port:
+        number: 53
+        protocol: UDP
+        name: dns
+
+    # Allow external HTTPS
+    - hosts:
+        - "*"
+      port:
+        number: 443
+        protocol: HTTPS
+        name: https
+
+  ingress:
+    # Allow ingress traffic on HTTP port
+    - port:
+        number: 80
+        protocol: HTTP
+        name: http
+      defaultEndpoint: 127.0.0.1:80
+
+    # Allow metrics collection
+    - port:
+        number: 8080
+        protocol: HTTP
+        name: metrics
+      defaultEndpoint: 127.0.0.1:8080
+---
+# Telemetry configuration for enhanced observability
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: authelia-telemetry
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia
+  metrics:
+    - providers:
+        - name: prometheus
+    - overrides:
+        - match:
+            metric: ALL_METRICS
+          tagOverrides:
+            request_id:
+              operation: UPSERT
+              value: "%{REQUEST_ID}"
+            user_id:
+              operation: UPSERT
+              value: "%{REQUEST_HEADERS['x-forwarded-user']}"
+  accessLogging:
+    - providers:
+        - name: otel
+    - filter:
+        expression: 'response.code >= 400'
+  tracing:
+    - providers:
+        - name: jaeger
+    - customTags:
+        auth_method:
+          header:
+            name: x-auth-method
+        user_id:
+          header:
+            name: x-forwarded-user
+        session_id:
+          header:
+            name: x-authelia-session
+---
+# EnvoyFilter for advanced traffic management
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: authelia-envoy-filter
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: service-mesh
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: authelia
+  configPatches:
+    # Add rate limiting
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              stat_prefix: local_rate_limiter
+              token_bucket:
+                max_tokens: 100
+                tokens_per_fill: 100
+                fill_interval: 60s
+              filter_enabled:
+                runtime_key: local_rate_limit_enabled
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              filter_enforced:
+                runtime_key: local_rate_limit_enforced
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              response_headers_to_add:
+                - append: false
+                  header:
+                    key: x-local-rate-limit
+                    value: 'true'
+---
+# Network Configuration for Authelia
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-network
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: network
+data:
+  network.yaml: |
+    components:
+      - name: auth-server
+        replicas: 3
+        ports:
+          - name: http
+            port: 9091
+          - name: metrics
+            port: 9959
+
+      - name: proxy
+        replicas: 2
+        ports:
+          - name: http
+            port: 9091
+
+    networking:
+      load_balancing: enabled
+      failover: automatic
+      latency_threshold: 100ms
+
+    monitoring:
+      metrics:
+        - "Authentication rate"
+        - "Response times"
+        - "Error rates"
+      alerts:
+        - "High latency"
+        - "Error spikes"
+        - "Auth failures"

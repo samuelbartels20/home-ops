@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["chaos-mesh.org/v1alpha1"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["PodChaos", "NetworkChaos", "IOChaos", "DNSChaos", "StressChaos", "HttpChaos", "Workflow"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "namespace"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "action": { "type": "string", "enum": ["pod-failure", "pod-kill", "container-kill"] },
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["action", "mode", "selector"]
+        },
+        {
+          "properties": {
+            "action": { "type": "string", "enum": ["delay", "loss", "duplicate", "corrupt", "partition", "bandwidth"] },
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "delay": { "type": "object" },
+            "loss": { "type": "object" },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["action", "mode", "selector"]
+        },
+        {
+          "properties": {
+            "action": { "type": "string", "enum": ["delay", "fault", "attrOverride", "mistake"] },
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "delay": { "type": "string" },
+            "percent": { "type": "integer" },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["action", "mode", "selector"]
+        },
+        {
+          "properties": {
+            "action": { "type": "string", "enum": ["error", "random"] },
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "patterns": { "type": "array", "items": { "type": "string" } },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["action", "mode", "selector"]
+        },
+        {
+          "properties": {
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "stressors": { "type": "object" },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["mode", "selector", "stressors"]
+        },
+        {
+          "properties": {
+            "mode": { "type": "string", "enum": ["one", "all", "fixed", "fixed-percent", "random-max-percent"] },
+            "selector": { "type": "object" },
+            "target": { "type": "string", "enum": ["Request", "Response"] },
+            "port": { "type": "integer" },
+            "path": { "type": "string" },
+            "method": { "type": "string" },
+            "delay": { "type": "string" },
+            "duration": { "type": "string" },
+            "scheduler": { "type": "object" }
+          },
+          "required": ["mode", "selector", "target"]
+        },
+        {
+          "properties": {
+            "entry": { "type": "string" },
+            "templates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "templateType"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "templateType": { "type": "string" },
+                  "deadline": { "type": "string" },
+                  "children": { "type": "array", "items": { "type": "string" } },
+                  "podChaos": { "type": "object" },
+                  "networkChaos": { "type": "object" },
+                  "ioChaos": { "type": "object" },
+                  "dnsChaos": { "type": "object" },
+                  "stressChaos": { "type": "object" },
+                  "httpChaos": { "type": "object" },
+                  "task": { "type": "object" }
+                }
+              }
+            },
+            "schedule": { "type": "string" }
+          },
+          "required": ["entry", "templates"]
+        }
+      ]
+    }
+  }
+}

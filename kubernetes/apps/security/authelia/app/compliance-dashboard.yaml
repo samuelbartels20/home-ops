@@ -1,0 +1,127 @@
+---
+# Compliance Dashboard for Grafana
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-compliance-dashboard
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: compliance
+    grafana_dashboard: "1"
+data:
+  authelia-compliance.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Authelia Compliance Dashboard",
+        "tags": ["authelia", "compliance", "soc2", "iso27001", "nist"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Overall Compliance Score",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=\"overall_compliance_score\"}",
+                "legendFormat": "Compliance Score %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 80},
+                    {"color": "green", "value": 95}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Compliance Violations",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=\"total_violations\"}",
+                "legendFormat": "Total Violations"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": 0},
+                    {"color": "yellow", "value": 1},
+                    {"color": "red", "value": 3}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "SOC2 Type II Controls",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=~\"soc2_.*_status\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "GDPR Compliance Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=~\"gdpr_.*_status\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "HIPAA Compliance Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=~\"hipaa_.*_status\"}",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Framework Compliance Overview",
+            "type": "piechart",
+            "targets": [
+              {
+                "expr": "count by (framework) (kube_configmap_info{configmap=\"authelia-compliance-status\", namespace=\"security\", key=~\".*_status\", value=\"compliant\"})",
+                "legendFormat": "{{framework}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-24h",
+          "to": "now"
+        },
+        "refresh": "1m"
+      }
+    } 

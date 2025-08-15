@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-region-health
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: multi-region-health
+data:
+  us-east-1_status: "healthy"
+  us-west-2_status: "healthy"
+  eu-west-1_status: "healthy"
+  overall_health_percentage: "100"
+  healthy_regions: "3"
+  total_regions: "3"
+  last_health_check: "1970-01-01T00:00:00Z"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-sync-status
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: multi-region
+data:
+  last_sync: "1970-01-01T00:00:00Z"
+  sync_status: "pending"
+  regions_synced: "" 

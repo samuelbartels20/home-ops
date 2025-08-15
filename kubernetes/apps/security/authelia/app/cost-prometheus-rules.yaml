@@ -1,0 +1,145 @@
+---
+# Cost Monitoring and Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: authelia-cost-optimization
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: cost-optimization
+spec:
+  groups:
+    - name: authelia.cost-optimization
+      interval: 5m
+      rules:
+        # Cost Metrics
+        - record: authelia:cost:cpu_cores_used
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{namespace="security", pod=~"authelia-.*", container!="POD", container!=""}[5m]))
+
+        - record: authelia:cost:memory_bytes_used
+          expr: |
+            sum(container_memory_working_set_bytes{namespace="security", pod=~"authelia-.*", container!="POD", container!=""})
+
+        - record: authelia:cost:storage_bytes_used
+          expr: |
+            sum(kubelet_volume_stats_used_bytes{namespace="security", persistentvolumeclaim=~".*authelia.*"})
+
+        # Efficiency Metrics
+        - record: authelia:efficiency:cpu_utilization
+          expr: |
+            (
+              authelia:cost:cpu_cores_used /
+              sum(kube_pod_container_resource_requests{namespace="security", pod=~"authelia-.*", resource="cpu"})
+            ) * 100
+
+        - record: authelia:efficiency:memory_utilization
+          expr: |
+            (
+              authelia:cost:memory_bytes_used /
+              sum(kube_pod_container_resource_requests{namespace="security", pod=~"authelia-.*", resource="memory"})
+            ) * 100
+
+        # Cost per Request
+        - record: authelia:cost:per_request
+          expr: |
+            (
+              (authelia:cost:cpu_cores_used * 0.048) +  # $0.048 per CPU hour
+              (authelia:cost:memory_bytes_used / 1024^3 * 0.0067)  # $0.0067 per GB hour
+            ) / sum(rate(authelia_http_requests_total[5m]))
+
+        # Waste Detection
+        - record: authelia:waste:overprovisioned_cpu
+          expr: |
+            sum(kube_pod_container_resource_requests{namespace="security", pod=~"authelia-.*", resource="cpu"}) -
+            authelia:cost:cpu_cores_used
+
+        - record: authelia:waste:overprovisioned_memory
+          expr: |
+            sum(kube_pod_container_resource_requests{namespace="security", pod=~"authelia-.*", resource="memory"}) -
+            authelia:cost:memory_bytes_used
+
+        # Scaling Recommendations
+        - record: authelia:recommendation:right_sized_cpu
+          expr: |
+            quantile_over_time(0.95, authelia:cost:cpu_cores_used[7d]) * 1.2
+
+        - record: authelia:recommendation:right_sized_memory
+          expr: |
+            quantile_over_time(0.95, authelia:cost:memory_bytes_used[7d]) * 1.2
+
+        # Monthly Cost Projection
+        - record: authelia:cost:monthly_projection
+          expr: |
+            (
+              (authelia:cost:cpu_cores_used * 0.048 * 24 * 30) +
+              (authelia:cost:memory_bytes_used / 1024^3 * 0.0067 * 24 * 30) +
+              (authelia:cost:storage_bytes_used / 1024^3 * 0.10)  
+            )
+
+        # Cost Alerts
+        - alert: AutheliaCostBudgetExceeded
+          expr: |
+            authelia:cost:monthly_projection > 50  
+          for: 5m
+          labels:
+            severity: warning
+            category: cost-optimization
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia monthly cost budget exceeded"
+            description: "Projected monthly cost is ${{ $value | printf \"%.2f\" }}, exceeding $50 budget"
+            runbook_url: "https://runbooks.samcloud.online/cost-optimization/budget-exceeded"
+
+        - alert: AutheliaResourceOverprovisioned
+          expr: |
+            (
+              authelia:efficiency:cpu_utilization < 30 or
+              authelia:efficiency:memory_utilization < 50
+            )
+          for: 30m
+          labels:
+            severity: info
+            category: cost-optimization
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia resources are overprovisioned"
+            description: "CPU utilization: {{ authelia:efficiency:cpu_utilization | printf \"%.1f\" }}%, Memory utilization: {{ authelia:efficiency:memory_utilization | printf \"%.1f\" }}%"
+            runbook_url: "https://runbooks.samcloud.online/cost-optimization/overprovisioned"
+
+        - alert: AutheliaResourceUnderprovisioned
+          expr: |
+            (
+              authelia:efficiency:cpu_utilization > 90 or
+              authelia:efficiency:memory_utilization > 95
+            )
+          for: 10m
+          labels:
+            severity: warning
+            category: cost-optimization
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia resources are underprovisioned"
+            description: "CPU utilization: {{ authelia:efficiency:cpu_utilization | printf \"%.1f\" }}%, Memory utilization: {{ authelia:efficiency:memory_utilization | printf \"%.1f\" }}%"
+            runbook_url: "https://runbooks.samcloud.online/cost-optimization/underprovisioned"
+
+        - alert: AutheliaWasteDetected
+          expr: |
+            (
+              authelia:waste:overprovisioned_cpu > 0.5 or
+              authelia:waste:overprovisioned_memory > 536870912  
+            )
+          for: 2h
+          labels:
+            severity: info
+            category: cost-optimization
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia resource waste detected"
+            description: "Wasted CPU: {{ authelia:waste:overprovisioned_cpu | printf \"%.3f\" }} cores, Wasted Memory: {{ authelia:waste:overprovisioned_memory | humanize1024 }}B"
+            runbook_url: "https://runbooks.samcloud.online/cost-optimization/waste-detected" 

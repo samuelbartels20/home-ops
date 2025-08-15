@@ -1,0 +1,17 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: authelia-snapshot-class
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: storage
+  annotations:
+    snapshot.storage.kubernetes.io/is-default-class: "false"
+spec:
+  driver: csi.storage.k8s.io
+  deletionPolicy: Retain
+  parameters:
+    encryption: "true"
+    encrypted: "true"
+    csi.storage.k8s.io/snapshotter-secret-name: "authelia-snapshot-secret"
+    csi.storage.k8s.io/snapshotter-secret-namespace: "security" 

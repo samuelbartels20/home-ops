@@ -1,0 +1,41 @@
+---
+# OPA Gatekeeper Configuration for Authelia
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: authelia-policies
+spec:
+  crd:
+    spec:
+      names:
+        kind: AutheliaPolicies
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package authelia
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "HelmRelease"
+          input.review.object.metadata.namespace == "security"
+          input.review.object.metadata.name == "authelia"
+
+          not has_resource_limits
+          msg := "Authelia components must have resource limits defined"
+        }
+
+        has_resource_limits {
+          input.review.object.spec.values.resources.limits
+        }
+
+        violation[{"msg": msg}] {
+          input.review.object.kind == "HelmRelease"
+          input.review.object.metadata.namespace == "security"
+          input.review.object.metadata.name == "authelia"
+
+          not has_persistence_enabled
+          msg := "Authelia must have persistence enabled"
+        }
+
+        has_persistence_enabled {
+          input.review.object.spec.values.persistence.enabled == true
+        }

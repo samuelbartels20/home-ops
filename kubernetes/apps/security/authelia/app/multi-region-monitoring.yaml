@@ -1,0 +1,93 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: authelia-multi-region-monitoring
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: multi-region
+spec:
+  groups:
+    - name: authelia.multi-region
+      interval: 30s
+      rules:
+        # Regional Health Metrics
+        - record: authelia:region:health_status
+          expr: |
+            label_replace(
+              kube_configmap_info{configmap="authelia-region-health", namespace="security"},
+              "region", "$1", "key", "(.*)_status"
+            )
+
+        - record: authelia:region:last_sync_seconds
+          expr: |
+            (time() - on() kube_configmap_info{configmap="authelia-sync-status", namespace="security", key="last_sync"})
+
+        - record: authelia:region:overall_health_percentage
+          expr: |
+            kube_configmap_info{configmap="authelia-region-health", namespace="security", key="overall_health_percentage"}
+
+        # Cross-Region Latency (synthetic)
+        - record: authelia:region:cross_region_latency_ms
+          expr: |
+            (
+              (authelia_http_request_duration_seconds{job="authelia", quantile="0.95"} * 1000) +
+              (50 * on() vector(1))  
+            )
+
+        # Multi-Region Alerts
+        - alert: AutheliaRegionUnhealthy
+          expr: |
+            authelia:region:health_status == 0
+          for: 2m
+          labels:
+            severity: critical
+            category: multi-region
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia region {{ $labels.region }} is unhealthy"
+            description: "Region {{ $labels.region }} has been unhealthy for more than 2 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/region-unhealthy"
+
+        - alert: AutheliaMultiRegionSyncLag
+          expr: |
+            authelia:region:last_sync_seconds > 600  
+          for: 5m
+          labels:
+            severity: warning
+            category: multi-region
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia cross-region sync lag detected"
+            description: "Cross-region sync has not completed successfully in {{ $value }} seconds"
+            runbook_url: "https://runbooks.samcloud.online/authelia/sync-lag"
+
+        - alert: AutheliaOverallHealthLow
+          expr: |
+            authelia:region:overall_health_percentage < 66
+          for: 1m
+          labels:
+            severity: critical
+            category: multi-region
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia overall regional health is low"
+            description: "Overall health is {{ $value }}%, indicating multiple region failures"
+            runbook_url: "https://runbooks.samcloud.online/authelia/low-health"
+
+        - alert: AutheliaCrossRegionLatencyHigh
+          expr: |
+            authelia:region:cross_region_latency_ms > 200
+          for: 10m
+          labels:
+            severity: warning
+            category: multi-region
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia cross-region latency is high"
+            description: "Cross-region latency is {{ $value }}ms, exceeding 200ms threshold"
+            runbook_url: "https://runbooks.samcloud.online/authelia/high-latency" 

@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["helm.toolkit.fluxcd.io/v2beta1"]
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["HelmRelease"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "namespace"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["chart", "interval"],
+      "properties": {
+        "interval": { "type": "string" },
+        "chart": {
+          "type": "object",
+          "required": ["spec"],
+          "properties": {
+            "spec": {
+              "type": "object",
+              "required": ["chart", "version", "sourceRef"],
+              "properties": {
+                "chart": { "type": "string" },
+                "version": { "type": "string" },
+                "sourceRef": {
+                  "type": "object",
+                  "required": ["kind", "name", "namespace"],
+                  "properties": {
+                    "kind": { "type": "string" },
+                    "name": { "type": "string" },
+                    "namespace": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "values": { "type": "object" }
+      }
+    }
+  }
+}

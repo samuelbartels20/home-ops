@@ -1,0 +1,146 @@
+---
+# API Management Dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-api-management-dashboard
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: api-management
+    grafana_dashboard: "1"
+data:
+  authelia-api-management.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Authelia API Management",
+        "tags": ["authelia", "api-management", "gateway"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(envoy_http_inbound_0_0_0_0_8080_http_requests_total[5m])",
+                "legendFormat": "{{method}} {{path}}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "API Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(envoy_http_inbound_0_0_0_0_8080_http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P95 Latency"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(envoy_http_inbound_0_0_0_0_8080_http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "P50 Latency"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Seconds",
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "API Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(envoy_http_inbound_0_0_0_0_8080_http_requests_total{response_code=~\"5..\"}[5m])",
+                "legendFormat": "5xx Errors"
+              },
+              {
+                "expr": "rate(envoy_http_inbound_0_0_0_0_8080_http_requests_total{response_code=~\"4..\"}[5m])",
+                "legendFormat": "4xx Errors"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Errors/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Rate Limiting",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(envoy_http_local_rate_limit_rate_limited_total[5m])",
+                "legendFormat": "Rate Limited Requests"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec",
+                "min": 0
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Authentication Success Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(envoy_http_ext_authz_allowed_total[5m]) / (rate(envoy_http_ext_authz_allowed_total[5m]) + rate(envoy_http_ext_authz_denied_total[5m])) * 100",
+                "legendFormat": "Auth Success Rate %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 95},
+                    {"color": "green", "value": 99}
+                  ]
+                },
+                "unit": "percent"
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Top API Endpoints",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "topk(10, sum by (path) (rate(envoy_http_inbound_0_0_0_0_8080_http_requests_total[5m])))",
+                "format": "table",
+                "instant": true
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    } 

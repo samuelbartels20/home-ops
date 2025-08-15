@@ -1,0 +1,303 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: authelia-sli-slo
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: sli-slo
+spec:
+  groups:
+    - name: authelia.sli-slo
+      interval: 30s
+      rules:
+        # SLI: Availability
+        - record: authelia:sli:availability:ratio_5m
+          expr: |
+            (
+              sum(rate(authelia_http_requests_total{job="authelia", code!~"5.."}[5m])) /
+              sum(rate(authelia_http_requests_total{job="authelia"}[5m]))
+            )
+        - record: authelia:sli:availability:ratio_30m
+          expr: |
+            (
+              sum(rate(authelia_http_requests_total{job="authelia", code!~"5.."}[30m])) /
+              sum(rate(authelia_http_requests_total{job="authelia"}[30m]))
+            )
+        - record: authelia:sli:availability:ratio_6h
+          expr: |
+            (
+              sum(rate(authelia_http_requests_total{job="authelia", code!~"5.."}[6h])) /
+              sum(rate(authelia_http_requests_total{job="authelia"}[6h]))
+            )
+
+        # SLI: Latency
+        - record: authelia:sli:latency:p95_5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(authelia_http_request_duration_seconds_bucket{job="authelia"}[5m])) by (le)
+            )
+        - record: authelia:sli:latency:p99_5m
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(authelia_http_request_duration_seconds_bucket{job="authelia"}[5m])) by (le)
+            )
+
+        # SLI: Authentication Success Rate
+        - record: authelia:sli:auth_success:ratio_5m
+          expr: |
+            (
+              sum(rate(authelia_authentication_first_factor_total{success="true"}[5m])) +
+              sum(rate(authelia_authentication_second_factor_total{success="true"}[5m]))
+            ) /
+            (
+              sum(rate(authelia_authentication_first_factor_total[5m])) +
+              sum(rate(authelia_authentication_second_factor_total[5m]))
+            )
+
+        # Error Budget Burn Rates (Multi-window)
+        # 99.9% SLO = 0.1% error budget
+        - record: authelia:slo:error_budget_burn_rate:5m
+          expr: |
+            (1 - authelia:sli:availability:ratio_5m) / (1 - 0.999)
+        - record: authelia:slo:error_budget_burn_rate:1h
+          expr: |
+            (1 - authelia:sli:availability:ratio_30m) / (1 - 0.999)
+        - record: authelia:slo:error_budget_burn_rate:6h
+          expr: |
+            (1 - authelia:sli:availability:ratio_6h) / (1 - 0.999)
+
+        # SLO Compliance
+        - record: authelia:slo:availability:target
+          expr: "0.999"
+        - record: authelia:slo:latency:target
+          expr: "0.200"
+        - record: authelia:slo:auth_success:target
+          expr: "0.995"  
+
+    - name: authelia.enterprise-alerts
+      interval: 30s
+      rules:
+        # Critical SLO Burn Rate Alerts
+        - alert: AutheliaSLOBurnRateCritical
+          expr: |
+            authelia:slo:error_budget_burn_rate:5m > 14.4
+            and
+            authelia:slo:error_budget_burn_rate:1h > 14.4
+          for: 2m
+          labels:
+            severity: critical
+            category: slo
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia is burning error budget at critical rate"
+            description: "Authelia error budget burn rate is {{ $value | humanizePercentage }} over the last hour, indicating potential service degradation"
+            runbook_url: "https://runbooks.samcloud.online/authelia/slo-burn-rate"
+            dashboard_url: "https://grafana.samcloud.online/d/authelia-slo"
+
+        - alert: AutheliaSLOBurnRateHigh
+          expr: |
+            authelia:slo:error_budget_burn_rate:5m > 6
+            and
+            authelia:slo:error_budget_burn_rate:6h > 6
+          for: 15m
+          labels:
+            severity: warning
+            category: slo
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia is burning error budget at high rate"
+            description: "Authelia error budget burn rate is {{ $value | humanizePercentage }} over the last 6 hours"
+            runbook_url: "https://runbooks.samcloud.online/authelia/slo-burn-rate"
+
+        # Availability Alerts
+        - alert: AutheliaHighErrorRate
+          expr: |
+            (
+              sum(rate(authelia_http_requests_total{job="authelia", code=~"5.."}[5m])) /
+              sum(rate(authelia_http_requests_total{job="authelia"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+            category: availability
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia high error rate detected"
+            description: "Authelia error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/high-error-rate"
+
+        # Latency Alerts
+        - alert: AutheliaHighLatency
+          expr: |
+            authelia:sli:latency:p95_5m > 0.200
+          for: 5m
+          labels:
+            severity: warning
+            category: latency
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia high latency detected"
+            description: "Authelia P95 latency is {{ $value }}s over the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/high-latency"
+
+        - alert: AutheliaCriticalLatency
+          expr: |
+            authelia:sli:latency:p95_5m > 1.0
+          for: 2m
+          labels:
+            severity: critical
+            category: latency
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia critical latency detected"
+            description: "Authelia P95 latency is {{ $value }}s over the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/critical-latency"
+
+        # Authentication Alerts
+        - alert: AutheliaAuthenticationFailures
+          expr: |
+            (
+              sum(rate(authelia_authentication_first_factor_total{success="false"}[5m])) +
+              sum(rate(authelia_authentication_second_factor_total{success="false"}[5m]))
+            ) > 10
+          for: 2m
+          labels:
+            severity: warning
+            category: authentication
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia authentication failures spike"
+            description: "Authelia authentication failures: {{ $value }} per second over the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/auth-failures"
+
+        # Infrastructure Alerts
+        - alert: AutheliaPodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="security", pod=~"authelia-.*"}[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            category: infrastructure
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia pod is crash looping"
+            description: "Pod {{ $labels.pod }} is restarting frequently"
+            runbook_url: "https://runbooks.samcloud.online/authelia/crash-looping"
+
+        - alert: AutheliaHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="security", pod=~"authelia-.*", container="app"} /
+              container_spec_memory_limit_bytes{namespace="security", pod=~"authelia-.*", container="app"}
+            ) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            category: resources
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia high memory usage"
+            description: "Authelia memory usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+            runbook_url: "https://runbooks.samcloud.online/authelia/high-memory"
+
+        - alert: AutheliaHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{namespace="security", pod=~"authelia-.*", container="app"}[5m]) *
+              on(namespace,pod) group_left(node)
+              kube_pod_info{namespace="security", pod=~"authelia-.*"}
+            ) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            category: resources
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia high CPU usage"
+            description: "Authelia CPU usage is {{ $value | humanizePercentage }} on pod {{ $labels.pod }}"
+            runbook_url: "https://runbooks.samcloud.online/authelia/high-cpu"
+
+        # Database Connectivity
+        - alert: AutheliaDatabaseConnectionFailure
+          expr: |
+            increase(authelia_storage_postgres_connection_errors_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: database
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia database connection failures"
+            description: "Authelia has {{ $value }} database connection errors in the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/db-connection"
+
+        # LDAP Connectivity
+        - alert: AutheliaLDAPConnectionFailure
+          expr: |
+            increase(authelia_authentication_backend_ldap_connection_errors_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: ldap
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia LDAP connection failures"
+            description: "Authelia has {{ $value }} LDAP connection errors in the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/ldap-connection"
+
+        # Session Management
+        - alert: AutheliaRedisConnectionFailure
+          expr: |
+            increase(authelia_session_redis_connection_errors_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            category: session
+            service: authelia
+            team: security
+          annotations:
+            summary: "Authelia Redis connection failures"
+            description: "Authelia has {{ $value }} Redis connection errors in the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/redis-connection"
+
+        # Security Alerts
+        - alert: AutheliaBruteForceAttack
+          expr: |
+            sum(rate(authelia_regulation_ban_total[5m])) > 5
+          for: 1m
+          labels:
+            severity: critical
+            category: security
+            service: authelia
+            team: security
+          annotations:
+            summary: "Potential brute force attack on Authelia"
+            description: "{{ $value }} IPs have been banned in the last 5 minutes due to failed authentication attempts"
+            runbook_url: "https://runbooks.samcloud.online/authelia/brute-force"
+
+        - alert: AutheliaSuspiciousActivity
+          expr: |
+            sum(rate(authelia_http_requests_total{job="authelia", code="401"}[5m])) > 20
+          for: 2m
+          labels:
+            severity: warning
+            category: security
+            service: authelia
+            team: security
+          annotations:
+            summary: "High number of unauthorized requests to Authelia"
+            description: "{{ $value }} unauthorized requests per second in the last 5 minutes"
+            runbook_url: "https://runbooks.samcloud.online/authelia/suspicious-activity"

@@ -1,0 +1,81 @@
+---
+# API Gateway Service (using Envoy as example)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authelia-api-gateway
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia-api-gateway
+    app.kubernetes.io/component: api-management
+    security.samcloud.online/tier: enterprise
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia-api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authelia-api-gateway
+        app.kubernetes.io/component: api-management
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/stats/prometheus"
+    spec:
+      serviceAccountName: authelia-api-gateway
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.28-latest
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8443
+              name: https
+            - containerPort: 9901
+              name: admin
+          env:
+            - name: ENVOY_UID
+              value: "0"
+          command:
+            - envoy
+            - --config-path
+            - /etc/envoy/envoy.yaml
+            - --service-cluster
+            - authelia-api-gateway
+            - --service-node
+            - authelia-api-gateway
+            - --log-level
+            - info
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+            - name: certs
+              mountPath: /etc/ssl/certs
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 9901
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 9901
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: authelia-envoy-config
+        - name: certs
+          secret:
+            secretName: authelia-api-gateway-certs 

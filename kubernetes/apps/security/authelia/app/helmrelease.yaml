@@ -1,0 +1,50 @@
+# Authelia configuration
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: authelia
+  namespace: security
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: authelia
+      version: 0.8.57
+      sourceRef:
+        kind: HelmRepository
+        name: authelia
+        namespace: flux-system
+  values:
+    domain: samcloud.online
+    configMap:
+      enabled: true
+      config:
+        authentication_backend:
+          file:
+            path: /config/users_database.yml
+        access_control:
+          default_policy: deny
+          rules:
+            - domain: "*.samcloud.online"
+              policy: two_factor
+        session:
+          name: authelia_session
+          expiration: 3600
+          inactivity: 300
+          remember_me_duration: 1M
+        regulation:
+          max_retries: 3
+          find_time: 120
+          ban_time: 300
+        storage:
+          local:
+            path: /config/db.sqlite3
+        notifier:
+          filesystem:
+            filename: /config/notification.txt
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: mayastor-two-replica
+    serviceMonitor:
+      enabled: true

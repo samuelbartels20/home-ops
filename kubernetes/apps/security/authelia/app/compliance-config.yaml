@@ -1,0 +1,38 @@
+---
+# Compliance Configuration for Authelia
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-compliance-config
+  namespace: security
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/component: compliance
+  annotations:
+    compliance.kubernetes.io/frameworks: "soc2,iso27001,nist"
+data:
+  compliance-requirements.yaml: |
+    soc2:
+      cc6.1: "Logical and physical access controls"
+      cc6.6: "Protection of system components"
+      cc6.7: "Data transmission and disposal"
+    iso27001:
+      a9.1.1: "Access control policy"
+      a9.2.3: "Management of privileged access rights"
+      a12.3.1: "Information backup"
+    nist:
+      ac-2: "Account Management"
+      ac-3: "Access Enforcement"
+      sc-8: "Transmission Confidentiality and Integrity"
+  security-controls.yaml: |
+    authentication:
+      - multi_factor_authentication: enabled
+      - password_policy: enforced
+      - session_management: secure
+    authorization:
+      - rbac: enabled
+      - principle_of_least_privilege: enforced
+    data_protection:
+      - encryption_at_rest: enabled
+      - encryption_in_transit: enabled
+      - data_backup: automated
