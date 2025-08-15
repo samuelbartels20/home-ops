@@ -1,5 +1,5 @@
 ---
-apiVersion: policy/v1beta1
+apiVersion: policy/v1
 kind: PodSecurityPolicy
 metadata:
   name: kubecost-psp
@@ -80,7 +80,6 @@ spec:
     - '*'
 
 
-
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -110,12 +109,10 @@ roleRef:
   kind: ClusterRole
   name: kubecost-psp-use
   apiGroup: rbac.authorization.k8s.io
-rules:
-- apiGroups: ['policy']
-  resources: ['podsecuritypolicies']
-  verbs: ['use']
-  resourceNames:
-  - kubecost-psp
+subjects:
+- kind: ServiceAccount
+  name: kubecost
+  namespace: finops
 
 ---
 apiVersion: v1
