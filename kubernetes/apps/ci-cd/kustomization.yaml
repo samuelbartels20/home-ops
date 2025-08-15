@@ -4,7 +4,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: ci-cd
 components:
-  # - ../../components/alerts
+  - ../../components/alerts
   - ../../components/common
-resources:
-  # - ./jenkins/ks.yaml
+# resources:
+#   - ./jenkins/ks.yaml
