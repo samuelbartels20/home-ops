@@ -1,0 +1,43 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: clickhouse-server-tls
+  namespace: data-science
+spec:
+  secretName: clickhouse-server-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "clickhouse.samcloud.online"
+  dnsNames:
+    - "clickhouse.samcloud.online"
+    - "clickhouse-cluster.clickhouse.svc.cluster.local"
+    - "clickhouse-cluster"
+    - "*.clickhouse-cluster.clickhouse.svc.cluster.local"
+    - "localhost"
+  ipAddresses:
+    - "127.0.0.1"
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: clickhouse-client-tls
+  namespace: data-science
+spec:
+  secretName: clickhouse-client-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "clickhouse-client"
+  dnsNames:
+    - "clickhouse-client"
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth

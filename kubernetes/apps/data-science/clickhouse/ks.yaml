@@ -1,0 +1,68 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app clickhouse-operator
+  namespace: &namespace data-science
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  interval: 1h
+  path: ./kubernetes/apps/data-science/clickhouse/operator
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: *namespace
+  timeout: 5m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app-cluster clickhouse-cluster
+  namespace: &namespace data-science
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app-cluster
+  dependsOn:
+    - name: clickhouse-operator
+      namespace: *namespace
+    - name: rook-ceph-cluster
+      namespace: storage
+  interval: 1h
+  path: ./kubernetes/apps/data-science/clickhouse/cluster
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: *namespace
+  timeout: 10m
+  wait: false
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app-backup clickhouse-backup
+  namespace: &namespace data-science
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app-backup
+  dependsOn:
+    - name: clickhouse-cluster
+      namespace: *namespace
+  interval: 1h
+  path: ./kubernetes/apps/data-science/clickhouse/backup
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: *namespace
+  timeout: 5m
+  wait: false

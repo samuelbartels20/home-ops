@@ -1,0 +1,215 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: superset
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: superset
+  annotations:
+    # Restrict service account token auto-mount for security
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: superset-worker
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/component: worker
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: superset-celery-beat
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: superset
+    app.kubernetes.io/component: celery-beat
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: superset
+  namespace: data-science
+rules:
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["superset-secrets", "superset-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading own pods for health checks
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: []
+
+  # Allow creating events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: superset-worker
+  namespace: data-science
+rules:
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["superset-secrets", "superset-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow creating events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: superset
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: superset
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: superset
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: superset-worker
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: superset-worker
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: superset-worker
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: superset-celery-beat
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: superset-celery-beat
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: superset-worker
+  apiGroup: rbac.authorization.k8s.io
+---
+# Pod Security Standards - Restricted Profile
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: superset-security-limits
+  namespace: data-science
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 100m
+        memory: 128Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "4"
+        memory: "8Gi"
+      min:
+        cpu: "50m"
+        memory: "64Mi"
+    - type: Pod
+      max:
+        cpu: "8"
+        memory: "16Gi"
+---
+# Network Security Policy for Superset
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: superset-security-netpol
+  namespace: data-science
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: superset
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only allow ingress from authorized sources
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: network
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 8088
+  egress:
+    # Deny all egress by default, allow specific destinations
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53  # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+        - protocol: TCP
+          port: 6379  # Redis
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: clickhouse
+      ports:
+        - protocol: TCP
+          port: 8123  # ClickHouse
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: druid
+      ports:
+        - protocol: TCP
+          port: 8888  # Druid Router

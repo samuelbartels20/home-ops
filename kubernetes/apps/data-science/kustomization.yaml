@@ -1,0 +1,12 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: data-science
+
+# resources:
+#   - ./init-databases.yaml
+#   - ./resource-quotas.yaml
+#   - ./clickhouse/ks.yaml
+#   - ./superset/ks.yaml
+#   - ./druid/ks.yaml

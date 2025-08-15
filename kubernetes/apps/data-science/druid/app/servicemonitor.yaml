@@ -1,0 +1,196 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-coordinator
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: coordinator
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: coordinator
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'coordinator'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-broker
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: broker
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: broker
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'broker'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-historical
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: historical
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: historical
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'historical'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-overlord
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: overlord
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: overlord
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'overlord'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-middlemanager
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: middlemanager
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: middlemanager
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'middlemanager'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-router
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: router
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: router
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /status/metrics
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'druid_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'router'
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: druid-zookeeper
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: zookeeper
+    release: prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: druid
+      app.kubernetes.io/component: zookeeper
+  endpoints:
+    - port: admin
+      interval: 30s
+      path: /commands/stats
+      scheme: http
+      scrapeTimeout: 10s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'zk_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: druid_component
+          replacement: 'zookeeper'

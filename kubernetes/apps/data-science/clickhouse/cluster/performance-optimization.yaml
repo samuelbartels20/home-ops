@@ -1,0 +1,204 @@
+---
+# Enhanced Performance Optimization for ClickHouse - Production Grade
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-performance-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    performance.samcloud.online/level: "enhanced"
+    optimization.samcloud.online/type: "production"
+data:
+  performance-config.xml: |
+    <clickhouse>
+      <!-- Memory Management -->
+      <max_server_memory_usage>0.8</max_server_memory_usage>
+      <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+      <max_memory_usage>16000000000</max_memory_usage>
+      <max_bytes_before_external_group_by>8000000000</max_bytes_before_external_group_by>
+      <max_bytes_before_external_sort>8000000000</max_bytes_before_external_sort>
+      <max_bytes_in_distinct>8000000000</max_bytes_in_distinct>
+      <max_bytes_in_set>8000000000</max_bytes_in_set>
+      <max_bytes_in_join>8000000000</max_bytes_in_join>
+      
+      <!-- Query Processing -->
+      <max_concurrent_queries>2000</max_concurrent_queries>
+      <max_concurrent_insert_queries>500</max_concurrent_insert_queries>
+      <max_concurrent_select_queries>1500</max_concurrent_select_queries>
+      <max_thread_pool_size>20000</max_thread_pool_size>
+      <background_pool_size>128</background_pool_size>
+      <background_merges_mutations_concurrency_ratio>8</background_merges_mutations_concurrency_ratio>
+      <max_part_loading_threads>64</max_part_loading_threads>
+      
+      <!-- Storage Optimization -->
+      <mark_cache_size>50000000000</mark_cache_size>
+      <uncompressed_cache_size>100000000000</uncompressed_cache_size>
+      <compiled_expression_cache_size>1000000000</compiled_expression_cache_size>
+      <query_cache_size>10000000000</query_cache_size>
+      
+      <!-- Merge Tree Settings -->
+      <merge_tree>
+        <max_suspicious_broken_parts>1000</max_suspicious_broken_parts>
+        <parts_to_delay_insert>10000</parts_to_delay_insert>
+        <parts_to_throw_insert>20000</parts_to_throw_insert>
+        <inactive_parts_to_delay_insert>5000</inactive_parts_to_delay_insert>
+        <inactive_parts_to_throw_insert>10000</inactive_parts_to_throw_insert>
+        <max_parts_in_total>100000</max_parts_in_total>
+        <max_compress_block_size>1048576</max_compress_block_size>
+        <min_compress_block_size>65536</min_compress_block_size>
+        <max_block_size>1048576</max_block_size>
+      </merge_tree>
+      
+      <!-- Network Settings -->
+      <max_connections>10000</max_connections>
+      <keep_alive_timeout>300</keep_alive_timeout>
+      <tcp_keep_alive_timeout>7200</tcp_keep_alive_timeout>
+      <receive_timeout>300</receive_timeout>
+      <send_timeout>300</send_timeout>
+      <http_receive_timeout>300</http_receive_timeout>
+      <http_send_timeout>300</http_send_timeout>
+      
+      <!-- Compression Settings -->
+      <compression>
+        <case>
+          <method>zstd</method>
+          <level>3</level>
+        </case>
+        <case>
+          <method>lz4</method>
+          <min_part_size>10000000000</min_part_size>
+          <min_part_size_ratio>0.01</min_part_size_ratio>
+        </case>
+      </compression>
+      
+      <!-- Distributed DDL -->
+      <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+        <cleanup_delay_period>60</cleanup_delay_period>
+        <max_tasks_in_queue>10000</max_tasks_in_queue>
+      </distributed_ddl>
+      
+      <!-- Kafka Integration -->
+      <kafka>
+        <kafka_consumer_pool_size>1000</kafka_consumer_pool_size>
+        <kafka_max_wait_ms>5000</kafka_max_wait_ms>
+      </kafka>
+    </clickhouse>
+---
+# Performance Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: clickhouse-performance-alerts
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    release: prometheus-operator
+    performance.samcloud.online/level: "enhanced"
+spec:
+  groups:
+    - name: clickhouse.performance
+      interval: 30s
+      rules:
+        - alert: ClickHouseHighQueryLatency
+          expr: histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m])) > 10
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse query latency is high"
+            description: "95th percentile query latency is {{ $value }} seconds"
+        
+        - alert: ClickHouseHighMemoryUsage
+          expr: (clickhouse_memory_usage / clickhouse_memory_limit) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse memory usage is high"
+            description: "Memory usage is {{ $value }}%"
+        
+        - alert: ClickHouseSlowMerges
+          expr: rate(clickhouse_merge_duration_seconds_sum[5m]) / rate(clickhouse_merge_duration_seconds_count[5m]) > 300
+          for: 10m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse merges are slow"
+            description: "Average merge duration is {{ $value }} seconds"
+---
+# Performance Testing Job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clickhouse-performance-testing
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    performance.samcloud.online/level: "enhanced"
+spec:
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 4
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: clickhouse
+            job: performance-testing
+        spec:
+          serviceAccountName: clickhouse-service-account
+          restartPolicy: OnFailure
+          containers:
+            - name: performance-tester
+              image: clickhouse/performance-tester:latest
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  
+                  echo "Starting ClickHouse performance testing..."
+                  
+                  # Run performance benchmarks
+                  clickhouse-benchmark \
+                    --host=clickhouse-cluster.data-science.svc.cluster.local \
+                    --port=9000 \
+                    --user=performance \
+                    --password="${CLICKHOUSE_PASSWORD}" \
+                    --concurrency=100 \
+                    --iterations=1000 \
+                    --queries=/opt/queries/performance_queries.sql \
+                    --output=/tmp/performance_results.json
+                  
+                  # Analyze results
+                  python /opt/scripts/analyze_performance.py \
+                    --input=/tmp/performance_results.json \
+                    --output=/tmp/performance_report.html
+                  
+                  # Send report
+                  echo "Performance testing completed successfully"
+              
+              env:
+                - name: CLICKHOUSE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-secrets
+                      key: performance_password
+              
+              resources:
+                requests:
+                  cpu: 2
+                  memory: 4Gi
+                limits:
+                  cpu: 8
+                  memory: 16Gi 

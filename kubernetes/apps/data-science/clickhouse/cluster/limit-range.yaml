@@ -1,0 +1,32 @@
+---
+# Limit Range for ClickHouse
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: clickhouse-limits
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    security.samcloud.online/level: "restricted"
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 4
+        memory: 8Gi
+      defaultRequest:
+        cpu: 2
+        memory: 4Gi
+      min:
+        cpu: 100m
+        memory: 512Mi
+      max:
+        cpu: 16
+        memory: 32Gi
+      maxLimitRequestRatio:
+        cpu: 4
+        memory: 4
+    - type: Pod
+      max:
+        cpu: 32
+        memory: 64Gi 

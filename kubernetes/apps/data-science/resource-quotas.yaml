@@ -1,0 +1,232 @@
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: data-science-compute-quota
+  namespace: data-science
+spec:
+  hard:
+    # Compute resources
+    requests.cpu: "20"
+    requests.memory: "40Gi"
+    limits.cpu: "40"
+    limits.memory: "80Gi"
+
+    # Storage resources
+    requests.storage: "500Gi"
+    persistentvolumeclaims: "20"
+
+    # Object counts
+    pods: "50"
+    replicationcontrollers: "20"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: data-science-limits
+  namespace: data-science
+spec:
+  limits:
+    # Default pod limits
+    - type: Pod
+      max:
+        cpu: "8"
+        memory: "16Gi"
+        ephemeral-storage: "20Gi"
+      min:
+        cpu: "10m"
+        memory: "16Mi"
+        ephemeral-storage: "1Gi"
+
+    # Default container limits
+    - type: Container
+      default:
+        cpu: "100m"
+        memory: "128Mi"
+        ephemeral-storage: "1Gi"
+      defaultRequest:
+        cpu: "50m"
+        memory: "64Mi"
+        ephemeral-storage: "1Gi"
+      max:
+        cpu: "4"
+        memory: "8Gi"
+        ephemeral-storage: "10Gi"
+      min:
+        cpu: "10m"
+        memory: "16Mi"
+        ephemeral-storage: "100Mi"
+
+    # PVC limits
+    - type: PersistentVolumeClaim
+      max:
+        storage: "100Gi"
+      min:
+        storage: "1Gi"
+
+---
+# Network Security - Default Deny All
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-science-default-deny
+  namespace: data-science
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  # Default deny all traffic - explicit allow rules required
+
+---
+# Compliance - Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-science-security-policy
+  namespace: data-science
+  labels:
+    config.kubernetes.io/local-config: "true"
+data:
+  policy.yaml: |
+    # Pod Security Standards - Restricted Profile
+    apiVersion: pod-security.kubernetes.io/v1beta1
+    kind: PodSecurityPolicy
+    metadata:
+      name: data-science-restricted
+    spec:
+      privileged: false
+      allowPrivilegeEscalation: false
+      requiredDropCapabilities:
+        - ALL
+      volumes:
+        - 'configMap'
+        - 'emptyDir'
+        - 'projected'
+        - 'secret'
+        - 'downwardAPI'
+        - 'persistentVolumeClaim'
+        - 'csi'
+      hostNetwork: false
+      hostIPC: false
+      hostPID: false
+      runAsUser:
+        rule: 'MustRunAsNonRoot'
+      supplementalGroups:
+        rule: 'MustRunAs'
+        ranges:
+          - min: 1
+            max: 65535
+      fsGroup:
+        rule: 'MustRunAs'
+        ranges:
+          - min: 1
+            max: 65535
+      readOnlyRootFilesystem: false
+      seLinux:
+        rule: 'RunAsAny'
+      seccompProfile:
+        type: RuntimeDefault
+      allowedProcMountTypes:
+        - Default
+
+---
+# Data Governance and Compliance Labels
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-science-governance
+  namespace: data-science
+  labels:
+    compliance.samcloud.online/data-classification: "restricted"
+    compliance.samcloud.online/retention-policy: "7-years"
+    compliance.samcloud.online/backup-required: "true"
+    compliance.samcloud.online/encryption-required: "true"
+    compliance.samcloud.online/audit-logging: "enabled"
+data:
+  governance.yaml: |
+    # Data Science Governance Policy
+    metadata:
+      compliance:
+        frameworks:
+          - "GDPR"
+          - "SOX"
+          - "ISO27001"
+        data_classification: "restricted"
+        retention_policy: "7_years"
+        encryption_at_rest: "required"
+        encryption_in_transit: "required"
+        backup_frequency: "daily"
+        disaster_recovery_rto: "1_hour"
+        disaster_recovery_rpo: "24_hours"
+        audit_logging: "comprehensive"
+        access_control: "rbac_enabled"
+        network_segmentation: "enforced"
+        vulnerability_scanning: "continuous"
+
+    security:
+      authentication:
+        methods: ["oidc", "ldap", "local"]
+        mfa_required: true
+        session_timeout: "1_hour"
+
+      authorization:
+        rbac_enabled: true
+        principle: "least_privilege"
+        resource_scoped: true
+
+      network:
+        policies: "default_deny"
+        tls_version: "1.3"
+        certificate_rotation: "automated"
+
+      monitoring:
+        metrics_collection: "enabled"
+        log_aggregation: "centralized"
+        alerting: "comprehensive"
+        siem_integration: "enabled"
+
+---
+# Backup and Recovery Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-science-backup-policy
+  namespace: data-science
+  labels:
+    velero.io/backup-policy: "production"
+    velero.io/retention-policy: "30-days"
+data:
+  backup-policy.yaml: |
+    # Production Backup Strategy
+    backup:
+      frequency:
+        full_backup: "daily"
+        incremental_backup: "hourly"
+        verification: "weekly"
+
+      retention:
+        daily_backups: "30_days"
+        weekly_backups: "12_weeks"
+        monthly_backups: "12_months"
+        yearly_backups: "7_years"
+
+      storage:
+        primary: "s3_compatible"
+        secondary: "tape_archive"
+        encryption: "aes_256"
+        compression: "zstd"
+
+      testing:
+        recovery_drill: "monthly"
+        integrity_check: "weekly"
+        performance_test: "quarterly"
+
+      sla:
+        rto: "1_hour"       # Recovery Time Objective
+        rpo: "4_hours"      # Recovery Point Objective
+        mttr: "30_minutes"  # Mean Time To Recovery

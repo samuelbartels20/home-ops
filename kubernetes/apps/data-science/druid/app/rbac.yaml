@@ -1,0 +1,271 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-coordinator
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: coordinator
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-broker
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: broker
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-historical
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: historical
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-overlord
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: overlord
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-middlemanager
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: middlemanager
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-router
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: router
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: druid-zookeeper
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    app.kubernetes.io/component: zookeeper
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: druid-coordinator
+  namespace: data-science
+rules:
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["druid-secrets", "druid-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading pods for cluster management
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: druid-overlord
+  namespace: data-science
+rules:
+  # Allow managing pods for task execution
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["druid-secrets", "druid-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: druid-middlemanager
+  namespace: data-science
+rules:
+  # Allow creating pods for task execution
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
+
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["druid-secrets", "druid-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: druid-read-only
+  namespace: data-science
+rules:
+  # Allow reading secrets for configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["druid-secrets", "druid-server-tls"]
+
+  # Allow reading configmaps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading services for discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-coordinator
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-coordinator
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-coordinator
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-overlord
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-overlord
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-overlord
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-middlemanager
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-middlemanager
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-middlemanager
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-broker
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-broker
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-read-only
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-historical
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-historical
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-read-only
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-router
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-router
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-read-only
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: druid-zookeeper
+  namespace: data-science
+subjects:
+  - kind: ServiceAccount
+    name: druid-zookeeper
+    namespace: data-science
+roleRef:
+  kind: Role
+  name: druid-read-only
+  apiGroup: rbac.authorization.k8s.io

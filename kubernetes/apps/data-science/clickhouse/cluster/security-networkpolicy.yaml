@@ -1,0 +1,59 @@
+---
+# Network Security Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-security-netpol
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    security.samcloud.online/level: "restricted"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow only specific traffic patterns
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: data-science
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: superset
+      ports:
+        - protocol: TCP
+          port: 8123
+        - protocol: TCP
+          port: 9440
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9363
+  egress:
+    # Restrict outbound traffic
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: storage
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000 

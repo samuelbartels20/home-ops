@@ -1,0 +1,279 @@
+---
+# Hyperscale Druid Cluster for 15PB/day
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: druid-hyperscale-topology
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid
+    config.druid.io/type: hyperscale
+data:
+  cluster-spec.yaml: |
+    # Druid Hyperscale Architecture for 15PB/day
+    # Total cluster size: ~500 nodes
+
+    # Master tier (coordination and metadata)
+    coordinators:
+      replicas: 5
+      resources:
+        cpu: "8"
+        memory: "32Gi"
+        storage: "1Ti"
+      jvm_heap: "24g"
+      config:
+        druid_coordinator_balancer_strategy: "diskNormalized"
+        druid_coordinator_period: "PT10S"
+        druid_coordinator_startDelay: "PT10S"
+        druid_manager_segments_pollDuration: "PT5S"
+
+    overlords:
+      replicas: 3
+      resources:
+        cpu: "16"
+        memory: "64Gi"
+        storage: "2Ti"
+      jvm_heap: "48g"
+      config:
+        druid_indexer_runner_type: "remote"
+        druid_indexer_runner_capacity: "20"
+        druid_indexer_queue_maxSize: "1000"
+        druid_indexer_queue_startDelay: "PT5S"
+
+    # Query tier (high-performance query processing)
+    brokers:
+      replicas: 50  # Massive parallelization for query load
+      resources:
+        cpu: "32"
+        memory: "128Gi"
+        storage: "500Gi"
+      jvm_heap: "96g"
+      config:
+        druid_processing_buffer_sizeBytes: "2147483648"  # 2GB
+        druid_processing_numMergeBuffers: "16"
+        druid_processing_numThreads: "31"  # CPU count - 1
+        druid_broker_http_numConnections: "100"
+        druid_broker_http_maxQueuedBytes: "50000000"
+        # Aggressive caching for performance
+        druid_broker_cache_useCache: "true"
+        druid_broker_cache_populateCache: "true"
+        druid_broker_cache_sizeInBytes: "10737418240"  # 10GB
+
+    routers:
+      replicas: 10
+      resources:
+        cpu: "16"
+        memory: "32Gi"
+        storage: "200Gi"
+      jvm_heap: "24g"
+      config:
+        druid_router_http_numConnections: "200"
+        druid_router_http_numMaxThreads: "400"
+        druid_server_http_numThreads: "400"
+
+    # Data tier (massive storage and serving)
+    historicals:
+      # Tiered storage approach
+      tier_hot:
+        replicas: 100  # Hot data (last 7 days)
+        resources:
+          cpu: "48"
+          memory: "256Gi"
+          storage: "20Ti"  # NVMe SSD
+        jvm_heap: "192g"
+        config:
+          druid_server_maxSize: "17179869184000"  # 16TB
+          druid_processing_buffer_sizeBytes: "4294967296"  # 4GB
+          druid_processing_numMergeBuffers: "32"
+          druid_processing_numThreads: "47"
+          druid_segmentCache_locations: '[{"path":"/opt/druid/var/druid/segments","maxSize":"17179869184000","freeSpacePercent":0.1}]'
+          druid_server_tier: "hot"
+          druid_server_priority: "100"
+
+      tier_warm:
+        replicas: 200  # Warm data (8-90 days)
+        resources:
+          cpu: "32"
+          memory: "128Gi"
+          storage: "50Ti"  # High-performance SSD
+        jvm_heap: "96g"
+        config:
+          druid_server_maxSize: "42949672960000"  # 40TB
+          druid_processing_buffer_sizeBytes: "2147483648"  # 2GB
+          druid_processing_numMergeBuffers: "16"
+          druid_processing_numThreads: "31"
+          druid_server_tier: "warm"
+          druid_server_priority: "75"
+
+      tier_cold:
+        replicas: 100  # Cold data (91+ days)
+        resources:
+          cpu: "16"
+          memory: "64Gi"
+          storage: "100Ti"  # Regular SSD/HDD
+        jvm_heap: "48g"
+        config:
+          druid_server_maxSize: "85899345920000"  # 80TB
+          druid_processing_buffer_sizeBytes: "1073741824"  # 1GB
+          druid_processing_numMergeBuffers: "8"
+          druid_processing_numThreads: "15"
+          druid_server_tier: "cold"
+          druid_server_priority: "50"
+
+    # Ingestion tier (handling 15PB/day)
+    middlemanagers:
+      replicas: 50
+      resources:
+        cpu: "32"
+        memory: "128Gi"
+        storage: "10Ti"
+      jvm_heap: "96g"
+      worker_capacity: "20"  # 1000 total workers (50 × 20)
+      config:
+        druid_worker_capacity: "20"
+        druid_indexer_runner_javaOptsArray: '["-server", "-Xmx8g", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=100", "-XX:+ExitOnOutOfMemoryError"]'
+        druid_indexer_task_baseTaskDir: "/opt/druid/var/druid/task"
+        druid_indexer_task_defaultHadoopCoordinates: '["org.apache.hadoop:hadoop-client-api:3.3.4"]'
+        # Peon resource allocation
+        druid_indexer_runner_javaOpts: "-server -Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=100"
+
+    # High-performance ZooKeeper cluster
+    zookeeper:
+      replicas: 7  # Large ensemble for reliability
+      resources:
+        cpu: "8"
+        memory: "16Gi"
+        storage: "2Ti"
+      config:
+        ZOO_TICK_TIME: "2000"
+        ZOO_INIT_LIMIT: "10"
+        ZOO_SYNC_LIMIT: "5"
+        ZOO_MAX_CLIENT_CNXNS: "1000"
+        ZOO_AUTOPURGE_PURGEINTERVAL: "1"
+        ZOO_AUTOPURGE_SNAPRETAINCOUNT: "10"
+        # Performance tuning
+        ZOO_MAX_SESSION_TIMEOUT: "60000"
+        ZOO_MIN_SESSION_TIMEOUT: "4000"
+
+  # Deep storage configuration for petabyte scale
+  storage-config.yaml: |
+    # Multi-tier deep storage strategy
+    deep_storage:
+      # Primary: High-performance object storage
+      primary:
+        type: "s3"
+        bucket: "druid-deep-storage-primary"
+        baseKey: "segments"
+        storageClass: "INTELLIGENT_TIERING"
+        multipartUploadThreshold: "1GB"
+        maxConcurrentUploads: "100"
+
+      # Secondary: Archive storage for long-term retention
+      archive:
+        type: "s3"
+        bucket: "druid-deep-storage-archive"
+        baseKey: "segments"
+        storageClass: "GLACIER_FLEXIBLE_RETRIEVAL"
+        lifecycle_rules:
+          - transition_to_glacier_after: "90_days"
+          - transition_to_deep_archive_after: "365_days"
+          - delete_after: "2555_days"  # 7 years
+
+    # Cache configuration for performance
+    cache_config:
+      # L1 Cache: In-memory (Redis Cluster)
+      l1_cache:
+        type: "redis"
+        cluster_nodes:
+          - "redis-cluster-0.redis.svc.cluster.local:6379"
+          - "redis-cluster-1.redis.svc.cluster.local:6379"
+          - "redis-cluster-2.redis.svc.cluster.local:6379"
+          - "redis-cluster-3.redis.svc.cluster.local:6379"
+          - "redis-cluster-4.redis.svc.cluster.local:6379"
+          - "redis-cluster-5.redis.svc.cluster.local:6379"
+        maxTotalConnections: "1000"
+        maxIdleConnections: "100"
+        timeout: "5000"
+        database: "1"
+
+      # L2 Cache: SSD-based local cache
+      l2_cache:
+        type: "local"
+        sizeInBytes: "53687091200"  # 50GB per node
+        maxObjectSize: "1073741824"  # 1GB max object
+
+  # Ingestion optimization for 15PB/day
+  ingestion-config.yaml: |
+    # Kafka ingestion configuration
+    kafka_ingestion:
+      # Multiple Kafka clusters for geographic distribution
+      clusters:
+        us_east:
+          brokers: "kafka-us-east.kafka.svc.cluster.local:9092"
+          topics: ["events_us_east", "metrics_us_east"]
+          consumer_groups: ["druid_us_east_1", "druid_us_east_2"]
+          partitions: 1000  # High parallelization
+
+        us_west:
+          brokers: "kafka-us-west.kafka.svc.cluster.local:9092"
+          topics: ["events_us_west", "metrics_us_west"]
+          consumer_groups: ["druid_us_west_1", "druid_us_west_2"]
+          partitions: 1000
+
+        eu:
+          brokers: "kafka-eu.kafka.svc.cluster.local:9092"
+          topics: ["events_eu", "metrics_eu"]
+          consumer_groups: ["druid_eu_1", "druid_eu_2"]
+          partitions: 1000
+
+      # Ingestion optimization
+      ingestion_spec:
+        maxRowsInMemory: 1000000
+        maxBytesInMemory: 536870912  # 512MB
+        skipEmptyBuckets: true
+        reportParseExceptions: false
+        maxParseExceptions: 1000
+        maxSavedParseExceptions: 100
+
+        # Parallel processing
+        maxNumConcurrentSubTasks: 20
+        maxRetry: 3
+        taskStatusCheckPeriodMs: 1000
+        chatHandlerTimeout: "PT30S"
+        httpTimeout: "PT30S"
+
+    # Batch ingestion for historical data
+    batch_ingestion:
+      # Spark integration for large batch jobs
+      spark_config:
+        spark_master: "k8s://https://kubernetes.default.svc:443"
+        executor_instances: "500"
+        executor_cores: "8"
+        executor_memory: "32g"
+        driver_memory: "16g"
+
+      # Hadoop integration for data lake access
+      hadoop_config:
+        fs_defaultFS: "hdfs://hadoop-cluster.storage.svc.cluster.local:8020"
+        dfs_replication: "3"
+        mapreduce_job_reduces: "1000"
+
+    # Real-time tuning parameters
+    realtime_config:
+      # Window periods for real-time ingestion
+      windowPeriod: "PT10M"
+      basePersistDirectory: "/opt/druid/var/druid/realtime"
+      maxPendingPersists: 10
+
+      # Query granularities
+      queryGranularity: "minute"
+      segmentGranularity: "hour"
+
+      # Rollup configuration
+      rollup: true
+      metricsSpec:
+        - type: "count"
+          name: "count"
+        - type: "longSum"
+          name: "total_events"
+          fieldName: "events"

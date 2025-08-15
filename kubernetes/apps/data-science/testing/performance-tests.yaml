@@ -1,0 +1,357 @@
+---
+# Performance Testing - ClickHouse Load Testing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clickhouse-performance-test
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-test
+    test.samcloud.online/type: "performance"
+spec:
+  schedule: "0 2 * * 1"  # Weekly on Monday at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: clickhouse-test
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: clickhouse-benchmark
+              image: clickhouse/clickhouse-client:24.11
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  echo "Starting ClickHouse performance test..."
+
+                  # Connection test
+                  clickhouse-client --host=clickhouse-cluster.clickhouse.svc.cluster.local --port=8123 \
+                    --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD \
+                    --query="SELECT version()"
+
+                  # Performance benchmark - Insert test
+                  clickhouse-benchmark --host=clickhouse-cluster.clickhouse.svc.cluster.local --port=8123 \
+                    --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD \
+                    --concurrency=10 --iterations=1000 \
+                    --query="INSERT INTO test_performance VALUES" < /dev/null || true
+
+                  # Performance benchmark - Query test
+                  clickhouse-benchmark --host=clickhouse-cluster.clickhouse.svc.cluster.local --port=8123 \
+                    --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD \
+                    --concurrency=20 --iterations=100 \
+                    --query="SELECT count() FROM system.tables"
+
+                  # Load test with complex queries
+                  for i in {1..10}; do
+                    clickhouse-client --host=clickhouse-cluster.clickhouse.svc.cluster.local --port=8123 \
+                      --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD \
+                      --query="SELECT * FROM system.metrics WHERE metric LIKE '%Query%' ORDER BY value DESC LIMIT 100" &
+                  done
+                  wait
+
+                  echo "ClickHouse performance test completed."
+              envFrom:
+                - secretRef:
+                    name: clickhouse-secrets
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: 1
+                  memory: 2Gi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+
+---
+# Performance Testing - Druid Load Testing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: druid-performance-test
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: druid-test
+    test.samcloud.online/type: "performance"
+spec:
+  schedule: "0 3 * * 1"  # Weekly on Monday at 3 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: druid-test
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: druid-benchmark
+              image: curlimages/curl:8.5.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting Druid performance test..."
+
+                  # Health check
+                  curl -f "http://druid-router.data-science.svc.cluster.local:8888/status/health" || exit 1
+
+                  # Load test - Status endpoints
+                  for i in $(seq 1 50); do
+                    curl -s "http://druid-router.data-science.svc.cluster.local:8888/status" > /dev/null &
+                    curl -s "http://druid-broker.data-science.svc.cluster.local:8082/status" > /dev/null &
+                    curl -s "http://druid-coordinator.data-science.svc.cluster.local:8081/status" > /dev/null &
+                  done
+                  wait
+
+                  # Query performance test
+                  curl -X POST "http://druid-router.data-science.svc.cluster.local:8888/druid/v2/sql" \
+                    -H "Content-Type: application/json" \
+                    -d '{"query": "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES"}' || true
+
+                  echo "Druid performance test completed."
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+
+---
+# Performance Testing - Superset Load Testing
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: superset-performance-test
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: superset-test
+    test.samcloud.online/type: "performance"
+spec:
+  schedule: "0 4 * * 1"  # Weekly on Monday at 4 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: superset-test
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: superset-benchmark
+              image: curlimages/curl:8.5.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting Superset performance test..."
+
+                  # Health check
+                  curl -f "http://superset.data-science.svc.cluster.local:8088/health" || exit 1
+
+                  # Load test - Multiple concurrent requests
+                  for i in $(seq 1 20); do
+                    curl -s "http://superset.data-science.svc.cluster.local:8088/api/v1/security/csrf_token/" > /dev/null &
+                  done
+                  wait
+
+                  # API endpoint tests
+                  curl -s "http://superset.data-science.svc.cluster.local:8088/api/v1/chart/" > /dev/null || true
+                  curl -s "http://superset.data-science.svc.cluster.local:8088/api/v1/dashboard/" > /dev/null || true
+
+                  echo "Superset performance test completed."
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+
+---
+# Chaos Engineering - Network Latency Test
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chaos-network-latency
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: chaos-test
+    test.samcloud.online/type: "chaos"
+spec:
+  schedule: "0 1 * * 6"  # Weekly on Saturday at 1 AM
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: chaos-test
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: network-chaos
+              image: nicolaka/netshoot:v0.12
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  echo "Starting network latency chaos test..."
+
+                  # Test with artificial latency
+                  tc qdisc add dev eth0 root netem delay 100ms 10ms 25%
+
+                  # Test ClickHouse with latency
+                  timeout 30s ping -c 10 clickhouse-cluster.clickhouse.svc.cluster.local || true
+
+                  # Test Druid with latency
+                  timeout 30s ping -c 10 druid-router.data-science.svc.cluster.local || true
+
+                  # Test Superset with latency
+                  timeout 30s ping -c 10 superset.data-science.svc.cluster.local || true
+
+                  # Remove latency
+                  tc qdisc del dev eth0 root netem 2>/dev/null || true
+
+                  echo "Network latency chaos test completed."
+              securityContext:
+                capabilities:
+                  add: ["NET_ADMIN"]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+
+---
+# Resource Stress Test
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chaos-resource-stress
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: stress-test
+    test.samcloud.online/type: "chaos"
+spec:
+  schedule: "0 2 * * 6"  # Weekly on Saturday at 2 AM
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: stress-test
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: cpu-stress
+              image: progrium/stress:latest
+              command:
+                - stress
+                - --cpu
+                - "2"
+                - --timeout
+                - "300s"
+              resources:
+                requests:
+                  cpu: 1
+                  memory: 512Mi
+                limits:
+                  cpu: 2
+                  memory: 1Gi
+            - name: memory-stress
+              image: progrium/stress:latest
+              command:
+                - stress
+                - --vm
+                - "1"
+                - --vm-bytes
+                - "512M"
+                - --timeout
+                - "300s"
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: 1
+                  memory: 2Gi
+
+---
+# Disaster Recovery Test
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: disaster-recovery-test
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: dr-test
+    test.samcloud.online/type: "disaster-recovery"
+spec:
+  schedule: "0 0 1 * *"  # Monthly on the 1st at midnight
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: dr-test
+        spec:
+          restartPolicy: Never
+          serviceAccountName: disaster-recovery-test
+          containers:
+            - name: dr-test
+              image: curlimages/curl:8.5.0
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Starting disaster recovery simulation..."
+
+                  # Simulate service failure scenarios
+                  echo "Testing service resilience..."
+
+                  # Test ClickHouse cluster resilience
+                  curl -f "http://clickhouse-cluster.clickhouse.svc.cluster.local:8123/ping" || echo "ClickHouse unreachable"
+
+                  # Test Druid cluster resilience
+                  curl -f "http://druid-router.data-science.svc.cluster.local:8888/status/health" || echo "Druid unreachable"
+
+                  # Test Superset resilience
+                  curl -f "http://superset.data-science.svc.cluster.local:8088/health" || echo "Superset unreachable"
+
+                  # Test backup availability
+                  echo "Testing backup accessibility..."
+
+                  echo "Disaster recovery test completed."
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi

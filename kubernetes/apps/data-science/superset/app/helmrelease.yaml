@@ -1,0 +1,524 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: superset
+  namespace: data-science
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: superset
+      version: 0.12.11
+      sourceRef:
+        kind: HelmRepository
+        name: superset
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  dependsOn:
+    - name: cloudnative-pg
+      namespace: storage
+    - name: dragonfly
+      namespace: storage
+    - name: clickhouse-cluster
+      namespace: clickhouse
+    - name: druid
+      namespace: data-science
+  values:
+    # Production deployment configuration
+    replicaCount: 3
+
+    # Superset node configuration
+    supersetNode:
+      replicaCount: 3
+
+      # Container configuration
+      image:
+        repository: apache/superset
+        tag: 3.1.0
+        pullPolicy: IfNotPresent
+
+      # Resource configuration for production workloads
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+          ephemeral-storage: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+          ephemeral-storage: 2Gi
+
+      # Pod disruption budget for high availability
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 2
+
+      # Anti-affinity for distributed deployment
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values: ["superset"]
+                topologyKey: kubernetes.io/hostname
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values: ["superset"]
+                topologyKey: topology.kubernetes.io/zone
+
+      # Health checks
+      livenessProbe:
+        enabled: true
+        httpGet:
+          path: /health
+          port: http
+          scheme: HTTP
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 10
+        failureThreshold: 3
+        successThreshold: 1
+
+      readinessProbe:
+        enabled: true
+        httpGet:
+          path: /health
+          port: http
+          scheme: HTTP
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+
+      startupProbe:
+        enabled: true
+        httpGet:
+          path: /health
+          port: http
+          scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+
+      # Security context
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false  # Superset needs write access for temp files
+        capabilities:
+          drop: ["ALL"]
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+      # Pod security context
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Environment variables from secrets
+      env:
+        SUPERSET_ENV: "production"
+        SUPERSET_LOAD_EXAMPLES: "no"
+        CYPRESS_CONFIG: "false"
+        SUPERSET_PORT: "8088"
+
+        # Performance optimization
+        GUNICORN_WORKERS: "4"
+        GUNICORN_WORKER_CLASS: "gevent"
+        GUNICORN_WORKER_CONNECTIONS: "1000"
+        GUNICORN_TIMEOUT: "300"
+        GUNICORN_KEEPALIVE: "2"
+        GUNICORN_MAX_REQUESTS: "1000"
+        GUNICORN_MAX_REQUESTS_JITTER: "100"
+
+        # Python optimization
+        PYTHONPATH: "/app/pythonpath:/app/docker/pythonpath_dev"
+        FLASK_ENV: "production"
+
+      envFrom:
+        - secretRef:
+            name: superset-secrets
+
+    # Superset worker configuration for background tasks
+    supersetWorker:
+      enabled: true
+      replicaCount: 2
+
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+
+      # Celery configuration
+      command:
+        - "/bin/sh"
+        - "-c"
+        - ". {{ .Values.configMountPath }}/superset_bootstrap.sh; celery --app=superset.tasks.celery_app:app worker"
+
+      env:
+        SUPERSET_ENV: "production"
+
+      envFrom:
+        - secretRef:
+            name: superset-secrets
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          drop: ["ALL"]
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+    # Celery beat scheduler for periodic tasks
+    supersetCeleryBeat:
+      enabled: true
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 200m
+          memory: 512Mi
+
+      command:
+        - "/bin/sh"
+        - "-c"
+        - ". {{ .Values.configMountPath }}/superset_bootstrap.sh; celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid"
+
+      env:
+        SUPERSET_ENV: "production"
+
+      envFrom:
+        - secretRef:
+            name: superset-secrets
+
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: false
+        capabilities:
+          drop: ["ALL"]
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+    # Production database configuration (external PostgreSQL)
+    postgresql:
+      enabled: false
+
+    # Production Redis configuration (external Dragonfly)
+    redis:
+      enabled: false
+
+    # Superset configuration overrides
+    configOverrides:
+      # Feature flags for production
+      feature_flags: |
+        FEATURE_FLAGS = {
+            "DASHBOARD_NATIVE_FILTERS": True,
+            "DASHBOARD_CROSS_FILTERS": True,
+            "DASHBOARD_RBAC": True,
+            "ENABLE_TEMPLATE_PROCESSING": True,
+            "GENERIC_CHART_AXES": True,
+            "DASHBOARD_CACHE": True,
+            "REMOVE_SLICE_LEVEL_LABEL_COLORS": True,
+            "SIP_38_VIZ_REARCHITECTURE": True,
+            "TAGGING_SYSTEM": True,
+            "ENABLE_ADVANCED_DATA_TYPES": True,
+            "DRILL_TO_DETAIL": True,
+            "DRILL_BY": True,
+            "HORIZONTAL_FILTER_BAR": True,
+            "ALERT_REPORTS": True,
+            "DYNAMIC_PLUGINS": True,
+            "ESCAPE_MARKDOWN_HTML": True,
+            "ENABLE_EXPLORE_DRAG_AND_DROP": True
+        }
+
+      # Security configuration
+      security_config: |
+        import os
+        from flask_appbuilder.security.manager import AUTH_LDAP, AUTH_OAUTH
+
+        # Security settings
+        SECRET_KEY = os.environ.get('SECRET_KEY')
+        WTF_CSRF_ENABLED = True
+        WTF_CSRF_TIME_LIMIT = 3600
+
+        # Session configuration
+        PERMANENT_SESSION_LIFETIME = 3600
+        SESSION_COOKIE_SECURE = True
+        SESSION_COOKIE_HTTPONLY = True
+        SESSION_COOKIE_SAMESITE = 'Lax'
+
+        # Content Security Policy
+        TALISMAN_ENABLED = True
+        TALISMAN_CONFIG = {
+            'content_security_policy': {
+                'default-src': "'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+                'script-src': "'self' 'unsafe-inline' 'unsafe-eval'",
+                'style-src': "'self' 'unsafe-inline'",
+                'img-src': "'self' data: blob:",
+            }
+        }
+
+      # Database connections configuration
+      database_connections: |
+        import os
+        from celery import Celery
+
+        # PostgreSQL connection (for metadata)
+        SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+
+        # ClickHouse connection
+        CLICKHOUSE_CONFIG = {
+            'host': os.environ.get('CLICKHOUSE_HOST'),
+            'port': int(os.environ.get('CLICKHOUSE_PORT')),
+            'user': os.environ.get('CLICKHOUSE_USER'),
+            'password': os.environ.get('CLICKHOUSE_PASSWORD'),
+            'database': os.environ.get('CLICKHOUSE_DATABASE')
+        }
+
+        # Druid connection
+        DRUID_CONFIG = {
+            'host': os.environ.get('DRUID_HOST'),
+            'port': int(os.environ.get('DRUID_PORT')),
+            'user': os.environ.get('DRUID_USER'),
+            'password': os.environ.get('DRUID_PASSWORD')
+        }
+
+      # Cache configuration
+      cache_config: |
+        import os
+
+        # Redis cache configuration
+        CACHE_CONFIG = {
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_DEFAULT_TIMEOUT': 300,
+            'CACHE_KEY_PREFIX': 'superset_',
+            'CACHE_REDIS_HOST': os.environ.get('REDIS_HOST'),
+            'CACHE_REDIS_PORT': int(os.environ.get('REDIS_PORT')),
+            'CACHE_REDIS_DB': int(os.environ.get('REDIS_DB_CACHE')),
+            'CACHE_REDIS_PASSWORD': os.environ.get('REDIS_PASSWORD')
+        }
+
+        # Data cache configuration
+        DATA_CACHE_CONFIG = {
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_DEFAULT_TIMEOUT': 86400,  # 24 hours
+            'CACHE_KEY_PREFIX': 'superset_data_',
+            'CACHE_REDIS_HOST': os.environ.get('REDIS_HOST'),
+            'CACHE_REDIS_PORT': int(os.environ.get('REDIS_PORT')),
+            'CACHE_REDIS_DB': int(os.environ.get('REDIS_DB_CACHE')),
+            'CACHE_REDIS_PASSWORD': os.environ.get('REDIS_PASSWORD')
+        }
+
+      # Celery configuration
+      celery_config: |
+        import os
+
+        # Celery configuration for background tasks
+        class CeleryConfig:
+            broker_url = os.environ.get('REDIS_URL')
+            result_backend = os.environ.get('REDIS_URL')
+            task_serializer = 'json'
+            result_serializer = 'json'
+            accept_content = ['json']
+            result_expires = 3600
+            timezone = 'UTC'
+
+            # Task routing
+            task_routes = {
+                'sql_lab.get_sql_results': {'queue': 'sql_lab'},
+                'cache-warmup': {'queue': 'cache'},
+                'email_reports.send': {'queue': 'reports'},
+                'alerts.run_alert': {'queue': 'alerts'},
+            }
+
+            # Worker configuration
+            worker_prefetch_multiplier = 1
+            task_acks_late = True
+            worker_max_tasks_per_child = 1000
+
+        CELERY_CONFIG = CeleryConfig
+
+      # Email configuration for alerts
+      email_config: |
+        import os
+
+        # SMTP configuration
+        SMTP_HOST = os.environ.get('SMTP_HOST')
+        SMTP_PORT = int(os.environ.get('SMTP_PORT'))
+        SMTP_STARTTLS = os.environ.get('SMTP_STARTTLS', 'false').lower() == 'true'
+        SMTP_SSL = os.environ.get('SMTP_SSL', 'false').lower() == 'true'
+        SMTP_USER = os.environ.get('SMTP_USER')
+        SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+        SMTP_MAIL_FROM = os.environ.get('SMTP_MAIL_FROM')
+
+        # Alert and report configuration
+        ENABLE_ALERTS = True
+        ALERT_REPORTS_NOTIFICATION_DRY_RUN = False
+        WEBDRIVER_BASEURL = "http://superset.data-science.svc.cluster.local:8088"
+
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 8088
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8088"
+        prometheus.io/path: "/metrics"
+
+    # Ingress configuration
+    ingress:
+      enabled: true
+      className: external
+      annotations:
+        # External access via reverse proxy
+        external-dns.alpha.kubernetes.io/target: "external.samcloud.online"
+
+        # TLS and security
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+        # Authentication via Authelia
+        nginx.ingress.kubernetes.io/auth-url: "http://authelia.security.svc.cluster.local/api/verify"
+        nginx.ingress.kubernetes.io/auth-signin: "https://auth.samcloud.online"
+        nginx.ingress.kubernetes.io/auth-response-headers: "Remote-User,Remote-Name,Remote-Email,Remote-Groups"
+
+        # Rate limiting
+        nginx.ingress.kubernetes.io/rate-limit: "100"
+        nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+
+        # Proxy settings
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+        nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+
+        # Security headers
+        nginx.ingress.kubernetes.io/server-snippet: |
+          add_header X-Frame-Options "SAMEORIGIN" always;
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header X-XSS-Protection "1; mode=block" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+      hosts:
+        - host: &host "superset.samcloud.online"
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - hosts:
+            - *host
+          secretName: superset-server-tls
+
+    # Persistence for logs and uploads
+    persistence:
+      enabled: true
+      storageClass: ceph-filesystem
+      size: 20Gi
+      accessModes:
+        - ReadWriteMany
+
+    # Initialize default admin user
+    init:
+      enabled: true
+      createAdmin: true
+      adminUser:
+        username: admin
+        firstname: Super
+        lastname: Admin
+        email: admin@samcloud.online
+        password: admin123!
+
+      # Initialize sample data and databases
+      initscript: |
+        #!/bin/bash
+        set -e
+
+        echo "Initializing Superset..."
+
+        # Upgrade database
+        superset db upgrade
+
+        # Create admin user
+        superset fab create-admin \
+          --username "${ADMIN_USERNAME}" \
+          --firstname "${ADMIN_FIRSTNAME}" \
+          --lastname "${ADMIN_LASTNAME}" \
+          --email "${ADMIN_EMAIL}" \
+          --password "${ADMIN_PASSWORD}"
+
+        # Initialize roles and permissions
+        superset init
+
+        # Create ClickHouse database connection
+        echo "Creating ClickHouse database connection..."
+        superset set_database_uri \
+          --database_name "ClickHouse Production" \
+          --uri "${CLICKHOUSE_URL}"
+
+        # Create Druid database connection
+        echo "Creating Druid database connection..."
+        superset set_database_uri \
+          --database_name "Druid Analytics" \
+          --uri "${DRUID_URL}"
+
+        echo "Superset initialization completed!"
+
+    # ServiceMonitor for Prometheus monitoring
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        release: prometheus-operator
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'superset_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: component
+          replacement: 'superset'
+
+    # Pod annotations
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8088"
+      prometheus.io/path: "/metrics"
+
+      # Backup annotations
+      backup.velero.io/backup-volumes: "superset-storage"
+
+      # Security annotations
+      container.apparmor.security.beta.kubernetes.io/superset: "runtime/default"

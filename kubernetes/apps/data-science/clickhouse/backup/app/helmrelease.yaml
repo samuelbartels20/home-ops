@@ -1,0 +1,195 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: clickhouse-backup
+  namespace: clickhouse
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: app-template
+      version: 4.1.1
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    controllers:
+      clickhouse-backup:
+        type: deployment
+        replicas: 1
+        strategy: Recreate
+
+        containers:
+          app:
+            image:
+              repository: altinity/clickhouse-backup
+              tag: 2.4.25
+              pullPolicy: IfNotPresent
+
+            env:
+              # ClickHouse connection settings
+              CLICKHOUSE_HOST: "clickhouse-cluster.clickhouse.svc.cluster.local"
+              CLICKHOUSE_PORT: "9000"
+              CLICKHOUSE_USERNAME: "backup"
+              CLICKHOUSE_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: clickhouse-secrets
+                    key: backup_password
+
+              # S3 backup configuration
+              S3_ENDPOINT: "http://minio.storage.svc.cluster.local:9000"
+              S3_BUCKET: "clickhouse-backups"
+              S3_ACCESS_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: clickhouse-secrets
+                    key: s3_access_key
+              S3_SECRET_KEY:
+                valueFrom:
+                  secretKeyRef:
+                    name: clickhouse-secrets
+                    key: s3_secret_key
+              S3_DISABLE_SSL: "true"  # Internal MinIO doesn't use SSL
+              S3_FORCE_PATH_STYLE: "true"
+
+              # Backup configuration
+              BACKUP_COMPRESSION_FORMAT: "zstd"
+              BACKUP_COMPRESSION_LEVEL: "3"
+              BACKUP_RETENTION_DAYS: "30"
+              BACKUP_SCHEDULE: "0 2 * * *"  # Daily at 2 AM
+
+              # API server settings
+              API_LISTEN: "0.0.0.0:7171"
+              API_ENABLE_METRICS: "true"
+              API_ENABLE_PPROF: "false"
+
+              # Log level
+              LOG_LEVEL: "info"
+
+              # Remote storage options
+              REMOTE_STORAGE: "s3"
+              DISABLE_PROGRESS_BAR: "true"
+
+              # Backup strategy
+              BACKUP_SHARDED_OPERATION: "true"
+              BACKUP_PARALLEL_OPERATION: "true"
+              BACKUP_SKIP_TABLES: "system.*"
+
+            command:
+              - /bin/clickhouse-backup
+              - server
+
+            probes:
+              liveness: &probes
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /metrics
+                    port: &port 7171
+                  initialDelaySeconds: 30
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+              readiness: *probes
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /metrics
+                    port: *port
+                  initialDelaySeconds: 10
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 30
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]
+              runAsNonRoot: true
+              runAsUser: 65534
+              runAsGroup: 65534
+
+    service:
+      app:
+        controller: clickhouse-backup
+        ports:
+          http:
+            port: *port
+            protocol: TCP
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "7171"
+          prometheus.io/path: "/metrics"
+
+    serviceMonitor:
+      app:
+        serviceName: clickhouse-backup
+        endpoints:
+          - port: http
+            scheme: http
+            path: /metrics
+            interval: 30s
+            scrapeTimeout: 10s
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: clickhouse-backup
+
+    persistence:
+      config:
+        enabled: true
+        type: emptyDir
+        globalMounts:
+          - path: /etc/clickhouse-backup
+
+      tmp:
+        enabled: true
+        type: emptyDir
+        globalMounts:
+          - path: /tmp
+
+      backup-cache:
+        enabled: true
+        type: persistentVolumeClaim
+        size: 50Gi
+        storageClass: ceph-block
+        accessMode: ReadWriteOnce
+        globalMounts:
+          - path: /var/lib/clickhouse-backup
+
+    # Pod security context
+    defaultPodOptions:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7171"
+        prometheus.io/path: "/metrics"

@@ -1,0 +1,34 @@
+---
+# Security Context for ClickHouse Pods
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-security-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    security.samcloud.online/level: "restricted"
+data:
+  security-context.yaml: |
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      fsGroup: 101
+      supplementalGroups: [101]
+      capabilities:
+        drop: ["ALL"]
+        add: ["SYS_NICE"]
+      seccompProfile:
+        type: RuntimeDefault
+      seLinuxOptions:
+        level: "s0:c123,c456"
+      sysctls:
+        - name: net.core.somaxconn
+          value: "65535"
+        - name: vm.max_map_count
+          value: "262144"
+        - name: fs.file-max
+          value: "2097152" 

@@ -1,0 +1,539 @@
+---
+# Enhanced Observability for ClickHouse - Production Grade
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clickhouse-enhanced-monitoring
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    release: prometheus-operator
+    monitoring.samcloud.online/level: "enhanced"
+    observability.samcloud.online/type: "database"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+  endpoints:
+    # Basic metrics endpoint
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scheme: http
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'clickhouse_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: cluster
+          replacement: 'production'
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_node_name]
+          targetLabel: node
+    
+    # System metrics endpoint
+    - port: http
+      interval: 30s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.metrics FORMAT Prometheus']
+      scrapeTimeout: 15s
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'ClickHouse.*'
+          action: keep
+    
+    # Asynchronous metrics endpoint
+    - port: http
+      interval: 60s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.asynchronous_metrics FORMAT Prometheus']
+      scrapeTimeout: 20s
+    
+    # Events endpoint
+    - port: http
+      interval: 30s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.events FORMAT Prometheus']
+      scrapeTimeout: 15s
+    
+    # Parts endpoint for storage monitoring
+    - port: http
+      interval: 60s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.parts FORMAT Prometheus']
+      scrapeTimeout: 30s
+    
+    # Replicas endpoint for replication monitoring
+    - port: http
+      interval: 30s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.replicas FORMAT Prometheus']
+      scrapeTimeout: 15s
+    
+    # Query log endpoint for performance monitoring
+    - port: http
+      interval: 60s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.query_log WHERE type = 2 FORMAT Prometheus']
+      scrapeTimeout: 30s
+    
+    # Merge tree metrics endpoint
+    - port: http
+      interval: 120s
+      path: /
+      scheme: http
+      params:
+        query: ['SELECT * FROM system.merge_tree_settings FORMAT Prometheus']
+      scrapeTimeout: 45s
+---
+# Enhanced Prometheus Rules for ClickHouse
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: clickhouse-enhanced-alerts
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    release: prometheus-operator
+    alerting.samcloud.online/level: "enhanced"
+    observability.samcloud.online/type: "database"
+spec:
+  groups:
+    - name: clickhouse.cluster.health
+      interval: 30s
+      rules:
+        # Cluster health alerts
+        - alert: ClickHouseClusterDown
+          expr: up{job="clickhouse"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse cluster is down"
+            description: "ClickHouse cluster {{ $labels.instance }} has been down for more than 1 minute"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/cluster-down"
+        
+        - alert: ClickHouseReplicaLag
+          expr: clickhouse_replicas_max_absolute_delay > 300
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse replica lag is high"
+            description: "Replica lag is {{ $value }} seconds for {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/replica-lag"
+        
+        - alert: ClickHouseTooManyConnections
+          expr: clickhouse_connections_current > 800
+          for: 2m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "Too many connections to ClickHouse"
+            description: "{{ $value }} connections to {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/too-many-connections"
+    
+    - name: clickhouse.performance
+      interval: 30s
+      rules:
+        # Performance alerts
+        - alert: ClickHouseSlowQueries
+          expr: rate(clickhouse_query_duration_seconds_sum[5m]) / rate(clickhouse_query_duration_seconds_count[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse queries are slow"
+            description: "Average query duration is {{ $value }} seconds on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/slow-queries"
+        
+        - alert: ClickHouseHighMemoryUsage
+          expr: (clickhouse_memory_usage / clickhouse_memory_limit) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse memory usage is high"
+            description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/high-memory-usage"
+        
+        - alert: ClickHouseDiskSpaceLow
+          expr: (clickhouse_disk_usage / clickhouse_disk_total) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse disk space is low"
+            description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/disk-space-low"
+    
+    - name: clickhouse.storage
+      interval: 30s
+      rules:
+        # Storage alerts
+        - alert: ClickHouseTooManyParts
+          expr: clickhouse_parts_total > 10000
+          for: 10m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "Too many parts in ClickHouse"
+            description: "{{ $value }} parts on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/too-many-parts"
+        
+        - alert: ClickHouseMergeQueueBacklog
+          expr: clickhouse_merge_queue_size > 100
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse merge queue has backlog"
+            description: "{{ $value }} merges in queue on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/merge-queue-backlog"
+    
+    - name: clickhouse.errors
+      interval: 30s
+      rules:
+        # Error alerts
+        - alert: ClickHouseTooManyErrors
+          expr: rate(clickhouse_errors_total[5m]) > 10
+          for: 2m
+          labels:
+            severity: critical
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "Too many ClickHouse errors"
+            description: "{{ $value }} errors per second on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/too-many-errors"
+        
+        - alert: ClickHouseReplicationErrors
+          expr: rate(clickhouse_replication_errors_total[5m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+            team: data-platform
+            service: clickhouse
+          annotations:
+            summary: "ClickHouse replication errors detected"
+            description: "{{ $value }} replication errors per second on {{ $labels.instance }}"
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/replication-errors"
+---
+# Enhanced Pod Monitor for detailed metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clickhouse-pod-monitor
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    release: prometheus-operator
+    monitoring.samcloud.online/level: "enhanced"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_node_name]
+          targetLabel: node
+---
+# OpenTelemetry Collector for ClickHouse
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: clickhouse-otel-collector
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    observability.samcloud.online/type: "database"
+spec:
+  mode: DaemonSet
+  serviceAccount: clickhouse-service-account
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 1500
+      resource:
+        attributes:
+          - key: service.name
+            value: "clickhouse"
+            action: upsert
+          - key: service.namespace
+            value: "data-science"
+            action: upsert
+    
+    exporters:
+      otlp:
+        endpoint: "tempo.observability.svc.cluster.local:4317"
+        tls:
+          insecure: true
+      logging:
+        loglevel: debug
+    
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch, memory_limiter, resource]
+          exporters: [otlp, logging]
+        metrics:
+          receivers: [otlp]
+          processors: [batch, memory_limiter, resource]
+          exporters: [otlp, logging]
+        logs:
+          receivers: [otlp]
+          processors: [batch, memory_limiter, resource]
+          exporters: [otlp, logging]
+---
+# Fluent Bit configuration for ClickHouse logs
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-fluentbit-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    observability.samcloud.online/type: "logging"
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        1
+        Log_Level    info
+        Parsers_File parsers.conf
+        HTTP_Server  On
+        HTTP_Listen  0.0.0.0
+        HTTP_Port    2020
+
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/clickhouse-*.log
+        Parser            docker
+        DB                /var/log/flb_kube.db
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+        Mem_Buf_Limit     5MB
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL           https://kubernetes.default.svc:443
+        Kube_CA_Path       /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_Path    /var/run/secrets/kubernetes.io/serviceaccount/token
+        Merge_Log          On
+        Merge_Log_Key      log_processed
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+
+    [FILTER]
+        Name                modify
+        Match               kube.*
+        Add                 service_name clickhouse
+        Add                 environment production
+        Add                 data_classification restricted
+
+    [OUTPUT]
+        Name                es
+        Match               kube.*
+        Host                elasticsearch.observability.svc.cluster.local
+        Port                9200
+        Index               clickhouse-logs
+        Type                _doc
+        Generate_ID         On
+        Suppress_Type_Name  On
+        tls                 On
+        tls.verify          Off
+
+    [OUTPUT]
+        Name                loki
+        Match               kube.*
+        Host                loki.observability.svc.cluster.local
+        Port                3100
+        Labels              job=clickhouse,namespace=data-science,service=clickhouse
+        Label_Keys          $kubernetes['namespace_name'],$kubernetes['pod_name'],$kubernetes['container_name']
+        Remove_Keys         kubernetes,stream,time,tag
+
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+    [PARSER]
+        Name        clickhouse
+        Format      regex
+        Regex       ^(?<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) (?<level>\w+) \[(?<thread_id>\d+)\] (?<message>.*)$
+        Time_Key    timestamp
+        Time_Format %Y-%m-%d %H:%M:%S.%L
+---
+# Grafana Dashboard for ClickHouse
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-grafana-dashboard
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    grafana_dashboard: "1"
+    observability.samcloud.online/type: "dashboard"
+data:
+  clickhouse-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "ClickHouse Production Dashboard",
+        "tags": ["clickhouse", "database", "production"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster Health",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"clickhouse\"}",
+                "legendFormat": "{{instance}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Query Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(clickhouse_query_duration_seconds_sum[5m]) / rate(clickhouse_query_duration_seconds_count[5m])",
+                "legendFormat": "{{instance}}"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(clickhouse_memory_usage / clickhouse_memory_limit) * 100",
+                "legendFormat": "{{instance}}"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+# Jaeger configuration for distributed tracing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-jaeger-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    observability.samcloud.online/type: "tracing"
+data:
+  jaeger-config.yaml: |
+    sampling:
+      default_strategy:
+        type: probabilistic
+        param: 0.1
+      per_operation_strategies:
+        - operation: "clickhouse_query"
+          type: probabilistic
+          param: 0.5
+        - operation: "clickhouse_insert"
+          type: probabilistic
+          param: 0.3
+    
+    storage:
+      type: elasticsearch
+      options:
+        es:
+          server_urls: http://elasticsearch.observability.svc.cluster.local:9200
+          index_prefix: jaeger
+          username: jaeger
+          password: "${JAEGER_ES_PASSWORD}"
+    
+    ingester:
+      kafka:
+        topic: jaeger-spans
+        brokers: kafka.observability.svc.cluster.local:9092
+        group_id: clickhouse-jaeger-ingester 

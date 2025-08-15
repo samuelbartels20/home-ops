@@ -1,0 +1,19 @@
+---
+# Pod Security Standards
+apiVersion: pod-security.kubernetes.io/v1
+kind: PodSecurityConfiguration
+metadata:
+  name: clickhouse-pod-security
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    security.samcloud.online/level: "restricted"
+spec:
+  defaults:
+    audit: restricted
+    enforce: restricted
+    warn: restricted
+  exemptions:
+    usernames: []
+    runtimeClasses: []
+    namespaces: ["kube-system", "data-science"] 

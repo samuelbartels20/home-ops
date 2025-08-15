@@ -1,0 +1,23 @@
+---
+# Resource Quotas for ClickHouse
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: clickhouse-quota
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    security.samcloud.online/level: "restricted"
+spec:
+  hard:
+    requests.cpu: "32"
+    requests.memory: 64Gi
+    limits.cpu: "64"
+    limits.memory: 128Gi
+    requests.storage: 2Ti
+    persistentvolumeclaims: "10"
+    services: "5"
+    configmaps: "20"
+    secrets: "10"
+  scopes:
+    - NotTerminating 

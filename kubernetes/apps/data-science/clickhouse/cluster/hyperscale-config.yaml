@@ -1,0 +1,224 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-hyperscale-config
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    config.clickhouse.tech/type: hyperscale
+data:
+  cluster-config.xml: |
+    <clickhouse>
+      <remote_servers>
+        <production_cluster>
+          <shard>
+            <weight>1</weight>
+            <internal_replication>true</internal_replication>
+            <replica>
+              <host>clickhouse-shard01-replica01.data-science.svc.cluster.local</host>
+              <port>9000</port>
+            </replica>
+            <replica>
+              <host>clickhouse-shard01-replica02.data-science.svc.cluster.local</host>
+              <port>9000</port>
+            </replica>
+            <replica>
+              <host>clickhouse-shard01-replica03.data-science.svc.cluster.local</host>
+              <port>9000</port>
+            </replica>
+          </shard>
+        </production_cluster>
+      </remote_servers>
+
+      <memory_usage>
+        <max_server_memory_usage>0.9</max_server_memory_usage>
+        <max_memory_usage>128000000000</max_memory_usage>
+        <max_bytes_before_external_group_by>64000000000</max_bytes_before_external_group_by>
+        <max_bytes_before_external_sort>64000000000</max_bytes_before_external_sort>
+      </memory_usage>
+
+      <processing>
+        <max_concurrent_queries>2000</max_concurrent_queries>
+        <max_concurrent_insert_queries>500</max_concurrent_insert_queries>
+        <max_concurrent_select_queries>1500</max_concurrent_select_queries>
+        <background_pool_size>128</background_pool_size>
+        <background_merges_mutations_concurrency_ratio>8</background_merges_mutations_concurrency_ratio>
+        <max_part_loading_threads>64</max_part_loading_threads>
+      </processing>
+
+      <storage>
+        <mark_cache_size>50000000000</mark_cache_size>
+        <uncompressed_cache_size>100000000000</uncompressed_cache_size>
+        <compiled_expression_cache_size>1000000000</compiled_expression_cache_size>
+        <query_cache_size>10000000000</query_cache_size>
+
+        <merge_tree>
+          <max_suspicious_broken_parts>1000</max_suspicious_broken_parts>
+          <parts_to_delay_insert>10000</parts_to_delay_insert>
+          <parts_to_throw_insert>20000</parts_to_throw_insert>
+          <inactive_parts_to_delay_insert>5000</inactive_parts_to_delay_insert>
+          <inactive_parts_to_throw_insert>10000</inactive_parts_to_throw_insert>
+          <max_parts_in_total>100000</max_parts_in_total>
+          <max_compress_block_size>1048576</max_compress_block_size>
+          <min_compress_block_size>65536</min_compress_block_size>
+          <max_block_size>1048576</max_block_size>
+        </merge_tree>
+      </storage>
+
+      <network>
+        <max_connections>10000</max_connections>
+        <keep_alive_timeout>300</keep_alive_timeout>
+        <tcp_keep_alive_timeout>7200</tcp_keep_alive_timeout>
+        <receive_timeout>300</receive_timeout>
+        <send_timeout>300</send_timeout>
+        <http_receive_timeout>300</http_receive_timeout>
+        <http_send_timeout>300</http_send_timeout>
+        <max_server_memory_usage_to_ram_ratio>0.9</max_server_memory_usage_to_ram_ratio>
+      </network>
+
+      <compression>
+        <case>
+          <method>zstd</method>
+          <level>3</level>
+        </case>
+        <case>
+          <method>lz4</method>
+          <min_part_size>10000000000</min_part_size>
+          <min_part_size_ratio>0.01</min_part_size_ratio>
+        </case>
+      </compression>
+
+      <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+        <cleanup_delay_period>60</cleanup_delay_period>
+        <max_tasks_in_queue>10000</max_tasks_in_queue>
+      </distributed_ddl>
+
+      <kafka>
+        <kafka_consumer_pool_size>1000</kafka_consumer_pool_size>
+        <kafka_max_wait_ms>5000</kafka_max_wait_ms>
+        <kafka_poll_max_batch_size>65536</kafka_poll_max_batch_size>
+        <kafka_producer_pool_size>100</kafka_producer_pool_size>
+      </kafka>
+
+      <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+      </prometheus>
+
+      <query_optimization>
+        <optimize_move_to_prewhere>true</optimize_move_to_prewhere>
+        <optimize_read_in_order>true</optimize_read_in_order>
+        <optimize_aggregation_in_order>true</optimize_aggregation_in_order>
+        <use_index_for_in_with_subqueries>true</use_index_for_in_with_subqueries>
+        <optimize_monotonous_functions_in_order_by>true</optimize_monotonous_functions_in_order_by>
+        <low_cardinality_max_dictionary_size>8192000</low_cardinality_max_dictionary_size>
+        <enable_optimize_predicate_expression>true</enable_optimize_predicate_expression>
+      </query_optimization>
+    </clickhouse>
+
+  table-engines.sql: |
+    CREATE TABLE events_distributed ON CLUSTER production_cluster AS events_local
+    ENGINE = Distributed(production_cluster, default, events_local, rand());
+
+    CREATE TABLE events_local ON CLUSTER production_cluster (
+        timestamp DateTime64(3),
+        user_id UInt64,
+        event_type LowCardinality(String),
+        properties Map(String, String),
+        session_id String,
+        ip_address IPv4,
+        user_agent String,
+        country_code LowCardinality(String),
+        device_type LowCardinality(String),
+        INDEX user_idx user_id TYPE bloom_filter GRANULARITY 1,
+        INDEX event_type_idx event_type TYPE set(100) GRANULARITY 1
+    ) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/events_local', '{replica}')
+    PARTITION BY toYYYYMM(timestamp)
+    ORDER BY (timestamp, user_id, event_type)
+    TTL timestamp + INTERVAL 2 YEAR TO DISK 'cold',
+        timestamp + INTERVAL 7 YEAR DELETE
+    SETTINGS
+        index_granularity = 8192,
+        compress_block_size = 1048576,
+        min_compress_block_size = 65536,
+        ttl_only_drop_parts = 1,
+        merge_with_ttl_timeout = 86400;
+
+    CREATE TABLE metrics_hourly_distributed ON CLUSTER production_cluster AS metrics_hourly_local
+    ENGINE = Distributed(production_cluster, default, metrics_hourly_local, rand());
+
+    CREATE TABLE metrics_hourly_local ON CLUSTER production_cluster (
+        hour DateTime,
+        metric_name LowCardinality(String),
+        dimensions Map(String, String),
+        value Float64,
+        count UInt64,
+        INDEX metric_idx metric_name TYPE set(1000) GRANULARITY 1
+    ) ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/metrics_hourly_local', '{replica}')
+    PARTITION BY toYYYYMM(hour)
+    ORDER BY (hour, metric_name, cityHash64(dimensions))
+    TTL hour + INTERVAL 5 YEAR DELETE
+    SETTINGS ttl_only_drop_parts = 1;
+
+    CREATE TABLE events_kafka ON CLUSTER production_cluster (
+        timestamp DateTime64(3),
+        user_id UInt64,
+        event_type String,
+        properties String,
+        session_id String,
+        ip_address String,
+        user_agent String,
+        country_code String,
+        device_type String
+    ) ENGINE = Kafka()
+    SETTINGS
+        kafka_broker_list = 'kafka-cluster.kafka.svc.cluster.local:9092',
+        kafka_topic_list = 'events',
+        kafka_group_name = 'clickhouse_consumer',
+        kafka_format = 'JSONEachRow',
+        kafka_num_consumers = 50,
+        kafka_max_block_size = 1048576,
+        kafka_poll_timeout_ms = 5000;
+
+    CREATE MATERIALIZED VIEW events_mv ON CLUSTER production_cluster TO events_local AS
+    SELECT
+        timestamp,
+        user_id,
+        event_type::LowCardinality(String),
+        JSONExtractRaw(properties)::Map(String, String) as properties,
+        session_id,
+        toIPv4(ip_address) as ip_address,
+        user_agent,
+        country_code::LowCardinality(String),
+        device_type::LowCardinality(String)
+    FROM events_kafka;
+
+  performance-tuning.xml: |
+    <clickhouse>
+      <max_threads>0</max_threads>
+      <max_alter_threads>8</max_alter_threads>
+      <background_schedule_pool_size>512</background_schedule_pool_size>
+      <background_fetches_pool_size>128</background_fetches_pool_size>
+      <background_common_pool_size>128</background_common_pool_size>
+      <background_buffer_flush_schedule_pool_size>64</background_buffer_flush_schedule_pool_size>
+
+      <max_read_buffer_size>1048576</max_read_buffer_size>
+      <max_write_buffer_size>1048576</max_write_buffer_size>
+      <io_uring_enabled>true</io_uring_enabled>
+      <mmap_cache_size>10000000000</mmap_cache_size>
+
+      <max_distributed_connections>10000</max_distributed_connections>
+      <distributed_connections_pool_size>1024</distributed_connections_pool_size>
+      <connection_pool_max_wait_ms>5000</connection_pool_max_wait_ms>
+
+      <compile_expressions>true</compile_expressions>
+      <min_count_to_compile_expression>10</min_count_to_compile_expression>
+      <compiled_expression_cache_elements_size>10000</compiled_expression_cache_elements_size>
+      <query_profiler_real_time_period_ns>1000000000</query_profiler_real_time_period_ns>
+      <query_profiler_cpu_time_period_ns>1000000000</query_profiler_cpu_time_period_ns>
+    </clickhouse>

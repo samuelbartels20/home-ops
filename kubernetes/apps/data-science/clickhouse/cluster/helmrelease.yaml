@@ -1,0 +1,440 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: clickhouse-cluster
+  namespace: data-science
+spec:
+  interval: 15m
+  dependsOn:
+    - name: clickhouse-operator
+      namespace: data-science
+    - name: rook-ceph-cluster
+      namespace: storage
+    - name: cert-manager
+      namespace: kube-system
+  chart:
+    spec:
+      chart: clickhouse-cluster
+      version: 0.10.0
+      sourceRef:
+        kind: HelmRepository
+        name: altinity-clickhouse
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    cluster:
+      name: "production"
+      layout:
+        shardsCount: 3
+        replicasCount: 2
+
+      zookeeper:
+        enabled: true
+        replicas: 3
+        resources:
+          requests:
+            memory: 512Mi
+            cpu: 200m
+          limits:
+            memory: 1Gi
+            cpu: 500m
+        persistence:
+          enabled: true
+          size: 10Gi
+          storageClass: ceph-block
+
+    image:
+      repository: clickhouse/clickhouse-server
+      tag: 25.5-alpine
+      pullPolicy: IfNotPresent
+      pullSecrets: []
+
+    # Production security and user configuration
+    configuration:
+      users:
+        # Administrative users with strong passwords from secrets
+        default/password_sha256_hex: "${CLICKHOUSE_DEFAULT_PASSWORD_HASH}"
+        default/networks/ip: "::1,127.0.0.1"  # Localhost only
+        default/access_management: 1
+        default/named_collection_control: 1
+
+        # Admin user for cluster management
+        admin/password_sha256_hex: "${CLICKHOUSE_ADMIN_PASSWORD_HASH}"
+        admin/networks/ip: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        admin/access_management: 1
+        admin/profile: "admin"
+
+        # Analytics user for Superset (read-only with limited permissions)
+        analytics/password_sha256_hex: "${CLICKHOUSE_ANALYTICS_PASSWORD_HASH}"
+        analytics/networks/ip: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        analytics/profile: "analytics"
+        analytics/allow_databases: "analytics,logs,metrics"
+
+        # Read-only user for reporting
+        readonly/password_sha256_hex: "${CLICKHOUSE_READONLY_PASSWORD_HASH}"
+        readonly/networks/ip: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        readonly/profile: "readonly"
+        readonly/readonly: 1
+
+        # Backup user for maintenance
+        backup/password_sha256_hex: "${CLICKHOUSE_BACKUP_PASSWORD_HASH}"
+        backup/networks/ip: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+        backup/profile: "backup"
+
+      # User profiles with resource limitations
+      profiles:
+        # Admin profile - full access
+        admin/max_memory_usage: 20000000000
+        admin/max_execution_time: 0
+        admin/max_concurrent_queries_for_user: 10
+        admin/force_index_by_date: 0
+        admin/force_primary_key: 0
+
+        # Analytics profile - optimized for BI workloads
+        analytics/max_memory_usage: 12000000000
+        analytics/max_execution_time: 600
+        analytics/max_concurrent_queries_for_user: 5
+        analytics/readonly: 1
+        analytics/allow_ddl: 0
+        analytics/force_index_by_date: 1
+        analytics/force_primary_key: 1
+        analytics/max_result_rows: 10000000
+        analytics/max_result_bytes: 1000000000
+
+        # Read-only profile
+        readonly/max_memory_usage: 8000000000
+        readonly/max_execution_time: 300
+        readonly/max_concurrent_queries_for_user: 3
+        readonly/readonly: 1
+        readonly/allow_ddl: 0
+        readonly/force_index_by_date: 1
+        readonly/force_primary_key: 1
+        readonly/max_result_rows: 1000000
+        readonly/max_result_bytes: 100000000
+
+        # Backup profile
+        backup/max_memory_usage: 16000000000
+        backup/max_execution_time: 3600
+        backup/max_concurrent_queries_for_user: 2
+
+      # Production server settings
+      settings:
+        # Performance and concurrency
+        max_concurrent_queries: 200
+        max_thread_pool_size: 20000
+        max_connections: 1024
+        keep_alive_timeout: 3
+
+        # Memory management
+        max_server_memory_usage: 0.8
+        max_server_memory_usage_to_ram_ratio: 0.8
+
+        # Query execution
+        max_execution_time: 300
+        max_query_size: 1048576
+        max_ast_depth: 1000
+        max_ast_elements: 50000
+
+        # Distributed queries
+        distributed_directory_monitor_batch_inserts: 1
+        distributed_directory_monitor_split_batch_on_failure: 1
+        insert_distributed_sync: 0
+
+        # Logging for security and monitoring
+        log_queries: 1
+        log_query_threads: 1
+        log_processors_profiles: 1
+        send_crash_reports: 0
+
+        # Data compression
+        compression_config: |
+          <compression>
+            <case>
+              <method>zstd</method>
+              <level>3</level>
+            </case>
+          </compression>
+
+        # Background operations
+        background_pool_size: 32
+        background_merges_mutations_concurrency_ratio: 2
+        background_schedule_pool_size: 128
+
+        # Security settings
+        max_table_size_to_drop: 1000000000000
+        max_partition_size_to_drop: 1000000000000
+
+        # Network settings
+        listen_host: "0.0.0.0"
+        http_port: 8123
+        tcp_port: 9000
+        interserver_http_port: 9009
+
+        # TLS Configuration
+        https_port: 9440
+        tcp_port_secure: 9440
+        interserver_https_port: 9019
+
+        # SSL/TLS settings
+        openSSL:
+          server:
+            certificateFile: "/etc/clickhouse-server/certs/tls.crt"
+            privateKeyFile: "/etc/clickhouse-server/certs/tls.key"
+            caConfig: "/etc/clickhouse-server/certs/ca.crt"
+            verificationMode: "relaxed"
+            invalidCertificateHandler:
+              name: "RejectCertificateHandler"
+
+        # Inter-server authentication
+        interserver_http_credentials:
+          user: "interserver"
+          password: "${CLICKHOUSE_INTERSERVER_PASSWORD}"
+
+    # Storage configuration
+    persistence:
+      enabled: true
+      size: 500Gi
+      storageClass: ceph-block
+      accessModes:
+        - ReadWriteOnce
+
+      # Multiple storage tiers for different data types
+      additionalVolumes:
+        # Fast storage for recent data
+        - name: hot-storage
+          size: 200Gi
+          storageClass: ceph-block-ssd
+          mountPath: /var/lib/clickhouse/hot
+
+        # Archive storage for older data
+        - name: cold-storage
+          size: 1Ti
+          storageClass: ceph-filesystem
+          mountPath: /var/lib/clickhouse/cold
+
+        # Backup storage
+        - name: backup-storage
+          size: 100Gi
+          storageClass: ceph-filesystem
+          mountPath: /var/lib/clickhouse/backup
+
+    # Resource allocation
+    resources:
+      requests:
+        memory: 8Gi
+        cpu: 4
+        ephemeral-storage: 10Gi
+      limits:
+        memory: 16Gi
+        cpu: 8
+        ephemeral-storage: 20Gi
+
+    # Advanced pod configuration
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      fsGroup: 101
+      supplementalGroups: [101]
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false  
+      capabilities:
+        drop: ["ALL"]
+        add: ["SYS_NICE"]  
+      privileged: false
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+
+    # Service configuration
+    service:
+      type: ClusterIP
+      ports:
+        - name: http
+          port: 8123
+          targetPort: 8123
+          protocol: TCP
+        - name: https
+          port: 9440
+          targetPort: 9440
+          protocol: TCP
+        - name: tcp
+          port: 9000
+          targetPort: 9000
+          protocol: TCP
+        - name: tcp-secure
+          port: 9440
+          targetPort: 9440
+          protocol: TCP
+        - name: interserver
+          port: 9009
+          targetPort: 9009
+          protocol: TCP
+        - name: interserver-https
+          port: 9019
+          targetPort: 9019
+          protocol: TCP
+        - name: metrics
+          port: 9363
+          targetPort: 9363
+          protocol: TCP
+
+      # Service annotations for monitoring
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9363"
+        prometheus.io/path: "/metrics"
+
+    # Health checks
+    livenessProbe:
+      enabled: true
+      httpGet:
+        path: /ping
+        port: 8123
+        scheme: HTTP
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+
+    readinessProbe:
+      enabled: true
+      httpGet:
+        path: /ping
+        port: 8123
+        scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+      successThreshold: 1
+
+    startupProbe:
+      enabled: true
+      httpGet:
+        path: /ping
+        port: 8123
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+      successThreshold: 1
+
+    # Observability configuration
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        scrapeTimeout: 10s
+        additionalLabels:
+          release: prometheus-operator
+          cluster: production
+        metricRelabelings:
+          - sourceLabels: [__name__]
+            regex: 'clickhouse_.*'
+            action: keep
+        relabelings:
+          - sourceLabels: [__meta_kubernetes_pod_name]
+            targetLabel: pod
+          - sourceLabels: [__meta_kubernetes_namespace]
+            targetLabel: namespace
+
+    # Pod disruption budget for high availability
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 50%
+
+    # Anti-affinity for high availability
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values: ["clickhouse"]
+              topologyKey: kubernetes.io/hostname
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values: ["clickhouse"]
+              topologyKey: topology.kubernetes.io/zone
+
+    # Node selection for dedicated hardware if available
+    nodeSelector: {}
+    tolerations: []
+
+    # Backup configuration
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"  
+      retention: "30d"
+
+      # S3-compatible backup to MinIO/TrueNAS
+      s3:
+        enabled: true
+        endpoint: "http://192.168.8.102:9000"
+        bucket: "clickhouse-backups"
+        access_key: "${S3_ACCESS_KEY}"
+        secret_key: "${S3_SECRET_KEY}"
+        compression: "zstd"
+
+      # Additional backup verification
+      verification:
+        enabled: true
+        schedule: "0 4 * * 0"  
+
+    # Environment variables from secrets
+    envFrom:
+      - secretRef:
+          name: clickhouse-secrets
+
+    # Volume mounts for TLS certificates
+    extraVolumes:
+      - name: tls-certs
+        secret:
+          secretName: clickhouse-server-tls
+      - name: ca-certs
+        secret:
+          secretName: clickhouse-ca-bundle
+
+    extraVolumeMounts:
+      - name: tls-certs
+        mountPath: /etc/clickhouse-server/certs
+        readOnly: true
+      - name: ca-certs
+        mountPath: /etc/ssl/certs/ca-bundle.crt
+        subPath: ca-bundle.crt
+        readOnly: true
+
+    # Pod annotations for enhanced monitoring
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9363"
+      prometheus.io/path: "/metrics"
+
+      # Backup annotations
+      backup.velero.io/backup-volumes: "data,hot-storage"
+
+      # Security annotations
+      container.apparmor.security.beta.kubernetes.io/clickhouse: "runtime/default"
