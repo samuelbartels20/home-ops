@@ -5,8 +5,6 @@ kind: Kustomization
 namespace: data-science
 
 # resources:
-#   - ./init-databases.yaml
-#   - ./resource-quotas.yaml
 #   - ./clickhouse/ks.yaml
 #   - ./superset/ks.yaml
 #   - ./druid/ks.yaml
