@@ -15,5 +15,5 @@ resources:
   - ./reflector/ks.yaml
   - ./kured/ks.yaml
   # - ./tetragon/ks.yaml
-  # - ./multus/ks.yaml
+  - ./multus/ks.yaml
 
