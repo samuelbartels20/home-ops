@@ -191,118 +191,118 @@ spec:
     - name: onepassword
       namespace: security
 
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app cloudnative-pg-analytics-worker-one
-  namespace: &namespace storage
-spec:
-  targetNamespace: *namespace
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-one
-  prune: true 
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: &app cloudnative-pg-analytics-worker-one
+#   namespace: &namespace storage
+# spec:
+#   targetNamespace: *namespace
+#   commonMetadata:
+#     labels:
+#       app.kubernetes.io/name: *app
+#   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-one
+#   prune: true 
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
+#     namespace: flux-system
+#   wait: false
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
+#   dependsOn:
+#     - name: cloudnative-pg
+#       namespace: storage
+#     - name: external-secrets
+#       namespace: security
+#     - name: onepassword
+#       namespace: security
 
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app cloudnative-pg-analytics-worker-two
-  namespace: &namespace storage
-spec:
-  targetNamespace: *namespace
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-two
-  prune: true 
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: &app cloudnative-pg-analytics-worker-two
+#   namespace: &namespace storage
+# spec:
+#   targetNamespace: *namespace
+#   commonMetadata:
+#     labels:
+#       app.kubernetes.io/name: *app
+#   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-two
+#   prune: true 
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
+#     namespace: flux-system
+#   wait: false
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
+#   dependsOn:
+#     - name: cloudnative-pg
+#       namespace: storage
+#     - name: external-secrets
+#       namespace: security
+#     - name: onepassword
+#       namespace: security
 
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app cloudnative-pg-analytics-worker-three
-  namespace: &namespace storage
-spec:
-  targetNamespace: *namespace
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-three
-  prune: true 
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage  
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: &app cloudnative-pg-analytics-worker-three
+#   namespace: &namespace storage
+# spec:
+#   targetNamespace: *namespace
+#   commonMetadata:
+#     labels:
+#       app.kubernetes.io/name: *app
+#   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-three
+#   prune: true 
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
+#     namespace: flux-system
+#   wait: false
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
+#   dependsOn:
+#     - name: cloudnative-pg
+#       namespace: storage  
+#     - name: external-secrets
+#       namespace: security
+#     - name: onepassword
+#       namespace: security
 
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app cloudnative-pg-analytics-worker-four
-  namespace: &namespace storage
-spec:
-  targetNamespace: *namespace
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-four
-  prune: true 
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  wait: false
-  interval: 30m
-  retryInterval: 1m
-  timeout: 5m
-  dependsOn:
-    - name: cloudnative-pg
-      namespace: storage
-    - name: external-secrets
-      namespace: security
-    - name: onepassword
-      namespace: security
+# ---
+# apiVersion: kustomize.toolkit.fluxcd.io/v1
+# kind: Kustomization
+# metadata:
+#   name: &app cloudnative-pg-analytics-worker-four
+#   namespace: &namespace storage
+# spec:
+#   targetNamespace: *namespace
+#   commonMetadata:
+#     labels:
+#       app.kubernetes.io/name: *app
+#   path: ./kubernetes/apps/storage/cloudnative-pg/analytics-worker-four
+#   prune: true 
+#   sourceRef:
+#     kind: GitRepository
+#     name: flux-system
+#     namespace: flux-system
+#   wait: false
+#   interval: 30m
+#   retryInterval: 1m
+#   timeout: 5m
+#   dependsOn:
+#     - name: cloudnative-pg
+#       namespace: storage
+#     - name: external-secrets
+#       namespace: security
+#     - name: onepassword
+#       namespace: security
