@@ -13,7 +13,7 @@ resources:
   - ./spegel/ks.yaml
   - ./descheduler/ks.yaml
   - ./reflector/ks.yaml
-  - ./kured/ks.yaml
-  - ./tetragon/ks.yaml
+  # - ./kured/ks.yaml
+  # - ./tetragon/ks.yaml
   # - ./multus/ks.yaml
 
