@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.13.1
+
+Date-based release for 2025-09-13
+
+### Changes
+- Update FUNDING.yml
+- chore(release): 2025.09.13 [skip ci]
+
 ##  v2025.09.13
 
 Date-based release for 2025-09-13
