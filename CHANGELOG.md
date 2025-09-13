@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.13
+
+Date-based release for 2025-09-13
+
+### Changes
+- Update FUNDING.yml with Patreon and Ko-fi details
+- chore(release): 2025.08.20.14 [skip ci]
+
 ##  v2025.08.20.14
 
 Date-based release for 2025-08-20
