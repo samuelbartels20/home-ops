@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.14.4
+
+Date-based release for 2025-09-14
+
+### Changes
+- added e2e test
+- deployed fluentbit
+- chore(release): 2025.09.14.3 [skip ci]
+
 ##  v2025.09.14.3
 
 Date-based release for 2025-09-14
