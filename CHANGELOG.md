@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.16.2
+
+Date-based release for 2025-09-16
+
+### Changes
+- deployed rook-ceph
+- chore(release): 2025.09.16.1 [skip ci]
+
 ##  v2025.09.16.1
 
 Date-based release for 2025-09-16
