@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.16
+
+Date-based release for 2025-09-16
+
+### Changes
+- deployed envoy gateway
+- chore(release): 2025.09.14.8 [skip ci]
+
 ##  v2025.09.14.8
 
 Date-based release for 2025-09-14
