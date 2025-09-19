@@ -1,0 +1,79 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: clickhouse-apps
+  namespace: data-science
+
+resources:
+  # Core Operator
+  - helmrelease.yaml
+  - operator-rbac.yaml
+  - operator-servicemonitor.yaml
+  - operator-networkpolicy.yaml
+  
+  # Management Tools
+  - clickhouse-keeper/
+  - clickhouse-backup-scheduler/
+  - clickhouse-monitoring/
+  - clickhouse-proxy/
+  
+  # Security and Compliance
+  - security-policies.yaml
+  - pod-security-standards.yaml
+  - network-security.yaml
+  - audit-logging.yaml
+  
+  # Observability Stack
+  - observability/
+  - alerting/
+  - dashboards/
+  
+  # Performance and Scaling
+  - performance-tuning.yaml
+  - horizontal-pod-autoscaler.yaml
+  - vertical-pod-autoscaler.yaml
+  - resource-quotas.yaml
+  
+  # Disaster Recovery
+  - backup-policies.yaml
+  - disaster-recovery.yaml
+  - data-retention.yaml
+
+commonLabels:
+  app.kubernetes.io/name: clickhouse-apps
+  app.kubernetes.io/instance: production
+  app.kubernetes.io/version: "0.25.1"
+  app.kubernetes.io/component: operator
+  app.kubernetes.io/part-of: data-platform
+  app.kubernetes.io/managed-by: flux
+  environment: production
+  tier: infrastructure
+  data-classification: restricted
+  compliance-framework: gdpr,sox,pci-dss,iso-27001
+
+commonAnnotations:
+  samcloud.online/owner: "data-platform-team"
+  samcloud.online/cost-center: "infrastructure"
+  samcloud.online/business-unit: "engineering"
+  samcloud.online/backup-required: "true"
+  samcloud.online/monitoring: "enhanced"
+  samcloud.online/security-level: "restricted"
+  samcloud.online/compliance-frameworks: "gdpr,sox,pci-dss,iso-27001"
+  samcloud.online/disaster-recovery: "enabled"
+  samcloud.online/audit-logging: "enabled"
+  samcloud.online/encryption-required: "true"
+
+patchesStrategicMerge:
+  - patches/security-hardening.yaml
+  - patches/resource-optimization.yaml
+  - patches/monitoring-enhancement.yaml
+
+patchesJson6902:
+  - target:
+      group: helm.toolkit.fluxcd.io
+      version: v2
+      kind: HelmRelease
+      name: clickhouse-operator
+    path: patches/operator-security.yaml 

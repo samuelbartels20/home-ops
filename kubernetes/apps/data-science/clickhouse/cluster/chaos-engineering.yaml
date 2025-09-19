@@ -1,0 +1,65 @@
+---
+# Chaos Engineering for ClickHouse Resilience Testing
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: clickhouse-pod-failure
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    chaos.samcloud.online/type: "resilience-testing"
+spec:
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      app.kubernetes.io/name: clickhouse
+  mode: one
+  action: pod-failure
+  duration: "30s"
+  scheduler:
+    cron: "0 3 * * 1"  # Weekly on Monday at 3 AM
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: clickhouse-network-partition
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    chaos.samcloud.online/type: "resilience-testing"
+spec:
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      app.kubernetes.io/name: clickhouse
+  mode: one
+  action: partition
+  direction: both
+  duration: "60s"
+  scheduler:
+    cron: "0 3 * * 3"  # Weekly on Wednesday at 3 AM
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: clickhouse-disk-pressure
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse
+    chaos.samcloud.online/type: "resilience-testing"
+spec:
+  selector:
+    namespaces:
+      - data-science
+    labelSelectors:
+      app.kubernetes.io/name: clickhouse
+  mode: one
+  action: latency
+  delay: "100ms"
+  percent: 50
+  duration: "5m"
+  volumePath: "/var/lib/clickhouse"
+  scheduler:
+    cron: "0 3 * * 5"  # Weekly on Friday at 3 AM 
