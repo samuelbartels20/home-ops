@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.19
+
+Date-based release for 2025-09-19
+
+### Changes
+- deployed clickhouse
+- chore(release): 2025.09.16.2 [skip ci]
+
 ##  v2025.09.16.2
 
 Date-based release for 2025-09-16
