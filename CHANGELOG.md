@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.12
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #34 from samuelbartels20/renovate/aqua-cloudflare-cloudflared-2025.x
+- chore(release): 2025.09.21.11 [skip ci]
+- chore(deps): update dependency aqua:cloudflare/cloudflared to v2025.9.0
+
 ##  v2025.09.21.11
 
 Date-based release for 2025-09-21
