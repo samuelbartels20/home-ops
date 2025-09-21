@@ -1285,7 +1285,7 @@ graph TB
     end
 ```
 
-🤝 Thanks
+### 🤝 Thanks
 
 I want to give credit to a few great resources:
 - The (cluster-template)[https://github.com/onedr0p/cluster-template] on GitHub.
