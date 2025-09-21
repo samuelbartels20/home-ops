@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.21
+
+Date-based release for 2025-09-21
+
+### Changes
+- added credits
+- chore(release): 2025.09.19 [skip ci]
+
 ##  v2025.09.19
 
 Date-based release for 2025-09-19
