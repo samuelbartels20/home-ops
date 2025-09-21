@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.11
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #39 from samuelbartels20/renovate/aqua-budimanjojo-talhelper-3.x
+- chore(deps): update dependency aqua:budimanjojo/talhelper to v3.0.35
+- chore(release): 2025.09.21.10 [skip ci]
+
 ##  v2025.09.21.10
 
 Date-based release for 2025-09-21
