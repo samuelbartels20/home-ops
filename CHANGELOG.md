@@ -1,5 +1,15 @@
 # Changelog
 
+##  v2025.09.21.6
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #35 from samuelbartels20/renovate/aqua-helmfile-helmfile-1.x
+- chore(deps): update dependency aqua:helmfile/helmfile to v1.1.7
+- chore(release): 2025.09.21.5 [skip ci]
+- chore(release): 2025.09.21.5 [skip ci]
+
 ##  v2025.09.21.5
 
 Date-based release for 2025-09-21
