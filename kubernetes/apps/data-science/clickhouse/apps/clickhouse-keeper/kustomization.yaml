@@ -1,0 +1,25 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: clickhouse-keeper
+  namespace: data-science
+
+resources:
+  - helmrelease.yaml
+  - service.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+  - poddisruptionbudget.yaml
+
+commonLabels:
+  app.kubernetes.io/name: clickhouse-keeper
+  app.kubernetes.io/instance: production
+  app.kubernetes.io/version: "25.5"
+  app.kubernetes.io/component: coordination
+  app.kubernetes.io/part-of: data-platform
+  app.kubernetes.io/managed-by: flux
+  environment: production
+  tier: infrastructure
+  data-classification: restricted 

@@ -1,0 +1,22 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: clickhouse-apps-observability
+  namespace: data-science
+
+resources:
+  - servicemonitor.yaml
+  - prometheusrule.yaml
+  - grafana-dashboard.yaml
+  - opentelemetry-collector.yaml
+  - jaeger-tracing.yaml
+  - log-aggregation.yaml
+
+commonLabels:
+  app.kubernetes.io/name: clickhouse-apps-observability
+  app.kubernetes.io/component: observability
+  app.kubernetes.io/part-of: data-platform
+  observability.samcloud.online/level: "enhanced"
+  monitoring.samcloud.online/stack: "prometheus-grafana-jaeger" 

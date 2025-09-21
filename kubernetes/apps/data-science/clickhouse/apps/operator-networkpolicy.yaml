@@ -1,0 +1,172 @@
+---
+# Network Policy for ClickHouse Operator
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-operator-netpol
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    security.samcloud.online/level: "restricted"
+    compliance.samcloud.online/frameworks: "gdpr,sox,pci-dss,iso-27001"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-operator
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Prometheus monitoring
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080  # Metrics port
+    
+    # Allow webhook traffic from Kubernetes API server
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 9443  # Webhook port
+    
+    # Allow health checks
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kube-probe
+      ports:
+        - protocol: TCP
+          port: 8081  # Health check port
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    
+    # Allow Kubernetes API server access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    
+    # Allow communication with ClickHouse instances
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: data-science
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: clickhouse
+      ports:
+        - protocol: TCP
+          port: 8123  # HTTP interface
+        - protocol: TCP
+          port: 9000  # Native interface
+        - protocol: TCP
+          port: 9009  # Inter-server HTTP
+        - protocol: TCP
+          port: 9440  # HTTPS interface
+        - protocol: TCP
+          port: 9019  # Inter-server HTTPS
+    
+    # Allow communication with cert-manager for certificate management
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: cert-manager
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cert-manager
+      ports:
+        - protocol: TCP
+          port: 9402  # Cert-manager metrics
+    
+    # Allow external secrets access
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: external-secrets
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-secrets
+      ports:
+        - protocol: TCP
+          port: 8080
+    
+    # Allow NTP synchronization
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 123
+    
+    # Allow HTTPS for external integrations (container registry, helm repos)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# Deny-all default policy for enhanced security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-operator-deny-all
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    security.samcloud.online/level: "restricted"
+    security.samcloud.online/type: "deny-all"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-operator
+  policyTypes:
+    - Ingress
+    - Egress
+  # Empty ingress and egress rules = deny all (overridden by more specific policies above)
+---
+# Network Policy for operator webhook
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-operator-webhook-netpol
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    security.samcloud.online/level: "restricted"
+    security.samcloud.online/component: "webhook"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow webhook calls from Kubernetes API server
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 9443
+    
+    # Allow webhook calls from admission controllers
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 9443 

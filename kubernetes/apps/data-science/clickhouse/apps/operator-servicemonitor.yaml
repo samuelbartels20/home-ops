@@ -1,0 +1,165 @@
+---
+# ServiceMonitor for ClickHouse Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clickhouse-operator
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    release: prometheus-operator
+    monitoring.samcloud.online/level: "enhanced"
+    observability.samcloud.online/type: "operator"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-operator
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'clickhouse_operator_.*'
+          action: keep
+        - sourceLabels: [job]
+          targetLabel: cluster
+          replacement: 'production'
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_node_name]
+          targetLabel: node
+---
+# Service for ClickHouse Operator Metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-operator-metrics
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    app.kubernetes.io/component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: clickhouse-operator
+  type: ClusterIP
+---
+# PrometheusRule for ClickHouse Operator
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: clickhouse-operator-alerts
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    release: prometheus-operator
+    alerting.samcloud.online/level: "enhanced"
+    observability.samcloud.online/type: "operator"
+spec:
+  groups:
+    - name: clickhouse.operator.health
+      interval: 30s
+      rules:
+        - alert: ClickHouseOperatorDown
+          expr: up{job="clickhouse-operator"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: data-platform
+            service: clickhouse-operator
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/operator-down"
+          annotations:
+            summary: "ClickHouse Operator is down"
+            description: "ClickHouse Operator has been down for more than 2 minutes on {{ $labels.instance }}"
+        
+        - alert: ClickHouseOperatorHighMemory
+          expr: (process_resident_memory_bytes{job="clickhouse-operator"} / 1024 / 1024) > 1024
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse-operator
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/operator-high-memory"
+          annotations:
+            summary: "ClickHouse Operator high memory usage"
+            description: "ClickHouse Operator is using {{ $value }}MB of memory on {{ $labels.instance }}"
+        
+        - alert: ClickHouseOperatorHighCPU
+          expr: rate(process_cpu_seconds_total{job="clickhouse-operator"}[5m]) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse-operator
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/operator-high-cpu"
+          annotations:
+            summary: "ClickHouse Operator high CPU usage"
+            description: "ClickHouse Operator is using {{ $value }}% CPU on {{ $labels.instance }}"
+        
+        - alert: ClickHouseOperatorReconcileErrors
+          expr: rate(clickhouse_operator_reconcile_errors_total[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: critical
+            team: data-platform
+            service: clickhouse-operator
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/operator-reconcile-errors"
+          annotations:
+            summary: "ClickHouse Operator reconcile errors"
+            description: "ClickHouse Operator is experiencing {{ $value }} reconcile errors per second on {{ $labels.instance }}"
+        
+        - alert: ClickHouseOperatorSlowReconcile
+          expr: histogram_quantile(0.95, rate(clickhouse_operator_reconcile_duration_seconds_bucket[5m])) > 30
+          for: 5m
+          labels:
+            severity: warning
+            team: data-platform
+            service: clickhouse-operator
+            runbook_url: "https://runbooks.samcloud.online/clickhouse/operator-slow-reconcile"
+          annotations:
+            summary: "ClickHouse Operator slow reconcile"
+            description: "95th percentile reconcile duration is {{ $value }} seconds on {{ $labels.instance }}"
+---
+# PodMonitor for detailed pod metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clickhouse-operator-pods
+  namespace: data-science
+  labels:
+    app.kubernetes.io/name: clickhouse-operator
+    release: prometheus-operator
+    monitoring.samcloud.online/level: "enhanced"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse-operator
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_node_name]
+          targetLabel: node 

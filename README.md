@@ -1284,3 +1284,10 @@ graph TB
         VPA[VPA] --> |Resources| KC
     end
 ```
+
+
+🤝 Thanks
+I want to give credit to a few great resources:
+- The (cluster-template)[https://github.com/onedr0p/cluster-template] on GitHub.
+- The (Home Operations)[https://discord.gg/home-operations] Discord community.
+- For deployment ideas and strategies, visit (kubesearch.dev)[https://kubesearch.dev/].
