@@ -63,9 +63,6 @@ spec:
       targetPath: kubecostProductConfigs.productKey
   values:
     global:
-      zone: "us-west-2a"
-      region: "us-west-2"
-
       images:
         pullPolicy: IfNotPresent
         pullSecrets:
@@ -77,7 +74,7 @@ spec:
 
       grafana:
         enabled: true
-        domainName: grafana.${CLUSTER_DOMAIN}
+        domainName: grafana.samcloud.online
 
       notifications:
         alertmanager:
@@ -314,11 +311,7 @@ spec:
     serviceAccount:
       create: true
       name: kubecost
-      automountServiceAccountToken: true  
-      annotations:
-        eks.amazonaws.com/role-arn: "arn:aws:iam::${AWS_ACCOUNT_ID}:role/kubecost-irsa"
-        azure.workload.identity/client-id: "${AZURE_CLIENT_ID}"
-        iam.gke.io/gcp-service-account: "kubecost@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+      automountServiceAccountToken: true
 
     rbac:
       create: true

@@ -11,9 +11,6 @@ spec:
       app.kubernetes.io/name: *app
       app.kubernetes.io/component: cost-analytics
       app.kubernetes.io/part-of: finops-platform
-  components:
-    - ../../../../components/gatus/guarded
-  dependsOn: []
   interval: 1h
   path: ./kubernetes/apps/finops/kubecost/app
   postBuild:
