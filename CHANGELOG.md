@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.13
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #30 from samuelbartels20/renovate/ghcr.io-cloudnative-pg-postgresql-17.x
+- chore(release): 2025.09.21.12 [skip ci]
+- chore(deps): update ghcr.io/cloudnative-pg/postgresql docker tag to v17.6
+
 ##  v2025.09.21.12
 
 Date-based release for 2025-09-21
