@@ -5,6 +5,18 @@
 Date-based release for 2025-09-21
 
 ### Changes
+- chore(release): 2025.09.21.5 [skip ci]
+- Merge pull request #36 from samuelbartels20/renovate/actions-checkout-digest
+- Merge pull request #37 from samuelbartels20/renovate/actions-checkout-4.x
+- chore(release): 2025.09.21.4 [skip ci]
+- chore(deps): update actions/checkout action to v4.3.0
+- chore(deps): update actions/checkout digest to 08eba0b
+
+##  v2025.09.21.5
+
+Date-based release for 2025-09-21
+
+### Changes
 - Merge pull request #36 from samuelbartels20/renovate/actions-checkout-digest
 - Merge pull request #37 from samuelbartels20/renovate/actions-checkout-4.x
 - chore(release): 2025.09.21.4 [skip ci]
