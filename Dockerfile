@@ -1,4 +1,4 @@
-FROM ghcr.io/cloudnative-pg/postgresql:17.2 AS base
+FROM ghcr.io/cloudnative-pg/postgresql:17.6 AS base
 
 ARG IMAGE_VERSION=1.0.0
 ARG BUILD_DATE=2025-08-01T20:49:47Z
