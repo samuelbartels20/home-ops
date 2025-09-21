@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.8
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #31 from samuelbartels20/renovate/docker-build-push-action-6.x
+- chore(release): 2025.09.21.7 [skip ci]
+- chore(deps): update docker/build-push-action action to v6
+
 ##  v2025.09.21.7
 
 Date-based release for 2025-09-21
