@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.4
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #38 from samuelbartels20/renovate/aqua-helm-helm-3.x
+- chore(release): 2025.09.21.3 [skip ci]
+- chore(deps): update dependency aqua:helm/helm to v3.19.0
+
 ##  v2025.09.21.3
 
 Date-based release for 2025-09-21
