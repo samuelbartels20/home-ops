@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.10
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #40 from samuelbartels20/renovate/aqua-cilium-cilium-cli-0.x
+- chore(release): 2025.09.21.9 [skip ci]
+- chore(deps): update dependency aqua:cilium/cilium-cli to v0.18.7
+
 ##  v2025.09.21.9
 
 Date-based release for 2025-09-21
