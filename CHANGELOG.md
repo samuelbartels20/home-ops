@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.2
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #28 from samuelbartels20/renovate/aqua-siderolabs-talos-1.x
+- chore(release): 2025.09.21.1 [skip ci]
+- chore(deps): update dependency aqua:siderolabs/talos to v1.11.1
+
 ##  v2025.09.21.1
 
 Date-based release for 2025-09-21
