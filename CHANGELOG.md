@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.21.3
+
+Date-based release for 2025-09-21
+
+### Changes
+- Merge pull request #29 from samuelbartels20/renovate/aqua-cue-lang-cue-0.x
+- chore(release): 2025.09.21.2 [skip ci]
+- chore(deps): update dependency aqua:cue-lang/cue to v0.14.1
+
 ##  v2025.09.21.2
 
 Date-based release for 2025-09-21
