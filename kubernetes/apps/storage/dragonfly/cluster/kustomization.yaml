@@ -117,7 +117,7 @@ configMapGenerator:
 # Image configurations for consistency
 images:
   - name: ghcr.io/dragonflydb/dragonfly
-    newTag: v1.30.3
+    newTag: v1.34.1
   - name: ghcr.io/dragonflydb/operator
     newTag: v1.1.11
 
