@@ -17,3 +17,4 @@ spec:
       backendRefs:
         - name: hubble-ui
           port: 80
+
