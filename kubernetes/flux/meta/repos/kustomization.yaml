@@ -11,4 +11,4 @@ resources:
   - ./descheduler.yaml
   - ./reflector.yaml
   - ./kured.yaml
-  # - ./node-problem-detector.yaml
+  - ./node-problem-detector.yaml
