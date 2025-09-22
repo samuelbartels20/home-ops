@@ -17,4 +17,5 @@ resources:
   - ./tetragon/ks.yaml
   - ./multus/ks.yaml
   - ./node-problem-detector/ks.yaml
+  - ./pod-autoscaling/ks.yaml
 

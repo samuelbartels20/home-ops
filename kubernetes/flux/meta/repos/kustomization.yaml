@@ -12,3 +12,4 @@ resources:
   - ./reflector.yaml
   - ./kured.yaml
   - ./node-problem-detector.yaml
+  - ./vpa.yaml
