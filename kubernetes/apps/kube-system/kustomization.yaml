@@ -16,5 +16,5 @@ resources:
   - ./kured/ks.yaml
   - ./tetragon/ks.yaml
   - ./multus/ks.yaml
-  - ./node-problem-detector/ks.yaml
+  # - ./node-problem-detector/ks.yaml
 
