@@ -4,7 +4,7 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
   name: cilium
-  namespace: kube-system # Required for Renovate lookups
+  namespace: kube-system 
 spec:
   interval: 1h
   url: https://helm.cilium.io

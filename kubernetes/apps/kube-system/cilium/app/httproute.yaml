@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
 spec:
   parentRefs:
-    - name: internal
+    - name: external
       namespace: kube-system
   hostnames:
     - hubble.samcloud.online
