@@ -6,6 +6,14 @@ bpf:
   hostLegacyRouting: true
 bgpControlPlane:
   enabled: true
+# ClusterMesh configuration
+cluster:
+  name: kubernetes
+  id: 1
+clustermesh:
+  useAPIServer: true
+  config:
+    enabled: true
 cni:
   # Required for pairing with Multus CNI
   exclusive: false
@@ -27,7 +35,29 @@ envoy:
 gatewayAPI:
   enabled: true
 hubble:
-  enabled: false
+  enabled: true
+  metrics:
+    enabled:
+      - dns:query
+      - drop
+      - tcp
+      - flow
+      - port-distribution
+      - icmp
+      - http
+    serviceMonitor:
+      enabled: true
+  relay:
+    enabled: true
+    rollOutPods: true
+    prometheus:
+      serviceMonitor:
+        enabled: true
+  ui:
+    enabled: true
+    rollOutPods: true
+    ingress:
+      enabled: false
 ipam:
   mode: kubernetes
 ipv4NativeRoutingCIDR: "10.42.0.0/16"
