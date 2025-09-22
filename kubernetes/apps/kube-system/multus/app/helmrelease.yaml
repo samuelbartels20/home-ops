@@ -10,11 +10,19 @@ spec:
   chart:
     spec:
       chart: app-template
-      version: 4.0.1
+      version: 4.1.1
       sourceRef:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
 
   values:
     controllers:
@@ -46,8 +54,9 @@ spec:
                 memory: "512Mi"
             securityContext:
               privileged: true
-        serviceAccount:
-          identifier: multus
+
+    serviceAccount:
+      multus: {}
 
     persistence:
       etc-cni-net-d:
@@ -96,6 +105,3 @@ spec:
             identifier: multus
           subjects:
             - identifier: multus
-
-    serviceAccount:
-      multus: {}
