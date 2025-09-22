@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.22.13
+
+Date-based release for 2025-09-22
+
+### Changes
+- rolledback deployment of cloudnative-pg
+- chore(release): 2025.09.22.12 [skip ci]
+
 ##  v2025.09.22.12
 
 Date-based release for 2025-09-22
