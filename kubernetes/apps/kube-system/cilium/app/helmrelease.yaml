@@ -25,6 +25,7 @@ spec:
         name: cilium
         namespace: kube-system
   install:
+    crds: CreateReplace
     remediation:
       retries: -1
   upgrade:
