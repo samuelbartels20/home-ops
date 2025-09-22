@@ -65,7 +65,7 @@ images:
   - name: registry.k8s.io/kubectl
     newTag: v1.28.0
   - name: alpine
-    newTag: "3.18"
+    newTag: "3.22"
 
 # Patches for production hardening
 patchesStrategicMerge:
