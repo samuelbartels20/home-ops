@@ -47,13 +47,6 @@ dnsPolicy: ClusterFirstWithHostNet
 exportDirectory: "/var/run/cilium/tetragon"
 # exportFileRotationInterval specifies file creation interval for hubble-export-s3.
 exportFileCreationInterval: "60s"
-
-#
-# Configures whether Tetragon pods run on the host network.
-#
-# IMPORTANT: Tetragon must be on the host network for the process visibility to
-# function properly.
-#
 hostNetwork: true
 
 tetragon:
