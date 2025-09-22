@@ -14,7 +14,7 @@ spec:
       version: "2.3.3"
       sourceRef:
         kind: HelmRepository
-        name: deliveryhero
+        name: node-problem-detector
         namespace: flux-system
   maxHistory: 3
   install:
