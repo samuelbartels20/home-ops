@@ -13,9 +13,8 @@ spec:
       reconcileStrategy: ChartVersion
       sourceRef:
         kind: HelmRepository
-        name: cilium-chart
-        namespace: flux-system
-      # The HelmRelease version of Cilium MUST match the version installed via Talos to avoid collisions on cluster rebuilds
+        name: cilium
+        namespace: kube-system
       version: 1.4.0
   install:
     timeout: 10m
