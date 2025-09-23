@@ -21,7 +21,7 @@ spec:
             limits:
               memory: 1Gi
       envoyService:
-        externalTrafficPolicy: Cluster
+        externalTrafficPolicy: Local
   shutdown:
     drainTimeout: 180s
   telemetry:
@@ -49,13 +49,13 @@ kind: Gateway
 metadata:
   name: envoy-external
   annotations:
-    external-dns.alpha.kubernetes.io/target: &hostname external.turbo.ac
+    external-dns.alpha.kubernetes.io/target: &hostname external.samcloud.online
 spec:
   gatewayClassName: envoy
   infrastructure:
     annotations:
       external-dns.alpha.kubernetes.io/hostname: *hostname
-      lbipam.cilium.io/ips: 192.168.42.126
+      lbipam.cilium.io/ips: 192.168.8.126
   listeners:
     - name: http
       protocol: HTTP
@@ -72,7 +72,7 @@ spec:
       tls:
         certificateRefs:
           - kind: Secret
-            name: turbo-ac-tls
+            name: samcloud-online-tls
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/gateway.networking.k8s.io/gateway_v1.json
 apiVersion: gateway.networking.k8s.io/v1
@@ -80,13 +80,13 @@ kind: Gateway
 metadata:
   name: envoy-internal
   annotations:
-    external-dns.alpha.kubernetes.io/target: &hostname internal.turbo.ac
+    external-dns.alpha.kubernetes.io/target: &hostname internal.samcloud.online
 spec:
   gatewayClassName: envoy
   infrastructure:
     annotations:
       external-dns.alpha.kubernetes.io/hostname: *hostname
-      lbipam.cilium.io/ips: 192.168.42.121
+      lbipam.cilium.io/ips: 192.168.8.121
   listeners:
     - name: http
       protocol: HTTP
@@ -103,7 +103,7 @@ spec:
       tls:
         certificateRefs:
           - kind: Secret
-            name: turbo-ac-tls
+            name: samcloud-online-tls
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/envoyproxy/gateway/refs/heads/main/charts/gateway-helm/crds/generated/gateway.envoyproxy.io_clienttrafficpolicies.yaml
 apiVersion: gateway.envoyproxy.io/v1alpha1
