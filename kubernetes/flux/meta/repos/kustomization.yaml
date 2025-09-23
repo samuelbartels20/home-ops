@@ -13,4 +13,4 @@ resources:
   - ./kured.yaml
   - ./node-problem-detector.yaml
   - ./vpa.yaml
-  - ./kube-prometheus-stack.yaml
+  # - ./kube-prometheus-stack.yaml
