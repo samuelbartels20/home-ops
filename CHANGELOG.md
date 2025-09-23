@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.6
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #42 from samuelbartels20/renovate/ghcr.io-coredns-charts-coredns-1.x
+- chore(release): 2025.09.23.5 [skip ci]
+- chore(deps): update ghcr.io/coredns/charts/coredns docker tag to v1.43.3
+
 ##  v2025.09.23.5
 
 Date-based release for 2025-09-23
