@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.3
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #47 from samuelbartels20/renovate/ghcr.io-allenporter-flux-local-7.x
+- chore(release): 2025.09.23.2 [skip ci]
+- chore(deps): update ghcr.io/allenporter/flux-local docker tag to v7.10.0
+
 ##  v2025.09.23.2
 
 Date-based release for 2025-09-23
