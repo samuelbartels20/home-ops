@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.11
+
+Date-based release for 2025-09-23
+
+### Changes
+- deployed kube prometheus stack
+- rolledback deployment of cloudnative-pg
+- chore(release): 2025.09.23.10 [skip ci]
+
 ##  v2025.09.23.10
 
 Date-based release for 2025-09-23
