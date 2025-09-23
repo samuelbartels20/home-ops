@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #49 from samuelbartels20/renovate/ghcr.io-controlplaneio-fluxcd-charts-flux-operator-0.x
+- chore(release): 2025.09.22.20 [skip ci]
+- chore(deps): update ghcr.io/controlplaneio-fluxcd/charts/flux-operator docker tag to v0.28.0
+
 ##  v2025.09.22.20
 
 Date-based release for 2025-09-22
