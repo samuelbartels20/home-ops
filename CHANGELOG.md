@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.23.21
+
+Date-based release for 2025-09-23
+
+### Changes
+- migrate from k8s-gateway to envoy-gateway
+- chore(release): 2025.09.23.20 [skip ci]
+
 ##  v2025.09.23.20
 
 Date-based release for 2025-09-23
