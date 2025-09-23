@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.10
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #50 from samuelbartels20/renovate/ghcr.io-dragonflydb-dragonfly-1.x
+- chore(release): 2025.09.23.9 [skip ci]
+- chore(deps): update ghcr.io/dragonflydb/dragonfly docker tag to v1.34.1
+
 ##  v2025.09.23.9
 
 Date-based release for 2025-09-23
