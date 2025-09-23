@@ -57,3 +57,8 @@ releases:
     version: 0.28.0
     values: ['../kubernetes/apps/flux-system/flux-instance/app/helm/values.yaml']
     needs: ['flux-system/flux-operator']
+
+  - name: envoy-gateway
+    namespace: network
+    chart: oci://docker.io/envoyproxy/gateway-helm
+    version: 1.5.0
