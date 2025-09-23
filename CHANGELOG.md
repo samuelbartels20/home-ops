@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.23.19
+
+Date-based release for 2025-09-23
+
+### Changes
+- deployed kube prometheus stack
+- chore(release): 2025.09.23.18 [skip ci]
+
 ##  v2025.09.23.18
 
 Date-based release for 2025-09-23
