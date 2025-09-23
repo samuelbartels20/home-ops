@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.2
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #48 from samuelbartels20/renovate/ghcr.io-controlplaneio-fluxcd-charts-flux-instance-0.x
+- chore(release): 2025.09.23.1 [skip ci]
+- chore(deps): update ghcr.io/controlplaneio-fluxcd/charts/flux-instance docker tag to v0.28.0
+
 ##  v2025.09.23.1
 
 Date-based release for 2025-09-23
