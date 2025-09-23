@@ -1,5 +1,14 @@
 # Changelog
 
+##  v2025.09.23.7
+
+Date-based release for 2025-09-23
+
+### Changes
+- Merge pull request #43 from samuelbartels20/renovate/cilium-1.x
+- chore(release): 2025.09.23.6 [skip ci]
+- chore(deps): update helm release cilium to v1.18.2
+
 ##  v2025.09.23.6
 
 Date-based release for 2025-09-23
