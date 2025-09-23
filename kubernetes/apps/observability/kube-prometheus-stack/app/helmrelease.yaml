@@ -76,7 +76,7 @@ spec:
         storage:
           volumeClaimTemplate:
             spec:
-              storageClassName: ceph-block
+              storageClassName: openebs-hostpath
               resources:
                 requests:
                   storage: 10Mi
@@ -164,7 +164,7 @@ spec:
     prometheus:
       ingress:
         enabled: true
-        ingressClassName: internal
+        ingressClassName: external
         annotations:
           hajimari.io/appName: Prometheus
           hajimari.io/icon: simple-icons:prometheus
@@ -173,7 +173,7 @@ spec:
           gethomepage.dev/name: Prometheus
           gethomepage.dev/group: Observability
           gethomepage.dev/widget.type: prometheus
-          gethomepage.dev/widget.url: http://prometheus-operated.monitoring.svc.cluster.local:9090
+          gethomepage.dev/widget.url: http://prometheus-operated.observability.svc.cluster.local:9090
         pathType: Prefix
         hosts:
           - prometheus.samcloud.online
@@ -211,7 +211,7 @@ spec:
         storageSpec:
           volumeClaimTemplate:
             spec:
-              storageClassName: ceph-block
+              storageClassName: openebs-hostpath
               resources:
                 requests:
                   storage: 50Gi

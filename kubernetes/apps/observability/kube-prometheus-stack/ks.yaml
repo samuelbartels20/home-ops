@@ -13,7 +13,7 @@ spec:
     - ../../../../components/gatus/guarded
   dependsOn:
     - name: openebs
-      namespace: openebs-hostpath
+      namespace: storage
   interval: 1h
   path: ./kubernetes/apps/observability/kube-prometheus-stack/app
   postBuild:
