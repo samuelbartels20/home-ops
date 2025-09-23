@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.23.30
+
+Date-based release for 2025-09-23
+
+### Changes
+- added envoy gateway crds
+- chore(release): 2025.09.23.29 [skip ci]
+
 ##  v2025.09.23.29
 
 Date-based release for 2025-09-23
