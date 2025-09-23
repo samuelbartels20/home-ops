@@ -71,6 +71,6 @@ images:
   - name: registry.k8s.io/sig-storage/csi-snapshotter
     newTag: v8.3.0
   - name: registry.k8s.io/sig-storage/livenessprobe
-    newTag: v2.16.0
+    newTag: v2.17.0
   - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
     newTag: v2.14.0
