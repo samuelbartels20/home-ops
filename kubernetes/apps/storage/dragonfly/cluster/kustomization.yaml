@@ -119,7 +119,7 @@ images:
   - name: ghcr.io/dragonflydb/dragonfly
     newTag: v1.30.3
   - name: ghcr.io/dragonflydb/operator
-    newTag: v1.1.11
+    newTag: v1.2.1
 
 # Resource patches for configuration
 patches:
