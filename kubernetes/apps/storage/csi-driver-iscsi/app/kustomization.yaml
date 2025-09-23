@@ -73,4 +73,4 @@ images:
   - name: registry.k8s.io/sig-storage/livenessprobe
     newTag: v2.16.0
   - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
-    newTag: v2.14.0
+    newTag: v2.15.0
