@@ -128,8 +128,8 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: samcloud.online-tls
-  namespace: kube-system
+  name: samcloud-online-tls
+  namespace: network
   annotations:
     cert-manager.io/alt-names: '*.samcloud.online,samcloud.online'
     cert-manager.io/certificate-name: samcloud.online
@@ -143,8 +143,8 @@ metadata:
     controller.cert-manager.io/fao: "true"
 type: kubernetes.io/tls
 data:
-  tls.crt: op://kubernetes/samcloud.online-tls/tls.crt
-  tls.key: op://kubernetes/samcloud.online-tls/tls.key
+  tls.crt: op://K8s/samcloud-online-tls/tls.crt
+  tls.key: op://K8s/samcloud-online-tls/tls.key
 
 
 ---
@@ -261,6 +261,7 @@ type: Opaque
 stringData:
   ANALYTICS_USER: op://K8s/postgres-analytics-credentials/ANALYTICS_USER
   ANALYTICS_PASSWORD: op://K8s/postgres-analytics-credentials/ANALYTICS_PASSWORD
+
 
 
 ---
