@@ -49,17 +49,17 @@ spec:
         ports:
           http:
             port: 8080
-    # serviceMonitor:
-    #   app:
-    #     serviceName: trilium
-    #     endpoints:
-    #       - port: http
+    serviceMonitor:
+      app:
+        serviceName: trilium
+        endpoints:
+          - port: http
     route:
       app:
-        hostnames: ["{{ .Release.Name }}.samcloud.online"]
+        hostnames: ["trilium.samcloud.online"]
         parentRefs:
-          - name: external
-            namespace: kube-system
+          - name: envoy-external
+            namespace: network
             sectionName: https
         rules:
           - backendRefs:
