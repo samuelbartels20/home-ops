@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.24.10
+
+Date-based release for 2025-09-24
+
+### Changes
+- rolledback deployment of envoy gatewy
+- chore(release): 2025.09.24.9 [skip ci]
+
 ##  v2025.09.24.9
 
 Date-based release for 2025-09-24
