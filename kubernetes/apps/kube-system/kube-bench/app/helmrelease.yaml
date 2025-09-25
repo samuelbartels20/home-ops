@@ -90,9 +90,6 @@ spec:
 
             target_mapping:
               "k8s": "k8s"
-              "gke": "gke"
-              "eks": "eks"
-              "aks": "aks"
       - apiVersion: batch/v1
         kind: CronJob
         metadata:
