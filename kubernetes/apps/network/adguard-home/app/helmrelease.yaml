@@ -26,6 +26,7 @@ spec:
         annotations:
           reloader.stakater.com/auto: "true"
         strategy: RollingUpdate
+
         containers:
           app:
             image:
@@ -45,7 +46,6 @@ spec:
               - --work-dir
               - /opt/adguardhome/work
               - --no-check-update
-              - --no-mem-optimization
               - --verbose
             probes:
               liveness: &probes
@@ -181,14 +181,7 @@ spec:
         existingClaim: adguard-home-data
         globalMounts:
           - path: /opt/adguardhome/work
-      config-file:
-        enabled: true
-        type: configMap
-        name: adguard-home-config
-        globalMounts:
-          - path: /opt/adguardhome/conf/AdGuardHome.yaml
-            subPath: AdGuardHome.yaml
-            readOnly: true
+
       tmp:
         enabled: true
         type: emptyDir
