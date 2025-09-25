@@ -118,8 +118,8 @@ spec:
         ports:
           http:
             port: *webPort
-            protocol: HTTPS
-            appProtocol: https
+            protocol: HTTP
+            appProtocol: http
       dns:
         controller: adguard-home
         type: LoadBalancer
