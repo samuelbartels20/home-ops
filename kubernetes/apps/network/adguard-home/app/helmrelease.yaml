@@ -35,9 +35,7 @@ spec:
               pullPolicy: IfNotPresent
             env:
               TZ: UTC
-            envFrom:
-              - secretRef:
-                  name: adguard-home
+
             command:
               - /opt/adguardhome/AdGuardHome
             args:
