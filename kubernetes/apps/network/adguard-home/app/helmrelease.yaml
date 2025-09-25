@@ -168,7 +168,7 @@ spec:
                   type: PathPrefix
                   value: /
             backendRefs:
-              - name: adguard-home
+              - name: adguard-home-app
                 port: *webPort
     persistence:
       config:
