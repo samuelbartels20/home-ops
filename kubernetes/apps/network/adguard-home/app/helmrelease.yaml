@@ -30,8 +30,8 @@ spec:
         containers:
           app:
             image:
-              repository: docker.io/adguard/adguardhome
-              tag: v0.107.61
+              repository: adguard/adguardhome
+              tag: v0.107.65
               pullPolicy: IfNotPresent
             env:
               TZ: UTC
@@ -118,30 +118,30 @@ spec:
             port: *webPort
             protocol: HTTP
             appProtocol: http
-      # dns:
-      #   controller: adguard-home
-      #   type: LoadBalancer
-      #   annotations:
-      #     lbipam.cilium.io/ips: 192.168.8.140  
-      #     external-dns.alpha.kubernetes.io/hostname: adguard.samcloud.online
-      #   externalTrafficPolicy: Local
-      #   ports:
-      #     dns-tcp:
-      #       port: 53
-      #       protocol: TCP
-      #       targetPort: 53
-      #     dns-udp:
-      #       port: 53
-      #       protocol: UDP
-      #       targetPort: 53
-      #     dns-over-tls:
-      #       port: 853
-      #       protocol: TCP
-      #       targetPort: 853
-      #     dns-over-quic:
-      #       port: 853
-      #       protocol: UDP
-      #       targetPort: 853
+      dns:
+        controller: adguard-home
+        type: LoadBalancer
+        annotations:
+          lbipam.cilium.io/ips: 192.168.8.140  
+          external-dns.alpha.kubernetes.io/hostname: adguard.samcloud.online
+        externalTrafficPolicy: Local
+        ports:
+          dns-tcp:
+            port: 53
+            protocol: TCP
+            targetPort: 53
+          dns-udp:
+            port: 53
+            protocol: UDP
+            targetPort: 53
+          dns-over-tls:
+            port: 853
+            protocol: TCP
+            targetPort: 853
+          dns-over-quic:
+            port: 853
+            protocol: UDP
+            targetPort: 853
     serviceMonitor:
       app:
         serviceName: adguard-home
