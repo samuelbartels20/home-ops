@@ -5,8 +5,8 @@ metadata:
   namespace: kube-system
 spec:
   parentRefs:
-    - name: external
-      namespace: kube-system
+    - name: envoy-external
+      namespace: network
   hostnames:
     - hubble.samcloud.online
   rules:
