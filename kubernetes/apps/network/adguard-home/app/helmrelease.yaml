@@ -12,6 +12,7 @@ spec:
     name: app-template
     namespace: flux-system
   install:
+    crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
@@ -19,9 +20,6 @@ spec:
     remediation:
       strategy: rollback
       retries: 3
-  dependsOn:
-    - name: envoy-gateway
-      namespace: network
   values:
     controllers:
       adguard-home:
