@@ -58,7 +58,7 @@ spec:
       app:
         hostnames: ["trilium.samcloud.online"]
         parentRefs:
-          - name: envoy-internal
+          - name: envoy-external
             namespace: network
             sectionName: https
         rules:
