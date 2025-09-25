@@ -1,5 +1,5 @@
 ---
-apiVersion: helm.toolkit.fluxcd.io/v2beta2
+apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: kube-bench
@@ -12,7 +12,7 @@ spec:
       version: v0.3.2
       sourceRef:
         kind: HelmRepository
-        name: dysnix-charts
+        name: kube-bench
         namespace: flux-system
   maxHistory: 3
   install:
