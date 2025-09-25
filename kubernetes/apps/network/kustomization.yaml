@@ -11,3 +11,4 @@ resources:
   - ./echo/ks.yaml
   - ./certificates/ks.yaml
   - ./envoy-gateway/ks.yaml
+  - ./adguard-home/ks.yaml

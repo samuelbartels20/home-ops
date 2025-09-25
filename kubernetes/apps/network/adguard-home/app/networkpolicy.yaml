@@ -1,0 +1,84 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adguard-home-ingress
+  namespace: network
+  labels:
+    app.kubernetes.io/name: adguard-home
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: adguard-home
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow DNS queries from anywhere (UDP/TCP 53)
+    - from: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow web UI access from envoy gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: network
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: envoy-internal
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow metrics scraping from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adguard-home-egress
+  namespace: network
+  labels:
+    app.kubernetes.io/name: adguard-home
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: adguard-home
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution to upstream servers
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+        - protocol: TCP
+          port: 443  # DNS over HTTPS
+        - protocol: TCP
+          port: 853  # DNS over TLS
+    # Allow HTTP/HTTPS for filter list updates
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+    # Allow connection to Kubernetes API for service discovery
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443 

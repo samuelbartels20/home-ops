@@ -166,6 +166,17 @@ stringData:
   API_KEY: op://K8s/truenas-nfs/API_KEY
   DECRYPTION_KEY: op://K8s/truenas-nfs/DECRYPTION_KEY
 
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: adguard-home
+  namespace: network
+stringData:
+  adguard_username: op://K8s/adguard_home/adguard_username
+  adguard_password_hash: op://K8s/adguard_home/adguard_password_hash
+  adguard_session_key: op://K8s/adguard_home/adguard_session_key
 ---
 apiVersion: v1
 kind: Secret
