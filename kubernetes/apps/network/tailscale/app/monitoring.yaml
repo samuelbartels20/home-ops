@@ -1,0 +1,398 @@
+---
+# ServiceMonitor for Tailscale Metrics Collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tailscale
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+    monitoring: prometheus
+  annotations:
+    prometheus.io/description: "ServiceMonitor for Tailscale VPN mesh network metrics"
+    monitoring.samcloud.online/tier: "production"
+spec:
+  jobLabel: app.kubernetes.io/name
+  
+  # Service selector
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+      - network
+  
+  # Monitoring endpoints
+  endpoints:
+    # Main metrics endpoint
+    - port: metrics
+      scheme: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 15s
+      
+      # Metric relabeling for production
+      metricRelabelings:
+        # Keep Tailscale-specific metrics
+        - sourceLabels: [__name__]
+          regex: '^tailscale_.*'
+          action: keep
+        
+        # Add service-level labels
+        - targetLabel: service
+          replacement: tailscale
+        - targetLabel: component
+          replacement: vpn-mesh
+        - targetLabel: environment
+          replacement: production
+        - targetLabel: cluster
+          replacement: home-ops
+        
+        # Relabel instance to be more descriptive
+        - sourceLabels: [__address__]
+          targetLabel: instance
+          regex: '([^:]+).*'
+          replacement: 'tailscale-${1}'
+    
+    # Health metrics endpoint
+    - port: http
+      scheme: http
+      path: /healthz
+      interval: 15s
+      scrapeTimeout: 10s
+      
+      # Focus on health metrics
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: '^(up|tailscale_health_.*|tailscale_connection_.*)'
+          action: keep
+        
+        - targetLabel: endpoint_type
+          replacement: health
+        - targetLabel: service
+          replacement: tailscale
+
+---
+# PodMonitor for Tailscale Pod-level Metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tailscale-pods
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: pod-monitoring
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    prometheus.io/description: "PodMonitor for Tailscale pod-level metrics"
+spec:
+  # Pod selector
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+      - network
+  
+  # Pod endpoints
+  podMetricsEndpoints:
+    - port: metrics
+      scheme: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 15s
+      
+      # Pod-level metric relabeling
+      metricRelabelings:
+        # Keep Go runtime and process metrics
+        - sourceLabels: [__name__]
+          regex: '^(go_.*|process_.*|promhttp_.*|tailscale_.*)'
+          action: keep
+        
+        # Add pod-specific labels
+        - targetLabel: monitor_type
+          replacement: pod
+        - targetLabel: service
+          replacement: tailscale
+        - targetLabel: environment
+          replacement: production
+
+---
+# PrometheusRule for Tailscale Alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tailscale-alerts
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+    prometheus: kube-prometheus
+    role: alert-rules
+  annotations:
+    prometheus.io/description: "Alerting rules for Tailscale VPN mesh network"
+spec:
+  groups:
+    - name: tailscale.rules
+      interval: 30s
+      rules:
+        # Service availability alerts
+        - alert: TailscaleDown
+          expr: up{job="tailscale"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: tailscale
+            component: vpn-mesh
+          annotations:
+            summary: "Tailscale service is down"
+            description: "Tailscale VPN mesh service has been down for more than 1 minute. This affects network connectivity and routing."
+            runbook_url: "https://github.com/samuelbartels20/home-ops/wiki/runbooks/tailscale-down"
+        
+        - alert: TailscaleUnhealthy
+          expr: tailscale_health_status != 1
+          for: 2m
+          labels:
+            severity: warning
+            service: tailscale
+            component: vpn-mesh
+          annotations:
+            summary: "Tailscale health check failing"
+            description: "Tailscale health check has been failing for more than 2 minutes. Connection status: {{ $value }}"
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-unhealthy"
+        
+        # Connection and networking alerts
+        - alert: TailscaleConnectionLoss
+          expr: increase(tailscale_connection_failures_total[5m]) > 3
+          for: 1m
+          labels:
+            severity: warning
+            service: tailscale
+            component: connectivity
+          annotations:
+            summary: "Tailscale experiencing connection failures"
+            description: "Tailscale has had {{ $value }} connection failures in the last 5 minutes."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-connection-loss"
+        
+        - alert: TailscaleHighLatency
+          expr: tailscale_latency_seconds > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            service: tailscale
+            component: performance
+          annotations:
+            summary: "Tailscale experiencing high latency"
+            description: "Tailscale latency is {{ $value }}s, which is above the 500ms threshold."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-high-latency"
+        
+        # Resource usage alerts
+        - alert: TailscaleHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{container="app", pod=~"tailscale-.*"} /
+              container_spec_memory_limit_bytes{container="app", pod=~"tailscale-.*"}
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: tailscale
+            component: resources
+          annotations:
+            summary: "Tailscale high memory usage"
+            description: "Tailscale container memory usage is {{ $value }}% of the limit."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-high-memory"
+        
+        - alert: TailscaleHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{container="app", pod=~"tailscale-.*"}[5m]) /
+              container_spec_cpu_quota{container="app", pod=~"tailscale-.*"} * 
+              container_spec_cpu_period{container="app", pod=~"tailscale-.*"}
+            ) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            service: tailscale
+            component: resources
+          annotations:
+            summary: "Tailscale high CPU usage"
+            description: "Tailscale container CPU usage is {{ $value }}% of the limit."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-high-cpu"
+        
+        # Authentication and security alerts
+        - alert: TailscaleAuthenticationFailure
+          expr: increase(tailscale_auth_failures_total[10m]) > 0
+          for: 0s
+          labels:
+            severity: critical
+            service: tailscale
+            component: security
+          annotations:
+            summary: "Tailscale authentication failure detected"
+            description: "Tailscale has experienced {{ $value }} authentication failures in the last 10 minutes."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-auth-failure"
+        
+        - alert: TailscaleKeyExpiringSoon
+          expr: tailscale_key_expiry_seconds < 86400 * 7  # 7 days
+          for: 0s
+          labels:
+            severity: warning
+            service: tailscale
+            component: security
+          annotations:
+            summary: "Tailscale key expiring soon"
+            description: "Tailscale authentication key will expire in {{ $value | humanizeDuration }}."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-key-expiry"
+        
+        # Route and network configuration alerts
+        - alert: TailscaleRouteAdvertisementFailure
+          expr: tailscale_advertised_routes != 3  # Expecting 3 routes
+          for: 2m
+          labels:
+            severity: warning
+            service: tailscale
+            component: routing
+          annotations:
+            summary: "Tailscale route advertisement issue"
+            description: "Tailscale is advertising {{ $value }} routes instead of the expected 3 routes."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-route-advertisement"
+        
+        # Pod and container alerts
+        - alert: TailscalePodRestartLoop
+          expr: increase(kube_pod_container_status_restarts_total{container="app", pod=~"tailscale-.*"}[15m]) > 3
+          for: 0s
+          labels:
+            severity: warning
+            service: tailscale
+            component: stability
+          annotations:
+            summary: "Tailscale pod restarting frequently"
+            description: "Tailscale pod has restarted {{ $value }} times in the last 15 minutes."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-restart-loop"
+        
+        - alert: TailscalePodNotReady
+          expr: kube_pod_status_ready{condition="false", pod=~"tailscale-.*"} == 1
+          for: 2m
+          labels:
+            severity: warning
+            service: tailscale
+            component: availability
+          annotations:
+            summary: "Tailscale pod not ready"
+            description: "Tailscale pod has been not ready for more than 2 minutes."
+            runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-pod-not-ready"
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailscale-dashboard
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Network"
+data:
+  tailscale-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Tailscale VPN Mesh Network",
+        "tags": ["tailscale", "vpn", "network", "production"],
+        "style": "dark",
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Tailscale Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "up{job=\"tailscale\"}",
+                "legendFormat": "Service Status"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "green", "value": 1}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "title": "Connection Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "tailscale_health_status",
+                "legendFormat": "Health Status"
+              }
+            ]
+          },
+          {
+            "title": "Advertised Routes",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "tailscale_advertised_routes",
+                "legendFormat": "Routes"
+              }
+            ]
+          },
+          {
+            "title": "Network Latency",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "tailscale_latency_seconds",
+                "legendFormat": "Latency (s)"
+              }
+            ]
+          },
+          {
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_working_set_bytes{container=\"app\", pod=~\"tailscale-.*\"}",
+                "legendFormat": "Memory Usage"
+              }
+            ]
+          },
+          {
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{container=\"app\", pod=~\"tailscale-.*\"}[5m])",
+                "legendFormat": "CPU Usage"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    } 

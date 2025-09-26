@@ -2,7 +2,22 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+metadata:
+  name: tailscale
+  annotations:
+    config.kubernetes.io/local-config: "true"
 resources:
   - ./externalsecret.yaml
   - ./rbac.yaml
   - ./helmrelease.yaml
+  - ./pvc.yaml
+  - ./configmap.yaml
+  - ./networkpolicy.yaml
+  - ./monitoring.yaml
+  - ./poddisruptionbudget.yaml
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/name: tailscale
+      app.kubernetes.io/part-of: network-infrastructure
+      network.samcloud.online/tier: production

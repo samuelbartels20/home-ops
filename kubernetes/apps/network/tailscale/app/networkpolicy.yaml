@@ -1,0 +1,236 @@
+---
+# Ingress Network Policy for Tailscale
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-ingress
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: network
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    network-policy.kubernetes.io/type: "zero-trust"
+    security.tailscale.io/policy-version: "v1.0"
+    kubernetes.io/description: "Production-grade ingress policy for Tailscale VPN mesh"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow health checks and metrics scraping from observability namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9002  
+        - protocol: TCP
+          port: 9003  
+          
+    # Allow health checks from kube-system (kubelet)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 9002  
+          
+    # Allow Envoy Gateway to proxy web UI (if needed)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: network
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: envoy-internal
+      ports:
+        - protocol: TCP
+          port: 9002  
+          
+    # Allow Tailscale mesh traffic (if multiple instances)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tailscale
+      ports:
+        - protocol: UDP
+          port: 41641  
+        - protocol: TCP
+          port: 41641  
+
+---
+# Egress Network Policy for Tailscale
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-egress
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: network
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    network-policy.kubernetes.io/type: "zero-trust"
+    security.tailscale.io/policy-version: "v1.0"
+    kubernetes.io/description: "Production-grade egress policy for Tailscale VPN mesh"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+          
+    # Allow HTTPS to Tailscale control servers
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+          
+    # Allow Tailscale DERP servers (global)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 3478   
+        - protocol: UDP
+          port: 41641  
+        - protocol: TCP
+          port: 41641  
+        - protocol: UDP
+          port: 443    
+          
+    # Allow communication with Kubernetes API server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+          
+    # Allow communication with other pods in the same namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: network
+      ports:
+        - protocol: TCP
+          port: 1-65535
+        - protocol: UDP
+          port: 1-65535
+          
+    # Allow access to cluster services
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+          
+    # Allow access to local network ranges (for route advertising)
+    - to:
+        - ipBlock:
+            cidr: 192.168.8.0/24  
+        - ipBlock:
+            cidr: 10.42.0.0/16    
+        - ipBlock:
+            cidr: 10.43.0.0/16    
+      ports:
+        - protocol: TCP
+          port: 1-65535
+        - protocol: UDP
+          port: 1-65535
+
+---
+# Comprehensive Network Policy combining ingress and egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-comprehensive
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: network
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    network-policy.kubernetes.io/type: "comprehensive"
+    security.tailscale.io/policy-version: "v1.0"
+    kubernetes.io/description: "Comprehensive zero-trust policy for Tailscale"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Monitoring and health checks
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: network
+      ports:
+        - protocol: TCP
+          port: 9002
+        - protocol: TCP
+          port: 9003
+    
+    # Tailscale mesh communication
+    - from: []
+      ports:
+        - protocol: UDP
+          port: 41641
+        - protocol: TCP
+          port: 41641
+        
+  egress:
+    # Essential connectivity
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53      
+        - protocol: TCP
+          port: 53      
+        - protocol: TCP
+          port: 443     
+        - protocol: TCP
+          port: 80      
+        - protocol: UDP
+          port: 443     
+        - protocol: UDP
+          port: 3478    
+        - protocol: UDP
+          port: 41641   
+        - protocol: TCP
+          port: 41641   
+        - protocol: TCP
+          port: 6443    

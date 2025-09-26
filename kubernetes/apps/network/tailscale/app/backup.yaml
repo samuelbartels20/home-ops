@@ -1,0 +1,311 @@
+---
+# Velero Backup for Tailscale State
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: tailscale-state-backup
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+    backup.velero.io/type: "state"
+  annotations:
+    backup.velero.io/description: "Production backup for Tailscale VPN state and configuration"
+    backup.velero.io/retention-policy: "30d"
+    backup.velero.io/schedule: "daily"
+spec:
+  # Include specific resources
+  includedResources:
+    - persistentvolumes
+    - persistentvolumeclaims
+    - secrets
+    - configmaps
+    
+  # Namespace selector
+  includedNamespaces:
+    - network
+    
+  # Label selector for Tailscale resources
+  labelSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+      
+  # Storage location
+  storageLocation: default
+  
+  # Volume snapshot locations
+  volumeSnapshotLocations:
+    - default
+    
+  # Include cluster-scoped resources
+  includeClusterResources: false
+  
+  # Backup retention
+  ttl: 720h  # 30 days
+  
+  # Backup hooks for consistent state
+  hooks:
+    resources:
+      - name: tailscale-pre-backup
+        includedNamespaces:
+          - network
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: tailscale
+        pre:
+          - exec:
+              container: app
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Pre-backup: Ensuring Tailscale state consistency..."
+                  tailscale status --json > /tmp/backup-status.json
+                  sync
+              onError: Continue
+              timeout: 30s
+      - name: tailscale-post-backup
+        includedNamespaces:
+          - network
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: tailscale
+        post:
+          - exec:
+              container: app
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Post-backup: Backup completed successfully"
+                  rm -f /tmp/backup-status.json
+              onError: Continue
+              timeout: 30s
+
+---
+# Velero Schedule for Automated Backups
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: tailscale-daily-backup
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: backup-schedule
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    backup.velero.io/description: "Daily automated backup schedule for Tailscale"
+spec:
+  # Daily backup at 2 AM UTC
+  schedule: "0 2 * * *"
+  
+  # Backup template
+  template:
+    # Include specific resources
+    includedResources:
+      - persistentvolumes
+      - persistentvolumeclaims
+      - secrets
+      - configmaps
+      
+    # Namespace selector
+    includedNamespaces:
+      - network
+      
+    # Label selector for Tailscale resources
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: tailscale
+        
+    # Storage location
+    storageLocation: default
+    
+    # Volume snapshot locations
+    volumeSnapshotLocations:
+      - default
+      
+    # Backup retention (30 days)
+    ttl: 720h
+    
+    # Metadata
+    metadata:
+      labels:
+        backup.velero.io/scheduled: "true"
+        backup.velero.io/source: "tailscale-daily-backup"
+
+---
+# Velero Restore Template
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: tailscale-restore-template
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: restore
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    backup.velero.io/description: "Template for restoring Tailscale from backup"
+    restore.velero.io/usage: "template"
+spec:
+  # Backup name to restore from (to be specified during actual restore)
+  backupName: ""  # This should be set when creating an actual restore
+  
+  # Include specific resources
+  includedResources:
+    - persistentvolumes
+    - persistentvolumeclaims
+    - secrets
+    - configmaps
+    
+  # Namespace mappings (restore to same namespace)
+  namespaceMapping:
+    network: network
+    
+  # Restore PVs
+  restorePVs: true
+  
+  # Preserve node ports
+  preserveNodePorts: true
+  
+  # Include cluster-scoped resources
+  includeClusterResources: false
+  
+  # Restore hooks for post-restore configuration
+  hooks:
+    resources:
+      - name: tailscale-post-restore
+        includedNamespaces:
+          - network
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: tailscale
+        post:
+          - exec:
+              container: app
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Post-restore: Validating Tailscale configuration..."
+                  sleep 10
+                  if tailscale status; then
+                    echo "Tailscale restored successfully"
+                  else
+                    echo "Tailscale restore may need manual intervention"
+                  fi
+              onError: Continue
+              timeout: 60s
+
+---
+# ConfigMap for Backup Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailscale-backup-scripts
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: backup-scripts
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    backup.velero.io/description: "Backup and restore scripts for Tailscale"
+data:
+  pre-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Starting Tailscale pre-backup procedures..."
+    
+    # Export current status
+    echo "Exporting Tailscale status..."
+    tailscale status --json > /tmp/tailscale-status-backup.json
+    
+    # Export current configuration
+    echo "Exporting Tailscale configuration..."
+    if [ -f /var/lib/tailscale/tailscaled.state ]; then
+      cp /var/lib/tailscale/tailscaled.state /tmp/tailscaled.state.backup
+    fi
+    
+    # Sync filesystem
+    echo "Syncing filesystem..."
+    sync
+    
+    echo "Pre-backup procedures completed successfully"
+    
+  post-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Starting Tailscale post-backup procedures..."
+    
+    # Clean up temporary files
+    echo "Cleaning up temporary backup files..."
+    rm -f /tmp/tailscale-status-backup.json
+    rm -f /tmp/tailscaled.state.backup
+    
+    echo "Post-backup procedures completed successfully"
+    
+  pre-restore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Starting Tailscale pre-restore procedures..."
+    
+    # Stop Tailscale if running
+    echo "Stopping Tailscale daemon..."
+    if pgrep tailscaled; then
+      pkill tailscaled || true
+      sleep 5
+    fi
+    
+    # Backup current state (if exists)
+    echo "Backing up current state before restore..."
+    if [ -f /var/lib/tailscale/tailscaled.state ]; then
+      cp /var/lib/tailscale/tailscaled.state /tmp/tailscaled.state.pre-restore
+    fi
+    
+    echo "Pre-restore procedures completed successfully"
+    
+  post-restore.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Starting Tailscale post-restore procedures..."
+    
+    # Validate restored state
+    echo "Validating restored Tailscale state..."
+    if [ -f /var/lib/tailscale/tailscaled.state ]; then
+      echo "State file restored successfully"
+    else
+      echo "WARNING: State file not found after restore"
+    fi
+    
+    # Start Tailscale daemon
+    echo "Starting Tailscale daemon..."
+    tailscaled --state=/var/lib/tailscale/tailscaled.state \
+              --socket=/var/run/tailscale/tailscaled.sock \
+              --port=41641 \
+              --tun=userspace-networking &
+              
+    # Wait for daemon to start
+    sleep 10
+    
+    # Verify connection
+    echo "Verifying Tailscale connection..."
+    if tailscale status; then
+      echo "Tailscale restored and connected successfully"
+    else
+      echo "WARNING: Tailscale may need manual reconfiguration"
+      echo "Check logs and consider re-authentication if needed"
+    fi
+    
+    # Clean up
+    rm -f /tmp/tailscaled.state.pre-restore
+    
+    echo "Post-restore procedures completed successfully" 

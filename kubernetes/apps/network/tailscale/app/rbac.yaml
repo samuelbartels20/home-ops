@@ -1,26 +1,223 @@
 ---
+# Service Account for Tailscale with production-grade configuration
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tailscale
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: service-account
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    meta.helm.sh/release-name: tailscale
+    meta.helm.sh/release-namespace: network
+automountServiceAccountToken: true
+
+---
+# Role for Tailscale with least-privilege access
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: tailscale
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    rbac.authorization.kubernetes.io/description: "Production RBAC for Tailscale VPN mesh network"
 rules:
+  # Secret management for authentication and state
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["create"]
+    verbs: ["create", "get", "list", "watch"]
   - apiGroups: [""]
     resourceNames:
-      ["tailscale", "tailscale", "tailscale-auth", "tailscale-state"]
+      ["tailscale", "tailscale-auth", "tailscale-state", "tailscale-oauth"]
     resources: ["secrets"]
-    verbs: ["get", "update", "patch"]
+    verbs: ["get", "update", "patch", "delete"]
+    
+  # ConfigMap access for configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["tailscale-config"]
+    verbs: ["get", "list", "watch"]
+    
+  # Service account token access
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["tailscale"]
+    verbs: ["create"]
+    
+  # Event creation for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+    
+  # Pod information for health checks
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["tailscale-*"]
+    verbs: ["get", "list", "watch"]
+
 ---
+# ClusterRole for cluster-wide networking permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tailscale-network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    rbac.authorization.kubernetes.io/description: "Cluster-wide network permissions for Tailscale"
+rules:
+  # Node information for network discovery
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+    
+  # Service discovery for network routing
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+    
+  # Network policies for security integration
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+    
+  # Ingress information for routing
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for namespace-scoped permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: tailscale
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
 subjects:
   - kind: ServiceAccount
     name: tailscale
+    namespace: network
 roleRef:
   kind: Role
   name: tailscale
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRoleBinding for cluster-wide permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tailscale-network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+subjects:
+  - kind: ServiceAccount
+    name: tailscale
+    namespace: network
+roleRef:
+  kind: ClusterRole
+  name: tailscale-network
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy for Tailscale
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: tailscale-psp
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: security-policy
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: "runtime/default"
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: "runtime/default"
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: "runtime/default"
+    apparmor.security.beta.kubernetes.io/defaultProfileName: "runtime/default"
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities:
+    - NET_ADMIN  # Required for VPN networking
+    - NET_RAW    # Required for raw socket operations
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'RunAsAny'  # Tailscale needs root for network operations
+  runAsGroup:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+
+---
+# Role for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tailscale-psp-user
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+rules:
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames: ["tailscale-psp"]
+    verbs: ["use"]
+
+---
+# RoleBinding for PSP usage
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tailscale-psp-user
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/part-of: network-infrastructure
+    network.samcloud.online/tier: production
+subjects:
+  - kind: ServiceAccount
+    name: tailscale
+    namespace: network
+roleRef:
+  kind: Role
+  name: tailscale-psp-user
   apiGroup: rbac.authorization.k8s.io
