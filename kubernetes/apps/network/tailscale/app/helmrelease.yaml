@@ -6,9 +6,6 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: *app
-    app.kubernetes.io/component: vpn-mesh-network
-    app.kubernetes.io/part-of: network
-spec:
   interval: 1h
   timeout: 10m
   chartRef:
@@ -38,8 +35,6 @@ spec:
           reloader.stakater.com/auto: "true"
           configmap.reloader.stakater.com/reload: "tailscale-config"
           secret.reloader.stakater.com/reload: "tailscale"
-        serviceAccount:
-          identifier: tailscale
         containers:
           app:
             image:
@@ -186,6 +181,7 @@ spec:
               seccompProfile:
                 type: RuntimeDefault
     defaultPodOptions:
+      serviceAccountName: tailscale
       securityContext:
         fsGroup: 568
         fsGroupChangePolicy: OnRootMismatch
@@ -298,8 +294,3 @@ spec:
             backendRefs:
               - name: tailscale-app
                 port: *healthPort
-    serviceAccount:
-      tailscale:
-        enabled: true
-        create: true
-        forceRename: tailscale

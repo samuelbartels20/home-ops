@@ -1,5 +1,5 @@
 ---
-# Service Account for Tailscale with production-grade configuration
+# Service Account for Tailscale
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -7,12 +7,6 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: service-account
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    meta.helm.sh/release-name: tailscale
-    meta.helm.sh/release-namespace: network
 automountServiceAccountToken: true
 
 ---
@@ -24,11 +18,6 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    rbac.authorization.kubernetes.io/description: "Production RBAC for Tailscale VPN mesh network"
 rules:
   # Secret management for authentication and state
   - apiGroups: [""]
@@ -71,11 +60,6 @@ metadata:
   name: tailscale-network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    rbac.authorization.kubernetes.io/description: "Cluster-wide network permissions for Tailscale"
 rules:
   # Node information for network discovery
   - apiGroups: [""]
@@ -106,9 +90,6 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
 subjects:
   - kind: ServiceAccount
     name: tailscale
@@ -126,9 +107,6 @@ metadata:
   name: tailscale-network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
 subjects:
   - kind: ServiceAccount
     name: tailscale

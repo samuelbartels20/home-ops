@@ -60,7 +60,6 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: network
-      # Omit ports to allow all ports
 
     # Allow access to cluster services
     - to:
@@ -79,4 +78,3 @@ spec:
             cidr: 10.42.0.0/16    
         - ipBlock:
             cidr: 10.43.0.0/16    
-      # Omit ports to allow all ports
