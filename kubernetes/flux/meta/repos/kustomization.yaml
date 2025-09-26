@@ -14,4 +14,5 @@ resources:
   - ./node-problem-detector.yaml
   - ./vpa.yaml
   - ./kube-bench.yaml
+  - ./tailscale.yaml
   # - ./kube-prometheus-stack.yaml
