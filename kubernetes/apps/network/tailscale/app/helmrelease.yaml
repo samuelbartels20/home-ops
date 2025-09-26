@@ -7,13 +7,7 @@ metadata:
   labels:
     app.kubernetes.io/name: *app
     app.kubernetes.io/component: vpn-mesh-network
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    meta.helm.sh/release-name: *app
-    meta.helm.sh/release-namespace: network
-    fluxcd.io/automated: "false"
-    fluxcd.io/tag.chart-image: semver:~1.88
+    app.kubernetes.io/part-of: network
 spec:
   interval: 1h
   timeout: 10m
@@ -309,6 +303,3 @@ spec:
         enabled: true
         create: true
         forceRename: tailscale
-        annotations:
-          meta.helm.sh/release-name: *app
-          meta.helm.sh/release-namespace: network
