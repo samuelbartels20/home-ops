@@ -2,19 +2,14 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: tailscale-state
+  name: tailscale
   namespace: network
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: storage
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
   annotations:
     volume.beta.kubernetes.io/storage-class: "openebs-hostpath"
-    backup.velero.io/backup-volumes: "tailscale-state"
-    backup.samcloud.online/enabled: "true"
-    backup.samcloud.online/schedule: "daily"
-    backup.samcloud.online/retention: "30d"
+    backup.velero.io/backup-volumes: "tailscale"
 spec:
   accessModes:
     - ReadWriteOnce

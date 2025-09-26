@@ -6,15 +6,8 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: tailscale
-    app.kubernetes.io/component: availability
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    kubernetes.io/description: "Pod Disruption Budget for Tailscale VPN mesh network"
-    availability.samcloud.online/sla-tier: "high"
+    app.kubernetes.io/component: network
 spec:
-  # Allow at most 0 pods to be unavailable during voluntary disruptions
-  # This ensures the VPN connection remains active during maintenance
   maxUnavailable: 0
   
   selector:
