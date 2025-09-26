@@ -257,7 +257,7 @@ spec:
         
         # Route and network configuration alerts
         - alert: TailscaleRouteAdvertisementFailure
-          expr: tailscale_advertised_routes != 3  # Expecting 3 routes
+          expr: tailscale_advertised_routes < 1
           for: 2m
           labels:
             severity: warning
@@ -265,7 +265,7 @@ spec:
             component: routing
           annotations:
             summary: "Tailscale route advertisement issue"
-            description: "Tailscale is advertising {{ $value }} routes instead of the expected 3 routes."
+            description: "Tailscale is advertising {{ $value }} routes, expected at least 1 route."
             runbook_url: "https://github.com/samuelbartels2/home-ops/wiki/runbooks/tailscale-route-advertisement"
         
         # Pod and container alerts

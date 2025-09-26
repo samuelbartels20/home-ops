@@ -65,9 +65,6 @@ spec:
               TS_SOCKET: /var/run/tailscale/tailscaled.sock
               # Production networking configuration
               TS_EXTRA_ARGS: >-
-                --advertise-connector
-                --advertise-exit-node
-                --advertise-tags=tag:k8s,tag:home-ops,tag:production
                 --advertise-routes=192.168.8.0/24,10.42.0.0/16,10.43.0.0/16
                 --accept-routes
                 --accept-dns=false
@@ -114,9 +111,6 @@ spec:
                               --accept-routes \
                               --accept-dns=false \
                               --advertise-routes=192.168.8.0/24,10.42.0.0/16,10.43.0.0/16 \
-                              --advertise-tags=tag:k8s,tag:home-ops,tag:production \
-                              --advertise-connector \
-                              --advertise-exit-node \
                               --netfilter-mode=off \
                               --snat-subnet-routes=false
                 fi

@@ -17,8 +17,6 @@ data:
     # Network configuration
     accept-routes = true
     accept-dns = false
-    advertise-exit-node = true
-    advertise-connector = true
     
     # Security configuration
     netfilter-mode = off
@@ -36,9 +34,6 @@ data:
     # Routes to advertise to the tailnet
     advertise-routes = 192.168.8.0/24,10.42.0.0/16,10.43.0.0/16
     
-    # Tags for this node
-    advertise-tags = tag:k8s,tag:home-ops,tag:production
-    
     # Hostname for this node
     hostname = home-ops-k8s
     
@@ -47,12 +42,6 @@ data:
     
     # Accept routes from other nodes
     accept-routes = true
-    
-    # Exit node configuration
-    advertise-exit-node = true
-    
-    # Connector configuration
-    advertise-connector = true
     
   # Health check script
   health-check.sh: |
