@@ -8,13 +8,8 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: backup
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
+    app.kubernetes.io/part-of: network
     backup.velero.io/type: "state"
-  annotations:
-    backup.velero.io/description: "Production backup for Tailscale VPN state and configuration"
-    backup.velero.io/retention-policy: "30d"
-    backup.velero.io/schedule: "daily"
 spec:
   # Include specific resources
   includedResources:
@@ -94,10 +89,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: backup-schedule
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    backup.velero.io/description: "Daily automated backup schedule for Tailscale"
+    app.kubernetes.io/part-of: network
 spec:
   # Daily backup at 2 AM UTC
   schedule: "0 2 * * *"
@@ -146,11 +138,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: restore
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    backup.velero.io/description: "Template for restoring Tailscale from backup"
-    restore.velero.io/usage: "template"
+    app.kubernetes.io/part-of: network
 spec:
   # Backup name to restore from (to be specified during actual restore)
   backupName: ""  # This should be set when creating an actual restore
@@ -211,10 +199,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: backup-scripts
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    backup.velero.io/description: "Backup and restore scripts for Tailscale"
+    app.kubernetes.io/part-of: network
 data:
   pre-backup.sh: |
     #!/bin/bash
