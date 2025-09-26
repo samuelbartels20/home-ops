@@ -8,12 +8,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: monitoring
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
     monitoring: prometheus
-  annotations:
-    prometheus.io/description: "ServiceMonitor for Tailscale VPN mesh network metrics"
-    monitoring.samcloud.online/tier: "production"
 spec:
   jobLabel: app.kubernetes.io/name
   
@@ -87,10 +82,6 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: pod-monitoring
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
-  annotations:
-    prometheus.io/description: "PodMonitor for Tailscale pod-level metrics"
 spec:
   # Pod selector
   selector:
@@ -135,12 +126,8 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: alerting
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
     prometheus: kube-prometheus
     role: alert-rules
-  annotations:
-    prometheus.io/description: "Alerting rules for Tailscale VPN mesh network"
 spec:
   groups:
     - name: tailscale.rules
@@ -303,11 +290,7 @@ metadata:
   labels:
     app.kubernetes.io/name: tailscale
     app.kubernetes.io/component: observability
-    app.kubernetes.io/part-of: network-infrastructure
-    network.samcloud.online/tier: production
     grafana_dashboard: "1"
-  annotations:
-    grafana_folder: "Network"
 data:
   tailscale-dashboard.json: |
     {
