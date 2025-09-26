@@ -19,5 +19,4 @@ labels:
   - includeSelectors: true
     pairs:
       app.kubernetes.io/name: tailscale
-      app.kubernetes.io/part-of: network-infrastructure
-      network.samcloud.online/tier: production
+      app.kubernetes.io/part-of: network
