@@ -140,8 +140,7 @@ metadata:
     app.kubernetes.io/component: restore
     app.kubernetes.io/part-of: network
 spec:
-  # Backup name to restore from (to be specified during actual restore)
-  backupName: ""  # This should be set when creating an actual restore
+  backupName: "backup"  
   
   # Include specific resources
   includedResources:
@@ -150,7 +149,7 @@ spec:
     - secrets
     - configmaps
     
-  # Namespace mappings (restore to same namespace)
+  # Namespace mappings
   namespaceMapping:
     network: network
     
