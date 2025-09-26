@@ -6,7 +6,6 @@ metadata:
   namespace: network
   labels:
     app.kubernetes.io/name: *app
-  timeout: 10m
   chartRef:
     kind: OCIRepository
     name: app-template
