@@ -1,5 +1,12 @@
 # Changelog
 
+##  v2025.09.26.18
+
+Date-based release for 2025-09-26
+
+### Changes
+- chore(release): 2025.09.26.17 [skip ci]
+
 ##  v2025.09.26.17
 
 Date-based release for 2025-09-26
