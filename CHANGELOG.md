@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.09.26.22
+
+Date-based release for 2025-09-26
+
+### Changes
+- deployed adguard-home
+- chore(release): 2025.09.26.21 [skip ci]
+
 ##  v2025.09.26.21
 
 Date-based release for 2025-09-26
