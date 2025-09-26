@@ -145,7 +145,16 @@ type: kubernetes.io/tls
 data:
   tls.crt: op://K8s/samcloud-online-tls/tls.crt
   tls.key: op://K8s/samcloud-online-tls/tls.key
-
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: tailscale
+    namespace: network
+    labels:
+        reloader.stakater.com/auto: "true"
+stringData:
+     tailscale_auth_key: op://K8s/tailscale/tailscale_auth_key
 
 ---
 apiVersion: v1
