@@ -56,6 +56,16 @@ spec:
               # Core Tailscale configuration
               HOME: /tmp
               NO_AUTOUPDATE: true
+              OPERATOR_INITIAL_TAGS: "tag:k8s,tag:home-ops,tag:production,tag:tailscale-operator"
+              OPERATOR_HOSTNAME: "tailscale-operator"
+              OPERATOR_SECRET: "operator"
+              OPERATOR_LOGGING: "info"
+              OPERATOR_LOGIN_SERVER: "nudm.tailscale.com"
+              OPERATOR_INGRESS_CLASS_NAME: "tailscale"
+              CLIENT_ID_FILE: "/oauth/client_id"
+              CLIENT_SECRET_FILE: "/oauth/client_secret"
+              PROXY_TAGS: "tag:k8s"
+              PROXY_FIREWALL_MODE: "auto"
               TS_ENABLE_HEALTH_CHECK: true
               TS_ENABLE_METRICS: true
               TS_METRICS_LISTEN_ADDR: "0.0.0.0:9002"
