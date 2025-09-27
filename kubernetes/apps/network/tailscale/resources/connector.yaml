@@ -1,12 +1,16 @@
----
 apiVersion: tailscale.com/v1alpha1
 kind: Connector
 metadata:
-  name: ts-lbs
-  annotations:
-    tailscale.com/proxy-group: ingress-proxy
+  name: connector
 spec:
-  hostname: ts-lbs
+  tags:
+    - tag:k8s
+  hostname: connector
   subnetRouter:
     advertiseRoutes:
-      - "192.168.8.1/24"
+      - "192.168.8.1/24" # Local network
+      - "10.42.0.0/16"     # Pod CIDR
+      - "10.43.0.0/16"     # Service CIDR
+      - "192.168.8.136/24"    # LoadBalancer CIDR
+  exitNode: false
+

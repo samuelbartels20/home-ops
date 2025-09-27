@@ -6,3 +6,4 @@ resources:
   - ./connector.yaml
   - ./ollama-egress.yaml
   - ./proxygroup.yaml
+  - ./rbac.yaml
