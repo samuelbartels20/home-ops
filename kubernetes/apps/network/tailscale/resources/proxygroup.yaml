@@ -5,4 +5,4 @@ metadata:
   name: ingress-proxy
 spec:
   type: ingress
-  replicas: 2
+  replicas: 2 

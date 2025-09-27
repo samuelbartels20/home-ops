@@ -12,5 +12,4 @@ spec:
       - "10.42.0.0/16"     # Pod CIDR
       - "10.43.0.0/16"     # Service CIDR
       - "192.168.8.136/24"    # LoadBalancer CIDR
-  exitNode: false
-
+  exitNode: false 
