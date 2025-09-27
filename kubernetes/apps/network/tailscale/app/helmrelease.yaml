@@ -1,294 +1,40 @@
 ---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: tailscale-operator
+spec:
+  interval: 5m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 1.88.2
+  url: oci://ghcr.io/home-operations/charts-mirror/tailscale-operator
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: &app tailscale
-  namespace: network
-  labels:
-    app.kubernetes.io/name: *app
+  name: tailscale-operator
+spec:
+  interval: 1h
   chartRef:
     kind: OCIRepository
-    name: app-template
-    namespace: flux-system
+    name: tailscale-operator
   install:
-    crds: CreateReplace
     remediation:
       retries: -1
-    timeout: 10m
   upgrade:
     cleanupOnFail: true
     remediation:
-      strategy: rollback
       retries: 3
-    timeout: 10m
-  rollback:
-    timeout: 10m
-    cleanupOnFail: true
   values:
-    controllers:
-      tailscale:
-        replicas: 1
-        strategy: Recreate  
-        annotations:
-          reloader.stakater.com/auto: "true"
-          configmap.reloader.stakater.com/reload: "tailscale-config"
-          secret.reloader.stakater.com/reload: "tailscale"
-        containers:
-          app:
-            image:
-              repository: ghcr.io/tailscale/tailscale
-              tag: v1.88.2@sha256:9d66a1c8922e174cd346c2776c7c6f4450589543d988ae1bb9cefd8de58fd6c2
-              pullPolicy: IfNotPresent
-            env:
-              # Core Tailscale configuration
-              HOME: /tmp
-              NO_AUTOUPDATE: true
-              OPERATOR_INITIAL_TAGS: "tag:k8s,tag:home-ops,tag:production,tag:tailscale-operator"
-              OPERATOR_HOSTNAME: "tailscale-operator"
-              OPERATOR_SECRET: "operator"
-              OPERATOR_LOGGING: "info"
-              OPERATOR_LOGIN_SERVER: "nudm.tailscale.com"
-              OPERATOR_INGRESS_CLASS_NAME: "tailscale"
-              CLIENT_ID_FILE: "/oauth/client_id"
-              CLIENT_SECRET_FILE: "/oauth/client_secret"
-              PROXY_TAGS: "tag:k8s"
-              PROXY_FIREWALL_MODE: "auto"
-              TS_ENABLE_HEALTH_CHECK: true
-              TS_ENABLE_METRICS: true
-              TS_METRICS_LISTEN_ADDR: "0.0.0.0:9002"
-              TS_DEBUG_LISTEN_ADDR: "0.0.0.0:9003"
-              TS_STATE_DIR: /var/lib/tailscale
-              TS_USERSPACE: true
-              TS_SOCKET: /var/run/tailscale/tailscaled.sock
-              # Production networking configuration
-              TS_EXTRA_ARGS: >-
-                --advertise-routes=192.168.8.0/24,10.42.0.0/16,10.43.0.0/16
-                --accept-routes
-                --accept-dns=false
-                --netfilter-mode=off
-                --snat-subnet-routes=false
-              # Logging and debugging
-              TS_DEBUG: "false"
-              TS_LOG_LEVEL: "info"
-              # Security settings
-              TS_DISABLE_UPDATE_CHECK: "true"
-              TS_FORCE_LOGIN: "false"
-            envFrom:
-              - secretRef:
-                  name: tailscale
-            command:
-              - /bin/sh
-            args:
-              - -c
-              - |
-                set -e
-                echo "Starting Tailscale daemon..."
-                
-                # Ensure directories exist
-                mkdir -p /var/lib/tailscale /var/run/tailscale /tmp
-                
-                # Set proper permissions
-                chmod 700 /var/lib/tailscale /var/run/tailscale
-                
-                # Start tailscaled in background
-                tailscaled --state=/var/lib/tailscale/tailscaled.state \
-                          --socket=/var/run/tailscale/tailscaled.sock \
-                          --port=41641 \
-                          --tun=userspace-networking \
-                          --verbose=1 &
-                
-                # Wait for tailscaled to start
-                sleep 5
-                
-                # Authenticate if needed
-                if ! tailscale status --json | jq -r '.BackendState' | grep -q "Running"; then
-                  echo "Authenticating with Tailscale..."
-                  tailscale up --authkey="${ts_authkey}" \
-                              --hostname="home-ops-k8s" \
-                              --accept-routes \
-                              --accept-dns=false \
-                              --advertise-routes=192.168.8.0/24,10.42.0.0/16,10.43.0.0/16 \
-                              --netfilter-mode=off \
-                              --snat-subnet-routes=false
-                fi
-                
-                echo "Tailscale started successfully"
-                
-                # Keep container running and handle signals
-                trap 'echo "Shutting down..."; tailscale down; exit 0' TERM
-                while true; do
-                  sleep 30
-                  if ! tailscale status >/dev/null 2>&1; then
-                    echo "Tailscale daemon stopped unexpectedly"
-                    exit 1
-                  fi
-                done
-            probes:
-              startup:
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /healthz
-                    port: &healthPort 9002
-                  initialDelaySeconds: 10
-                  periodSeconds: 5
-                  timeoutSeconds: 3
-                  successThreshold: 1
-                  failureThreshold: 30
-              liveness: &probes
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /healthz
-                    port: *healthPort
-                  initialDelaySeconds: 30
-                  periodSeconds: 30
-                  timeoutSeconds: 10
-                  failureThreshold: 3
-                  successThreshold: 1
-              readiness:
-                enabled: true
-                custom: true
-                spec:
-                  httpGet:
-                    path: /healthz
-                    port: *healthPort
-                  initialDelaySeconds: 15
-                  periodSeconds: 10
-                  timeoutSeconds: 5
-                  failureThreshold: 3
-                  successThreshold: 1
-            resources:
-              requests:
-                cpu: 50m
-                memory: 128Mi
-              limits:
-                cpu: 500m
-                memory: 512Mi
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities: 
-                drop: ["ALL"]
-                add: ["NET_ADMIN", "NET_RAW"]  
-              runAsNonRoot: false  
-              runAsUser: 0
-              runAsGroup: 0
-              seccompProfile:
-                type: RuntimeDefault
-    defaultPodOptions:
-      serviceAccountName: tailscale
-      securityContext:
-        fsGroup: 568
-        fsGroupChangePolicy: OnRootMismatch
-        supplementalGroups: [568]
-      nodeSelector:
-        kubernetes.io/arch: amd64
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app.kubernetes.io/name
-                      operator: In
-                      values: ["tailscale"]
-                topologyKey: kubernetes.io/hostname
-      terminationGracePeriodSeconds: 60
-      dnsPolicy: ClusterFirst
-      dnsConfig:
-        options:
-          - name: ndots
-            value: "2"
-          - name: edns0
-    persistence:
-      state:
-        enabled: true
-        type: persistentVolumeClaim
-        existingClaim: tailscale-state
-        globalMounts:
-          - path: /var/lib/tailscale
-      socket:
-        enabled: true
-        type: emptyDir
-        medium: Memory
-        globalMounts:
-          - path: /var/run/tailscale
-      tmp:
-        enabled: true
-        type: emptyDir
-        medium: Memory
-        globalMounts:
-          - path: /tmp
-      config:
-        enabled: true
-        type: configMap
-        name: tailscale-config
-        globalMounts:
-          - path: /etc/tailscale
-            readOnly: true
-    service:
-      app:
-        controller: *app
-        type: ClusterIP
-        annotations:
-          prometheus.io/scrape: "true"
-          prometheus.io/port: "9002"
-          prometheus.io/path: "/metrics"
-        ports:
-          http:
-            port: *healthPort
-            protocol: HTTP
-            appProtocol: http
-          metrics:
-            port: 9002
-            protocol: HTTP
-            appProtocol: http
-          debug:
-            port: 9003
-            protocol: HTTP
-            appProtocol: http
-    serviceMonitor:
-      app:
-        enabled: true
-        serviceName: *app
-        endpoints:
-          - port: metrics
-            scheme: http
-            path: /metrics
-            interval: 30s
-            scrapeTimeout: 15s
-            metricRelabelings:
-              - sourceLabels: [__name__]
-                regex: '^tailscale_.*'
-                action: keep
-              - targetLabel: service
-                replacement: tailscale
-              - targetLabel: component
-                replacement: vpn-mesh
-              - targetLabel: environment
-                replacement: production
-    route:
-      app:
-        enabled: true
-        hostnames:
-          - &host tailscale.samcloud.online
-        parentRefs:
-          - name: envoy-external
-            namespace: network
-            sectionName: https
-        rules:
-          - matches:
-              - path:
-                  type: PathPrefix
-                  value: /
-            backendRefs:
-              - name: tailscale-app
-                port: *healthPort
+    operatorConfig:
+      image:
+        repository: ghcr.io/tailscale/k8s-operator
+        pullPolicy: IfNotPresent
+    proxyConfig:
+      image:
+        repository: ghcr.io/tailscale/tailscale
