@@ -1,0 +1,115 @@
+---
+# ServiceMonitor for Tailscale Operator Metrics Collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tailscale-operator
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+spec:
+  jobLabel: app.kubernetes.io/name
+
+  # Service selector
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+      - network
+
+  # Monitoring endpoints
+  endpoints:
+    # Operator metrics endpoint
+    - port: metrics
+      scheme: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 15s
+
+      # Metric relabeling for production
+      metricRelabelings:
+        # Keep Tailscale-specific metrics
+        - sourceLabels: [__name__]
+          regex: '^(tailscale_.*|controller_runtime_.*|workqueue_.*)'
+          action: keep
+
+        # Add service-level labels
+        - targetLabel: service
+          replacement: tailscale
+        - targetLabel: component
+          replacement: network
+
+        # Add cluster label
+        - targetLabel: cluster
+          replacement: home-ops-production
+
+        # Add tier label
+        - targetLabel: tier
+          replacement: production
+
+      # Relabel instance to be more descriptive
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+
+---
+# PodMonitor for Tailscale Proxy Pods
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: tailscale-proxies
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+spec:
+  # Select all Tailscale-managed pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+      - network
+
+  # Pod metrics endpoints
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 15s
+
+      metricRelabelings:
+        # Keep Tailscale proxy metrics
+        - sourceLabels: [__name__]
+          regex: '^(tailscale_.*|proxy_.*)'
+          action: keep
+
+        # Add labels
+        - targetLabel: service
+          replacement: tailscale-proxy
+        - targetLabel: component
+          replacement: network-proxy
+        - targetLabel: cluster
+          replacement: home-ops-production
+        - targetLabel: tier
+          replacement: production
+
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_tailscale_com_parent_resource_type]
+          targetLabel: parent_resource_type
+        - sourceLabels: [__meta_kubernetes_pod_label_tailscale_com_parent_resource]
+          targetLabel: parent_resource 

@@ -1,0 +1,32 @@
+---
+# Production PodDisruptionBudget for Tailscale Operator
+# Ensures high availability during cluster maintenance and updates
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tailscale-operator
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+spec:
+  # Ensure at least 1 pod remains available during disruptions
+  minAvailable: 1
+
+  # Target Tailscale operator pods
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+
+  # Unhealthy pod eviction policy
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+---
+# Priority Class for Tailscale Operator to ensure scheduling priority
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: tailscale-priority
+  labels:
+    app.kubernetes.io/name: tailscale
+value: 1000000
+globalDefault: false

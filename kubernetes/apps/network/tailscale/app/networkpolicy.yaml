@@ -1,0 +1,196 @@
+---
+# Zero-Trust Network Policy for Tailscale Operator - Production Grade
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-network-policy
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress Rules 
+  ingress:
+    # Allow metrics scraping from Prometheus
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080  # Metrics endpoint
+
+    # Allow webhook traffic from Kubernetes API server
+    - from:
+        - namespaceSelector: {}
+          podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9443  # Webhook server
+
+    # Allow health checks
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8081  # Health check endpoint
+
+  # Egress Rules - What Tailscale Operator can connect TO
+  egress:
+    # Allow DNS resolution (required)
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow Kubernetes API server access (required for operator)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443  
+        - protocol: TCP
+          port: 443  
+
+    # Allow Tailscale coordination server access (required)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443  
+        - protocol: TCP
+          port: 80    
+
+    # Allow DERP server access (Tailscale relay servers)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443   
+        - protocol: UDP
+          port: 3478  
+
+    # Allow direct peer-to-peer connections
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 41641  
+
+---
+# Network Policy for Tailscale Proxies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-proxies-network-policy
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from any namespace to proxy services
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8080
+
+    # Allow metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9001  
+
+    # Allow Tailscale mesh traffic
+    - from: []
+      ports:
+        - protocol: UDP
+          port: 41641
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow Tailscale coordination server access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+    # Allow DERP and STUN
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 3478
+
+    # Allow direct peer connections
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 41641
+
+    # Allow access to backend services
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 1-65535
+
+---
+# Network Policy for Connector
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tailscale-network-policy
+  namespace: network
+  labels:
+    app.kubernetes.io/name: tailscale
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tailscale
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow all traffic to connector (subnet router)
+    - from: []
+      ports:
+        - protocol: TCP
+        - protocol: UDP
+
+  egress:
+    # Allow all egress for subnet router functionality
+    - to: [] 
