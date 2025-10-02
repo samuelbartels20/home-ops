@@ -161,12 +161,11 @@ spec:
         - protocol: UDP
           port: 41641
 
-    # Allow access to backend services
+    # Allow access to backend services on all ports
     - to:
         - namespaceSelector: {}
       ports:
         - protocol: TCP
-          port: 1-65535
 
 ---
 # Network Policy for Connector
