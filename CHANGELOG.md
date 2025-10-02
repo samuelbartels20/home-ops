@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.10.02.12
+
+Date-based release for 2025-10-02
+
+### Changes
+- fix: resolve adguard-home connectivity issues
+- chore(release): 2025.10.02.11 [skip ci]
+
 ##  v2025.10.02.11
 
 Date-based release for 2025-10-02
