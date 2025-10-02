@@ -15,6 +15,8 @@ spec:
       namespace: security
     - name: openebs
       namespace: storage
+    - name: envoy-gateway
+      namespace: network
   path: ./kubernetes/apps/network/adguard-home/app
   prune: true
   sourceRef:
