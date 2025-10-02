@@ -11,4 +11,4 @@ resources:
   - ./pod-disruption-budget.yaml
   - ./servicemonitor.yaml
   - ./prometheusrules.yaml
-  - ./production-standards.yaml
+  - ./configmap.yaml
