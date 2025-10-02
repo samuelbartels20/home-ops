@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.10.02.15
+
+Date-based release for 2025-10-02
+
+### Changes
+- fix: simplify adguard-home network policy to allow envoy pods
+- chore(release): 2025.10.02.14 [skip ci]
+
 ##  v2025.10.02.14
 
 Date-based release for 2025-10-02
