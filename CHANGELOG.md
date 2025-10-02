@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.10.02.13
+
+Date-based release for 2025-10-02
+
+### Changes
+- fix: add backend connection timeouts to envoy gateway
+- chore(release): 2025.10.02.12 [skip ci]
+
 ##  v2025.10.02.12
 
 Date-based release for 2025-10-02
