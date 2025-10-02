@@ -114,6 +114,12 @@ spec:
   compression:
     - type: Brotli
     - type: Gzip
+  timeout:
+    http:
+      requestTimeout: 60s
+      connectionIdleTimeout: 300s
+    tcp:
+      connectTimeout: 30s
   targetSelectors:
     - group: gateway.networking.k8s.io
       kind: Gateway
