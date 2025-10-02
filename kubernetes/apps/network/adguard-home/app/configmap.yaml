@@ -17,7 +17,7 @@ data:
       session_ttl: 720h
     users:
       - name: ${adguard_username}
-      - password: ${adguard_password_hash}
+        password: ${adguard_password_hash}
     auth_attempts: 5
     block_auth_min: 15
     http_proxy: ""
