@@ -21,14 +21,11 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # Allow web UI access from envoy gateway
+    # Allow web UI access from envoy gateway (same namespace)
     - from:
-        - namespaceSelector:
+        - podSelector:
             matchLabels:
-              name: network
-          podSelector:
-            matchLabels:
-              gateway.networking.k8s.io/gateway-name: envoy-external
+              gateway.envoyproxy.io/owning-gateway-name: envoy-external
       ports:
         - protocol: TCP
           port: 3000
