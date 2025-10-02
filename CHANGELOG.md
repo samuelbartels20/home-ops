@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.10.02.14
+
+Date-based release for 2025-10-02
+
+### Changes
+- fix: correct YAML formatting in adguard-home users config
+- chore(release): 2025.10.02.13 [skip ci]
+
 ##  v2025.10.02.13
 
 Date-based release for 2025-10-02
