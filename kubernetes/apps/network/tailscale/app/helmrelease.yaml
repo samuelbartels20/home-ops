@@ -37,6 +37,7 @@ spec:
               TS_EXTRA_ARGS: "--accept-routes --advertise-exit-node=true --advertise-connector=true --advertise-tags=tag:k8s,tag:talos"
               TS_TAILSCALED_EXTRA_ARGS: "--debug=0.0.0.0:58169"
               TS_STATE_DIR: /tmp
+              TS_ROUTES: 192.168.8.0/24
             envFrom:
               - secretRef:
                   name: tailscale-secret
