@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2025.10.03.12
+
+Date-based release for 2025-10-03
+
+### Changes
+- deployed tailscale
+- chore(release): 2025.10.03.11 [skip ci]
+
 ##  v2025.10.03.11
 
 Date-based release for 2025-10-03
