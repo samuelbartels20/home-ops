@@ -125,6 +125,7 @@ patches:
   - "@./patches/global/machine-sysctls.yaml"
   - "@./patches/global/machine-time.yaml"
   - "@./patches/global/machine-openebs.yaml"
+  - "@./patches/global/machine-tailscale.yaml"
 
 # Controller patches
 controlPlane:

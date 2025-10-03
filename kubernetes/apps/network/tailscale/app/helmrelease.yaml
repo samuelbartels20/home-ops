@@ -34,7 +34,7 @@ spec:
               SA_NAME: tailscale
               TS_USERSPACE: true  # This means no kernel TUN device needed
               TS_KUBE_SECRET: ""
-              TS_EXTRA_ARGS: "--advertise-exit-node=true --advertise-connector=true --advertise-tags=tag:k8s"
+              TS_EXTRA_ARGS: "--accept-routes --advertise-exit-node=true --advertise-connector=true --advertise-tags=tag:k8s,tag:talos"
               TS_TAILSCALED_EXTRA_ARGS: "--debug=0.0.0.0:58169"
               TS_STATE_DIR: /tmp
             envFrom:

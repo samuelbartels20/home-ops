@@ -1,0 +1,15 @@
+machine:
+  install:
+    extensions:
+      - image: ghcr.io/siderolabs/tailscale:latest
+  files:
+    - content: |
+        TS_ROUTES=192.168.8.0/24
+        TS_EXTRA_ARGS=--accept-routes --advertise-tags=tag:talos
+        TS_STATE_DIR=/var/lib/tailscale
+      path: /var/etc/tailscale/auth.env
+      permissions: 0o600
+      op: create
+  sysctls:
+    net.ipv4.ip_forward: "1"
+    net.ipv6.conf.all.forwarding: "1"
