@@ -5,3 +5,4 @@ namespace: network
 resources:
   - ./connector.yaml
   - ./proxyclass.yaml
+  - ./ingressclass.yaml
