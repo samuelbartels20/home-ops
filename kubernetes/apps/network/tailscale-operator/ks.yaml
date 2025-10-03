@@ -10,7 +10,8 @@ spec:
     labels:
       app.kubernetes.io/name: *appname
   dependsOn:
-    - name: external-secrets-stores
+    - name: external-secrets
+      namespace: security
   path: ./kubernetes/apps/network/tailscale-operator/app
   prune: true
   sourceRef:
