@@ -46,7 +46,6 @@ spec:
                 memory: 128M
               limits:
                 memory: 256M
-                squat.ai/tun: "1"
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
