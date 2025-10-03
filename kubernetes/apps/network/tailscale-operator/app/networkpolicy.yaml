@@ -2,6 +2,7 @@ apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
   name: ingress-tailscale
+  namespace: network
 spec:
   endpointSelector:
     matchLabels:
