@@ -11,6 +11,7 @@ spec:
       app.kubernetes.io/name: *appname
   dependsOn:
     - name: external-secrets
+      namespace: security
   path: ./kubernetes/apps/network/tailscale/app
   prune: true
   sourceRef:
