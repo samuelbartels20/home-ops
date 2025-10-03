@@ -32,7 +32,7 @@ spec:
               TZ: ${TIMEZONE}
               PORT: &port 41641 
               SA_NAME: tailscale
-              TS_USERSPACE: true
+              TS_USERSPACE: true  # This means no kernel TUN device needed
               TS_KUBE_SECRET: ""
               TS_EXTRA_ARGS: "--advertise-exit-node=true --advertise-connector=true --advertise-tags=tag:k8s"
               TS_TAILSCALED_EXTRA_ARGS: "--debug=0.0.0.0:58169"
@@ -46,6 +46,7 @@ spec:
                 memory: 128M
               limits:
                 memory: 256M
+                # NO squat.ai/tun here - userspace mode doesn't need it
             securityContext:
               allowPrivilegeEscalation: false
               readOnlyRootFilesystem: true
