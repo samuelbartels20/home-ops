@@ -29,7 +29,7 @@ spec:
               repository: ghcr.io/tailscale/tailscale
               tag: v1.88.3
             env:
-              TZ: ${TIMEZONE}
+              TZ: UTC
               PORT: &port 41641 
               SA_NAME: tailscale
               TS_USERSPACE: true  # This means no kernel TUN device needed
