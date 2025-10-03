@@ -1,14 +1,8 @@
 ---
-# yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: network
+namespace: networking
 resources:
-  - ./helmrelease.yaml
+  - ./rbac.yaml
   - ./externalsecret.yaml
-  - ./ocirepository.yaml
-  - ./networkpolicy.yaml
-  - ./pod-disruption-budget.yaml
-  - ./servicemonitor.yaml
-  - ./prometheusrules.yaml
-  - ./configmap.yaml
+  - ./helmrelease.yaml
