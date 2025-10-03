@@ -30,7 +30,7 @@ spec:
         - "tag:k8s"
         - "tag:k8s-operator"
     apiServerProxyConfig:
-      mode: "true"
+      mode: "false"
     proxyConfig:
       image:
         repository: ghcr.io/tailscale/tailscale
