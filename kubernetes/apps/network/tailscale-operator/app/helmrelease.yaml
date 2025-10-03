@@ -15,6 +15,7 @@ spec:
         kind: HelmRepository
         name: tailscale
         namespace: flux-system
+  installCRDs: true
   values:
     operatorConfig:
       hostname: "tailscale-operator"
