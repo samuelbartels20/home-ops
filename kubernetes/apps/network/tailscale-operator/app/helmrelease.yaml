@@ -26,9 +26,6 @@ spec:
         policy.gabe565.com/egress-kubeapi: "true"
         policy.gabe565.com/egress-nodes: "true"
         policy.gabe565.com/egress-world: "true"
-      image:
-        repository: ghcr.io/tailscale/k8s-operator
-        tag: v0.1.0
       defaultTags:
         - "tag:k8s"
         - "tag:k8s-operator"
