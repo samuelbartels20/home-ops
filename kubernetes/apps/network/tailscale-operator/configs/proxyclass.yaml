@@ -6,9 +6,9 @@ spec:
   statefulSet:
     pod:
       tailscaleContainer:
-        resources:
-          limits:
-            kernel.org/tun: "1"
+        # resources:
+        #   limits:
+        #     kernel.org/tun: "1"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
