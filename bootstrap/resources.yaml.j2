@@ -149,14 +149,14 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-    name: tailscale-operator-secret
+    name: tailscale-operator-secret  
     namespace: network
     labels:
         reloader.stakater.com/auto: "true"
 stringData:
-     client_id: op://K8s/tailscale/client_id
-     client_secret: op://K8s/tailscale/client_secret
-     ts_authkey: op://K8s/tailscale/ts_authkey
+     client_id: op://K8s/tailscale/TS_CLIENT_ID 
+     client_secret: op://K8s/tailscale/TS_CLIENT_SECRET
+     ts_authkey: op://K8s/tailscale/TS_AUTHKEY
 
 
 ---
