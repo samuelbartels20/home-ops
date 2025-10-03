@@ -87,6 +87,9 @@ spec:
             protocol: UDP
     serviceAccount:
       name: tailscale
+    podDisruptionBudget:
+      app:
+        minAvailable: 1
     serviceMonitor:
       app:
         serviceName: tailscale
