@@ -3,19 +3,20 @@ apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
   name: &appname tailscale
-  namespace: flux-system
+  namespace: &namespace network
 spec:
-  targetNamespace: networking
+  targetNamespace: *namespace
   commonMetadata:
     labels:
       app.kubernetes.io/name: *appname
   dependsOn:
-    - name: external-secrets-stores
-  path: ./kubernetes/apps/networking/tailscale/app
+    - name: external-secrets
+  path: ./kubernetes/apps/network/tailscale/app
   prune: true
   sourceRef:
     kind: GitRepository
-    name: k8s-gitops
+    name: flux-system
+    namespace: flux-system
   wait: true
   interval: 30m
   retryInterval: 1m

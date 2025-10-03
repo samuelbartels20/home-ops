@@ -30,7 +30,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: tailscale
-    namespace: networking
+    namespace: network
 roleRef:
   kind: Role
   name: tailscale

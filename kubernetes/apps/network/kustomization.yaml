@@ -13,3 +13,4 @@ resources:
   - ./envoy-gateway/ks.yaml
   - ./adguard-home/ks.yaml
   - ./tailscale-operator/ks.yaml
+  - ./tailscale/ks.yaml
