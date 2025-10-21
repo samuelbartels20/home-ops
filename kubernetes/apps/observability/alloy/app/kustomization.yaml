@@ -63,7 +63,7 @@ images:
   - name: grafana/alloy
     newTag: v1.4.0
   - name: registry.k8s.io/kubectl
-    newTag: v1.28.0
+    newTag: v1.34.1
   - name: alpine
     newTag: "3.22"
 
