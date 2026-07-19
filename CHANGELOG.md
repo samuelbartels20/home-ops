@@ -1,5 +1,13 @@
 # Changelog
 
+##  v2026.07.19
+
+Date-based release for 2026-07-19
+
+### Changes
+- deleted an unused file
+- chore(release): 2025.10.06 [skip ci]
+
 ##  v2025.10.06
 
 Date-based release for 2025-10-06
